@@ -1,0 +1,3861 @@
+swagger: '2.0'
+info:
+  version: '1.0-SNAPSHOT'
+  title: TC Service Identity
+  license:
+    name: MIT
+    url: http://github.com/gruntjs/grunt/blob/master/LICENSE-MIT
+host: api.topcoder.com
+basePath: /v3
+schemes:
+- http
+- https
+securityDefinitions:
+  bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+paths:
+  /groups/{groupId}/singleMember/{memberId}:
+    get:
+      description: Get membership by group id and member id
+      tags:
+      - groups
+      operationId: GroupResource.getSingleMember
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to retrieve its member
+      - name: memberId
+        in: path
+        required: true
+        type: string
+        description: the id of member
+      responses:
+        200:
+          description: OK. Response will contain a single membership.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/GroupMembershipResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If group or member is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups/{groupId}/members/{membershipId}:
+    delete:
+      description: Remove a member from specified group
+      tags:
+      - groups
+      operationId: GroupResource.removeMember
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to update
+      - name: membershipId
+        in: path
+        required: true
+        type: string
+        description: the id of the membership to delete
+      responses:
+        200:
+          description: OK. Response will contain the removed member.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/GroupMembershipResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role and the group doesn't allow self registration
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If group or member is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups/{groupId}/membersCount:
+    get:
+      description: Get members count by group id
+      tags:
+      - groups
+      operationId: GroupResource.getMembersCount
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to retrieve its members count
+      - name: includeSubGroups
+        in: query
+        required: false
+        type: boolean
+        description: a flag to indicate whether to get the count of members in the root group or including all subgroups recursively
+      responses:
+        200:
+          description: OK. Response will contain count of members.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: string
+                    format: integer
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If group or member is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups/{groupId}/members:
+    get:
+      description: Get members by group id
+      tags:
+      - groups
+      operationId: GroupResource.getMembers
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to retrieve its members
+      responses:
+        200:
+          description: OK. Response will contain list of members.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/GroupMembershipResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If the group is private and the user is not a member of the group and or an admin.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If group or member is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    post:
+      description: Add a member to the specified group
+      tags:
+      - groups
+      operationId: GroupResource.addMember
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to add the member into
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewGroupMembershipBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain newly added member.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/GroupMembershipResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role and the group doesn't allow self registration.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups/{groupId}:
+    get:
+      description: Fetch a particular group
+      tags:
+      - groups
+      operationId: GroupResource.getObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to fetch
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of group that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + name
+          + description
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/GroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If the group is private and the user is not a member of the group and or an admin.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    delete:
+      description: Delete a group
+      tags:
+      - groups
+      operationId: GroupResource.deleteObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to delete
+      responses:
+        200:
+          description: OK. Response will contains deleted group.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/GroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    put:
+      description: Update group
+      tags:
+      - groups
+      operationId: GroupResource.updateObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        type: string
+        description: the id of group to update
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewGroupBodyParam'
+      responses:
+        200:
+          description: OK. Response will contains updated group.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/GroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups/{groupId}/getSubGroups:
+    get:
+      description: Fetch a particular group
+      tags:
+        - groups
+      operationId: GroupResource.getGroup
+      security:
+        - bearer: []
+      produces:
+        - application/json
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          type: string
+          description: the id of group to fetch
+        - name: fields
+          in: query
+          required: false
+          type: string
+          description: |
+            fields=fieldName1,fieldName2,...,fieldN  - parameter for
+            choosing which fields of group that will be included in response.
+
+            + id
+            + createdAt
+            + createdBy
+            + updatedAt
+            + updatedBy
+            + name
+            + description
+            + subGroups
+        - name: includeSubGroups
+          in: query
+          required: false
+          type: boolean
+          description: a flag to indicate whether or not include the sub groups, default to false
+        - name: oneLevel
+          in: query
+          required: false
+          type: boolean
+          description: a flag to indicate whether or not get one level of sub groups or all the sub groups recursively, default to false
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: '#/definitions/GroupResponse'
+        400:
+          description: Invalid input.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+  /groups/{groupId}/getParentGroup:
+    get:
+      description: Fetch a particular group
+      tags:
+        - groups
+      operationId: GroupResource.getParentGroup
+      security:
+        - bearer: []
+      produces:
+        - application/json
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          type: string
+          description: the id of group to fetch
+        - name: fields
+          in: query
+          required: false
+          type: string
+          description: |
+            fields=fieldName1,fieldName2,...,fieldN  - parameter for
+            choosing which fields of group that will be included in response.
+
+            + id
+            + createdAt
+            + createdBy
+            + updatedAt
+            + updatedBy
+            + name
+            + description
+            + subGroups
+            + parentGroups
+        - name: oneLevel
+          in: query
+          required: false
+          type: boolean
+          default: true
+          description: >-
+            a flag to indicate whether or not get one level of parent groups or all the parent groups recursively, default to true
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: '#/definitions/GroupResponse'
+        400:
+          description: Invalid input.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+  /groups/securityGroups:
+    post:
+      description: Creation of new security group
+      tags:
+      - groups
+      operationId: GroupResource.createSecurityGroup
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/SecurityGroupBodyParam'
+      responses:
+        200:
+          description: OK. Response will contains newly created group.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/SecurityGroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /groups:
+    get:
+      description: Fetch groups by user or group. Omit the query parameters to fetch all groups.
+      tags:
+      - groups
+      operationId: GroupResource.getObjects
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: memberId
+        in: query
+        required: false
+        type: string
+        description: id of membership
+      - name: membershipType
+        in: query
+        required: false
+        type: string
+        description: membership type. Use 'group' if memberId is an id of a group, otherwise 'user'
+      responses:
+        200:
+          description: OK. Response will contain array of groups.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/GroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the group does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    post:
+      description: Creation of new group
+      tags:
+      - groups
+      operationId: GroupResource.createObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewGroupBodyParam'
+      responses:
+        200:
+          description: OK. Response will contains newly created group.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/GroupResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/validateEmail:
+    get:
+      description: Validate email address for user
+      tags:
+      - users
+      operationId: UserResource.validateEmail
+      produces:
+      - application/json
+      parameters:
+      - name: email
+        in: query
+        required: true
+        type: string
+        description: The email address to validate
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/ValidationResult"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/validateHandle:
+    get:
+      description: Validate handle for user
+      tags:
+      - users
+      operationId: UserResource.validateHandle
+      produces:
+      - application/json
+      parameters:
+      - name: handle
+        in: query
+        required: true
+        type: string
+        description: The user handle to validate
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/ValidationResult"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/validateSocial:
+    get:
+      description: Validate social account for user
+      tags:
+      - users
+      operationId: UserResource.validateSocial
+      produces:
+      - application/json
+      parameters:
+      - name: socialUserId
+        in: query
+        required: true
+        type: string
+        description: user id of social account
+      - name: socialProvider
+        in: query
+        required: true
+        type: string
+        description: the provider of social account
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/ValidationResult"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/resetToken:
+    get:
+      description: Generate new reset token for user
+      tags:
+      - users
+      operationId: UserResource.getResetToken
+      produces:
+      - application/json
+      parameters:
+      - name: handle
+        in: query
+        required: true
+        type: string
+        description: user handle
+      - name: email
+        in: query
+        required: true
+        type: string
+        description: user email
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user has SSO profile as SSO users can't reset their password.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/email:
+    patch:
+      description: Update primary email of user
+      tags:
+      - users
+      operationId: UserResource.updatePrimaryEmail
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: id of user to update his/her primary email
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user to update does not exist, or if user to update does not have current email.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/achievements:
+    get:
+      description: Get achievements of a user
+      tags:
+      - users
+      operationId: UserResource.getAchievements
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: id of user to get her/his achievements
+      - name: filter
+        in: query
+        required: false
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + typeId
+          + type
+          + description
+          + achievementDate
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of an achievement that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + typeId
+          + type
+          + description
+          + achievementDate
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        createdAt:
+                          type: string
+                          format: date-time
+                        createdBy:
+                          type: string
+                          format: integer
+                        updatedAt:
+                          type: string
+                          format: date-time
+                        updatedBy:
+                          type: string
+                        typeId:
+                          type: integer
+                        type:
+                          type: string
+                        description:
+                          type: string
+                        achievementDate:
+                          type: string
+                          format: date-time
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/status:
+    patch:
+      description: Update user status
+      tags:
+      - users
+      operationId: UserResource.updateStatus
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - name: comment
+        in: query
+        required: false
+        type: string
+        description: status comment
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain user with updated status.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/handle:
+    patch:
+      description: Update user handle
+      tags:
+      - users
+      operationId: UserResource.updateHandle
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain user with updated handle.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/profiles/{provider}:
+    delete:
+      description: Delete user social profile
+      tags:
+      - users
+      operationId: UserResource.deleteUserProfile
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - name: provider
+        in: path
+        required: true
+        type: string
+        description: social provider name
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/UserProfile"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If social profile does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        501:
+          description: If social provider is not supported.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{userId}/ssoUserLogins:
+    get:
+      description: get sso user profiles
+      tags:
+      - users
+      operationId: UserResource.getSSOUserLoginsByUserId
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        type: number
+        format: int64
+        description: user id
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/UserProfile"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{userId}/ssoUserLogin:
+    post:
+      description: create sso user profile
+      tags:
+      - users
+      operationId: UserResource.createSSOUserLogin
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        type: number
+        format: int64
+        description: user id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/UserProfile'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserProfile"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    put:
+      description: update sso user profile
+      tags:
+      - users
+      operationId: UserResource.updateSSOUserLogin
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        type: number
+        format: int64
+        description: user id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/UserProfile'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserProfile"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    delete:
+      description: delete sso user profile, one of the provider and providerId should be provided
+      tags:
+      - users
+      operationId: UserResource.deleteSSOUserLogin
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        type: number
+        format: int64
+        description: user id
+      - in: query
+        name: providerId
+        required: false
+        type: number
+      - in: query
+        name: provider
+        required: false
+        type: string
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/NormalResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}/profiles:
+    post:
+      description: Create user social profile
+      tags:
+      - users
+      operationId: UserResource.createUserProfile
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/UserProfile'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserProfile"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/{resourceId}:
+    get:
+      description: Get user by id
+      tags:
+      - users
+      operationId: UserResource.getObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of user that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + handle
+          + email
+          + firstName
+          + lastName
+          + regSource
+          + utmSource
+          + utmMedium
+          + utmCampaign
+          + ssoLogin
+          + profiles
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    delete:
+      description: |
+        Delete user by id.
+
+        It is not yet implemented (501).
+      tags:
+      - users
+      operationId: UserResource.deleteObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      responses:
+        501:
+          description: Not yet implemented
+    patch:
+      description: Update user by id
+      tags:
+      - users
+      operationId: UserResource.updateObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        type: string
+        description: user id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain updated user.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/activate:
+    put:
+      description: Activate a user
+      summary: UsersActivate
+      tags:
+      - users
+      operationId: UserResource.activateUser
+      produces:
+      - application/json
+      parameters:
+      - name: code
+        in: query
+        required: true
+        type: string
+        description: user activation code
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/login:
+    post:
+      description: >
+        API to authenticate users with email and password.
+         This is supposed to be called from Auth0 custom connection.
+      tags:
+      - users
+      operationId: UserResource.login
+      consumes:
+      - application/x-www-form-urlencoded
+      produces:
+      - application/json
+      parameters:
+      - name: password
+        in: formData
+        required: true
+        type: string
+        description: user password
+      - name: handleOrEmail
+        in: formData
+        required: true
+        type: string
+        description: user handle or email
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If credential is incorrect.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users/resetPassword:
+    put:
+      description: Reset user password
+      tags:
+      - users
+      operationId: UserResource.resetPassword
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If user is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /users:
+    get:
+      description: Fetch list of users
+      tags:
+      - users
+      operationId: UserResource.getObjects
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters: []
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user to perform this operation does not had admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    post:
+      description: Create a user
+      tags:
+      - users
+      operationId: UserResource.createObject
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewUserBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain newly created user.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/UserResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /policies/{id}:
+    get:
+      description: Load policy by id
+      tags:
+      - policies
+      operationId: PoliciesResource.loadPolicy
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+        description: policy id
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/PermissionsPolicyResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If policy does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    put:
+      description: Update policy
+      tags:
+      - policies
+      operationId: PoliciesResource.updatePolicy
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+        description: The id of policy to update
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewPermissionsPolicyBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain updated policy.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/PermissionsPolicyResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authorized (does not have admin role).
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /policies:
+    get:
+      description: Fetch list of policies
+      tags:
+      - policies
+      operationId: PoliciesResource.queryPolicies
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: resource
+        in: query
+        required: false
+        type: string
+        description: policy resource
+      - name: userId
+        in: query
+        required: false
+        type: string
+        description: user id
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/PermissionsPolicyResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If not authorized.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    post:
+      description: Create a policy
+      tags:
+      - policies
+      operationId: PoliciesResource.createPolicy
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewPermissionsPolicyBodyParam'
+      responses:
+        201:
+          description: OK. Response will contain newly created policy.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: string
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /authorizations/validateClient:
+    get:
+      description: Validate a client
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.validateClient
+      produces:
+      - application/json
+      parameters:
+      - name: clientId
+        in: query
+        required: true
+        type: string
+        description: client id
+      - name: redirectUrl
+        in: query
+        required: true
+        type: string
+        description: client redirect url
+      - name: scope
+        in: query
+        required: false
+        type: string
+        description: scope
+      responses:
+        200:
+          description: Represents a successful deletion, the response content will just be string "Valid client"
+          schema:
+            $ref: "#/definitions/NormalResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or if client does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /authorizations/{targetId}:
+    get:
+      description: Get an authorization by target id.
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.getObject
+      produces:
+      - application/json
+      parameters:
+      - name: targetId
+        in: path
+        required: true
+        type: string
+        description: target id
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of authorization that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + handle
+          + email
+          + firstName
+          + lastName
+          + regSource
+          + utmSource
+          + utmMedium
+          + utmCampaign
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/AuthorizationResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    put:
+      description: |
+        Get an authorization by target id.
+        It is not yet implemented (501).
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.updateObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: targetId
+        in: path
+        required: true
+        type: string
+        description: target id
+      responses:
+        501:
+          description: Not yet implemented
+          schema:
+            type: object
+    delete:
+      description: Delete an authorization by target id
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.deleteObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: targetId
+        in: path
+        required: true
+        type: string
+        description: target id
+      responses:
+        200:
+          description: Represents a successful deletion, the response content will just be null
+          schema:
+            $ref: "#/definitions/NormalResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /authorizations:
+    get:
+      description: >-
+        Get the access token and id token by the authorization code and redirect
+        url
+      tags:
+        - authorizations
+      operationId: AuthorizationResource.getTokenByAuthorizationCode
+      produces:
+        - application/json
+      parameters:
+        - in: query
+          name: code
+          required: true
+          type: string
+          description: the authoriztion code to get the token
+        - in: query
+          name: redirectUrl
+          required: true
+          type: string
+          description: the redirect url to get the token
+        - in: query
+          name: state
+          required: true
+          type: string
+          description: the state code to get the token
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: '#/definitions/Auth0Credential'
+        '400':
+          description: Invalid input.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '401':
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '403':
+          description: If account is inactive.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '404':
+          description: If data is not found.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+    post:
+      description: Create an authorization, or refresh a token that might be expired
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.createObject
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewAuthorizationBodyParam'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/AuthorizationResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If account is inactive.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If account is not found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    delete:
+      description: Delete authorization with target id of "1"
+      tags:
+      - authorizations
+      operationId: AuthorizationResource.deleteobject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters: []
+      responses:
+        200:
+          description: Represents a successful deletion, the response content will just be null
+          schema:
+            $ref: "#/definitions/NormalResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /authorizations/login:
+    get:
+      description: >-
+        Get the redirect url.
+      tags:
+        - authorizations
+      operationId: AuthorizationResource.redirect
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref:  "#/definitions/NormalResponse"
+        '400':
+          description: Invalid input.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '401':
+          description: If not authorized to perform this operation.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '403':
+          description: If account is inactive.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '404':
+          description: If data is not found.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ErrorModel'
+  /roles/{roleId}:
+    get:
+      description: Fetch a particular role information
+      tags:
+      - roles
+      operationId: RoleResource.getObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjects
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/RoleResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If role does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    put:
+      description: Update a particular role
+      tags:
+      - roles
+      operationId: RoleResource.updateObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewRoleBodyParam'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/RoleResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If role does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    delete:
+      description: Delete a role
+      tags:
+      - roles
+      operationId: RoleResource.deleteObject
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      responses:
+        200:
+          description: OK. Response will contain id of deleted role.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If role does not exist.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /roles/{roleId}/assign:
+    post:
+      description: Assign a role to a user
+      tags:
+      - roles
+      operationId: RoleResource.assignRole
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      - name: filter
+        in: query
+        required: false
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjectID
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjects
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK. Response will contain id of assigned role.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /roles/{roleId}/hasrole:
+    get:
+      description: |
+        Check whether a subject has role
+        It returns with a role if user has a role specified by id
+      tags:
+      - roles
+      operationId: RoleResource.hasRole
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      - name: filter
+        in: query
+        required: false
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjectID
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjects
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/RoleResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If the role can not be found
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /roles/{roleId}/deassign:
+    delete:
+      description: Remove a role from user
+      tags:
+      - roles
+      operationId: RoleResource.deassignRole
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        type: string
+        description: role id
+      - name: filter
+        in: query
+        required: false
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjectID
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjects
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK. Response will contain id of deassigned role.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /roles:
+    get:
+      description: Fetch all roles in the system
+      tags:
+      - roles
+      operationId: RoleResource.getObjects
+      security:
+        - bearer: []
+      produces:
+      - application/json
+      parameters:
+      - name: filter
+        in: query
+        required: false
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjectID
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + roleName
+          + subjects
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/RoleResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        404:
+          description: If none is found.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+    post:
+      description: Creation of new role
+      tags:
+      - roles
+      operationId: RoleResource.createObject
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/NewRoleBodyParam'
+      responses:
+        200:
+          description: OK. Response will contain newly created role.
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/RoleResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated or does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        403:
+          description: If user does not have admin role.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /identityproviders:
+    get:
+      description: Return Identity Provider of a user
+      tags:
+      - identityproviders
+      operationId: IdentityProvider.fetchProviderInfo
+      produces:
+      - application/json
+      parameters:
+      - name: filter
+        in: query
+        required: true
+        type: string
+        description: |
+          fieldName=fieldValue (enum[string],optional)  - parameter for
+          filtering the fields according to v3 spec
+
+          Either email or handle must be specifed.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + email
+          + handle
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + id
+          + createdAt
+          + createdBy
+          + updatedAt
+          + updatedBy
+          + name
+          + type
+      - $ref: "#/parameters/offsetParam"
+      - $ref: "#/parameters/limitParam"
+      - $ref: "#/parameters/orderByParam"
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    $ref: "#/definitions/IdentityProviderResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+  /ssoLoginProviders:
+    get:
+      description: Return all sso login providers
+      tags:
+      - ssoLoginProviders
+      operationId: SSOLoginProviderResource.getAllProviders
+      produces:
+      - application/json
+      parameters:
+      - name: fields
+        in: query
+        required: false
+        type: string
+        description: |
+          fields=fieldName1,fieldName2,...,fieldN  - parameter for
+          choosing which fields of role that will be included in response.
+
+          + ssoLoginProviderId
+          + name
+          + type
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              version:
+                type: string
+              result:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: integer
+                  metadata:
+                    type: object
+                  content:
+                    type: array
+                    items:
+                      $ref: "#/definitions/SSOLoginProviderResponse"
+        400:
+          description: Invalid input.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        401:
+          description: If user not authenticated.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/ErrorModel"
+definitions:
+  ValidationResult:
+    type: object
+    properties:
+      valid:
+        type: boolean
+      reason:
+        type: string
+      reasonCode:
+        type: string
+  Auth0Credential:
+    type: object
+    properties:
+      access_token:
+        type: string
+      id_token:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      expires_in:
+        type: number
+        format: int64
+  Credential:
+    type: object
+    properties:
+      activationCode:
+        type: string
+      resetToken:
+        type: string
+      hasPassword:
+        type: boolean
+  CredentialParam:
+    type: object
+    properties:
+      password:
+        type: string
+  Country:
+    type: object
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+      isoAlpha2Code:
+        type: string
+      isoAlpha3Code:
+        type: string
+  UserProfile:
+    type: object
+    properties:
+      emailVerified:
+        type: boolean
+      provider:
+        type: string
+      name:
+        type: string
+      context:
+        type: object
+        additionalProperties:
+          type: string
+      userId:
+        type: string
+      email:
+        type: string
+      providerType:
+        type: string
+  User:
+    type: object
+    properties:
+      handle:
+        type: string
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      credential:
+        $ref: "#/definitions/CredentialParam"
+      profiles:
+        type: array
+        items:
+          $ref: "#/definitions/UserProfile"
+      status:
+        type: string
+      country:
+        $ref: "#/definitions/Country"
+      regSource:
+        type: string
+      utmSource:
+        type: string
+      utmMedium:
+        type: string
+      utmCampaign:
+        type: string
+  NewUserBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/User"
+  GroupMembership:
+    type: object
+    properties:
+      memberId:
+        type: integer
+      membershipType:
+        type: string
+        enum:
+        - user
+        - group
+  NewGroupMembershipBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/GroupMembership"
+  Group:
+    type: object
+    properties:
+      id:
+        type: number
+        format: long
+      name:
+        type: string
+      description:
+        type: string
+      privateGroup:
+        type: boolean
+      selfRegister:
+        type: boolean
+  NewGroupBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/Group"
+  PermissionsPolicy:
+    type: object
+    properties:
+      resource:
+        type: string
+      policy:
+        $ref: "#/definitions/Policy"
+      subjectId:
+        type: string
+      subjectType:
+        type: string
+      policyJson:
+        type: string
+  NewPermissionsPolicyBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/PermissionsPolicy"
+  Authorization:
+    type: object
+    properties:
+      token:
+        type: string
+      refreshToken:
+        type: string
+      target:
+        type: string
+      externalToken:
+        type: string
+      zendeskJwt:
+        type: string
+  NewAuthorizationBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/Authorization"
+  Role:
+    type: object
+    properties:
+      roleName:
+        type: string
+      subjects:
+        type: array
+        items:
+          type: string
+  NewRoleBodyParam:
+    type: object
+    properties:
+      param:
+        $ref: "#/definitions/Role"
+  IdentityProviderResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+  UserResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      handle:
+        type: string
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      ssoLogin:
+        type: boolean
+      credential:
+        $ref: "#/definitions/Credential"
+      profiles:
+        type: array
+        items:
+          $ref: "#/definitions/UserProfile"
+      status:
+        type: string
+      country:
+        $ref: "#/definitions/Country"
+      regSource:
+        type: string
+      utmSource:
+        type: string
+      utmMedium:
+        type: string
+      utmCampaign:
+       type: string
+  GroupMembershipResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      groupId:
+        type: integer
+      groupName:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+        format: integer
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      memberId:
+        type: integer
+      membershipType:
+        type: string
+        enum:
+        - user
+        - group
+  GroupResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+        format: integer
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      privateGroup:
+        type: boolean
+      selfRegister:
+        type: boolean
+      subGroups:
+        type: array
+        items:
+            $ref: '#/definitions/GroupResponse' 
+      parentGroup:
+        $ref: '#/definitions/GroupResponse' 
+  SecurityGroupResponse:
+    type: object
+    properties:
+      id:
+        type: number
+        format: long
+      createUserId:
+        type: number
+        format: long
+      name:
+        type: string
+  SecurityGroupBodyParam:
+    type: object
+    properties:
+      id:
+        type: number
+        format: long
+      createUserId:
+        type: number
+        format: long
+      name:
+        type: string
+  Policy:
+    type: object
+    properties:
+      version:
+        type: string
+      permissions:
+        type: object
+        additionalProperties: true
+  PermissionsPolicyResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+        format: integer
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      resource:
+        type: string
+      policy:
+        $ref: "#/definitions/Policy"
+      subjectId:
+        type: string
+      subjectType:
+        type: string
+      policyJson:
+        type: string
+  AuthorizationResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+        format: integer
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      token:
+        type: string
+      refreshToken:
+        type: string
+      target:
+        type: string
+      externalToken:
+        type: string
+      zendeskJwt:
+        type: string
+  RoleResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
+      createdBy:
+        type: string
+        format: integer
+      updatedAt:
+        type: string
+        format: date-time
+      updatedBy:
+        type: string
+      roleName:
+        type: string
+      subjects:
+        type: array
+        items:
+          type: string
+  SSOLoginProviderResponse:
+    type: object
+    properties:
+      ssoLoginProviderId:
+        type: integer
+      name:
+        type: string
+      type:
+        type: string  
+  ResponseMetadata:
+    title: Metadata object for a response
+    type: object
+    properties:
+      totalCount:
+        type: integer
+        format: int32
+        description: Total count of the objects
+  ErrorModel:
+    type: object
+    properties:
+      id:
+        type: string
+        description: unique id identifying the request
+      version:
+        type: string
+      result:
+        type: object
+        properties:
+          success:
+            type: boolean
+          status:
+            description: http status code
+            type: number
+          metadata:
+            $ref: '#/definitions/ResponseMetadata'
+          content:
+            type: object
+  NormalResponse:
+    title: Response with null or a single string
+    type: object
+    properties:
+      id:
+        type: string
+        description: unique id identifying the request
+      version:
+        type: string
+      result:
+        type: object
+        properties:
+          success:
+            type: boolean
+          status:
+            type: number
+            description: http status code
+          metadata:
+            $ref: "#/definitions/ResponseMetadata"
+          content:
+            type: object
+            description: a string or null
+parameters:
+  offsetParam:
+    name: offset
+    description: "number of items to skip. Defaults to 0"
+    in: query
+    required: false
+    type: integer
+    format: int32
+  limitParam:
+    name: limit
+    description: "max records to return. Defaults to 10"
+    in: query
+    required: false
+    type: integer
+    format: int32
+  orderByParam:
+    name: orderBy
+    description: "sort items order by field."
+    in: query
+    required: false
+    type: string

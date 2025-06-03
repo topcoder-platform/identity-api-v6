@@ -1,0 +1,1564 @@
+{
+	"info": {
+		"_postman_id": "7e37c499-3e9f-4e48-8e5d-7179adfabbc3",
+		"name": "Topcoder - Identity v3 - Users",
+		"description": "Postman collection for the v3 Identity User Service.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "2487006"
+	},
+	"item": [
+		{
+			"name": "User Management (Core CRUD)",
+			"item": [
+				{
+					"name": "Find Users (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"const jsonData = pm.response.json();",
+									"pm.test(\"Test array\", () => {",
+									"    //array is not empty",
+									"  pm.expect(jsonData).not.to.be.empty;",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/v3/users?limit=10&offset=0",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users"
+							],
+							"query": [
+								{
+									"key": "handle",
+									"value": "{{searchHandle}}",
+									"disabled": true
+								},
+								{
+									"key": "email",
+									"value": "{{searchEmail}}",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Find users based on query parameters. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Register New User (Public)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.id) {",
+									"    pm.collectionVariables.set(\"newlyRegisteredUserId\", jsonData.id);",
+									"    console.log('Newly registered user ID set: ' + jsonData.id);",
+									"}",
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var uuid = require('uuid')",
+									"pm.collectionVariables.set(\"randomUser\", uuid.v4());",
+									"pm.collectionVariables.set(\"userPassword\", uuid.v4());",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"handle\": \"{{randomUser}}\", // Changed to use $guid\n        \"email\": \"{{userEmail}}\",\n        \"firstName\": \"Test\",\n        \"lastName\": \"User\",\n        \"credential\": {\n            \"password\": \"{{userPassword}}\"\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users",
+						"description": "Registers a new user. Activation will be required separately."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User By ID (Admin/Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"const jsonData = pm.response.json();",
+									"pm.test(\"Test Response\", () => {",
+									"    //array is not empty",
+									"  pm.expect(jsonData.id).to.eq(pm.collectionVariables.get(\"newlyRegisteredUserId\"));",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"description": "Get a specific user by their ID. Allowed for self or admin."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Basic User Info (Admin/Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"firstName\": \"UpdatedFirstName\",\n        \"lastName\": \"UpdatedLastName\",\n        \"countryCode\": \"US\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"description": "Updates basic information for a user. Allowed for self or admin. `targetUserId` should be the ID of the user to update (can be `{{userId}}` for self)."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 501\", function () { pm.response.to.have.status(501); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"description": "Deletes/anonymizes a user. Admin role required. `userIdToDelete` should be the ID of the user to delete."
+					},
+					"response": []
+				}
+			],
+			"description": "Core User Management endpoints (Create, Read, Update, Delete)."
+		},
+		{
+			"name": "SSO Profile Management (Admin)",
+			"item": [
+				{
+					"name": "Link SSO Profile to User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"provider\": \"okta-customer\",\n        \"userId\": \"{{newlyRegisteredUserId}}\", // This should be the user's ID *from Okta*, not your internal newlyRegisteredUserId\n        \"name\": \"user.name.from.okta\",      // e.g., the Okta username or primary email\n        \"email\": \"{{userEmail}}\" // Optional, but good to include if available\n        // \"isPrimary\": true, // This field is not part of UserProfileDto, remove it\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+						"description": "Links an SSO profile to a user. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All SSO Profiles for User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogins",
+						"description": "Gets all SSO profiles linked to a user. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Update SSO Profile for User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"provider\": \"okta-customer\",\n        \"userId\": \"{{newlyRegisteredUserId}}\", \n        \"name\": \"user.name.from.okta\",\n        \"isPrimary\": false\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+						"description": "Updates an existing SSO profile linked to a user. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink SSO Profile from User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin?provider=okta-customer&ssoUserId={{newlyRegisteredUserId}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": "okta-customer"
+								},
+								{
+									"key": "ssoUserId",
+									"value": "{{newlyRegisteredUserId}}"
+								}
+							]
+						},
+						"description": "Unlinks an SSO profile from a user. Admin role required."
+					},
+					"response": []
+				}
+			],
+			"description": "Manage SSO (Single Sign-On) user logins. Admin access required for these operations."
+		},
+		{
+			"name": "External Profile Management (Social, etc.)",
+			"item": [
+				{
+					"name": "Add External Profile to User (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"provider\": \"github\",\n        \"userId\": \"github_user_12345\",\n        \"name\": \"github_user_12345\",\n        \"Profile\": { \"followers\": 100 },\n        \"isPrimary\": false\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+						"description": "Adds an external profile (e.g., social media link) to a user. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All External Profiles for User (Admin/Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+						"description": "Gets all external profiles (SSO, social, etc.) for a user. Allowed for self or admin."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete External Profiles by Provider for User (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles/github",
+						"description": "Deletes all external profiles for a user under a specific provider (e.g., all 'github' profiles). Admin role required."
+					},
+					"response": []
+				}
+			],
+			"description": "Manage external user profiles (e.g., GitHub, LinkedIn)."
+		},
+		{
+			"name": "Auth0 Custom DB Script Endpoints (Public, Form Data)",
+			"item": [
+				{
+					"name": "Auth0 Login (Custom DB)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "handleOrEmail",
+									"value": "{{randomUser}}",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "{{userPassword}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": "{{host}}/v3/users/login",
+						"description": "Authenticates a user for Auth0 Custom Database script. Expects form data."
+					},
+					"response": []
+				},
+				{
+					"name": "Auth0 Get User Profile & Roles",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"console.log(JSON.stringify(jsonData));",
+									"if (jsonData && jsonData.resendToken) {",
+									"    pm.environment.set(\"resendToken\", jsonData.resendToken);",
+									"    console.log('Resend Token set: ' + jsonData.resendToken);",
+									"}",
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "handle",
+									"value": "{{randomUser}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": "{{host}}/v3/users/roles",
+						"description": "Gets user profile and roles for Auth0 Rules/Actions. Expects form data with email OR handle."
+					},
+					"response": []
+				},
+				{
+					"name": "Auth0 Change Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(201); });",
+									"if (pm.response.code === 200) {",
+									"     pm.collectionVariables.set(\"userPassword\", pm.collectionVariables.get(\"newPassword\"));",
+									"  }"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var uuid = require('uuid')",
+									"pm.collectionVariables.set(\"newPassword\", uuid.v4());",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "email",
+									"value": "{{userEmail}}",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "{{newPassword}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": "{{host}}/v3/users/changePassword",
+						"description": "Changes password for Auth0 Action (e.g., post-password-reset flow). Expects form data."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints intended for use by Auth0 Custom Database scripts, Rules, or Actions. These typically expect `application/x-www-form-urlencoded` data."
+		},
+		{
+			"name": "Password & Activation Flows (Public)",
+			"item": [
+				{
+					"name": "Initiate Password Reset",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "B",
+								"value": "",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"url": {
+							"raw": "{{host}}/v3/users/resetToken?handle={{randomUser}}&resetPasswordUrlPrefix={{ui_reset_password_url_prefix}}&email={{userEmail}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"resetToken"
+							],
+							"query": [
+								{
+									"key": "handle",
+									"value": "{{randomUser}}"
+								},
+								{
+									"key": "resetPasswordUrlPrefix",
+									"value": "{{ui_reset_password_url_prefix}}"
+								},
+								{
+									"key": "email",
+									"value": "{{userEmail}}"
+								}
+							]
+						},
+						"description": "Initiates the password reset process and sends a token via email."
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password (with Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+									"if (pm.response.code === 201) {",
+									"     pm.collectionVariables.set(\"userPassword\", pm.collectionVariables.get(\"newPassword\"));",
+									"  }"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var uuid = require('uuid')",
+									"pm.collectionVariables.set(\"newPassword\", uuid.v4());",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"handle\": \"{{randomUser}}\",\n        \"email\": \"{{userEmail}}\",\n        \"credential\": {\n            \"resetToken\": \"YlYFSQ\",\n            \"password\": \"{{newPassword}}\"\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/resetPassword",
+						"description": "Resets the user password using a valid reset token and new password."
+					},
+					"response": []
+				},
+				{
+					"name": "Activate User Account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"userId\": {{newlyRegisteredUserId}},\n        \"otp\": \"909661\",\n        \"resendToken\": \"{{resendToken}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/activate",
+						"description": "Activates a new user account using OTP and a resend token. `newlyRegisteredUserId` can be set from the Register New User response."
+					},
+					"response": []
+				},
+				{
+					"name": "Resend Activation Email/OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"userId\": {{newlyRegisteredUserId}},\n    \"resendToken\": \"{{resendToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/resendActivationEmail",
+						"description": "Resends the activation email/OTP using a resend token (obtained from initial registration or a previous resend attempt)."
+					},
+					"response": []
+				}
+			],
+			"description": "Public endpoints for user password management and account activation."
+		},
+		{
+			"name": "User Profile Updates (Authenticated)",
+			"item": [
+				{
+					"name": "Update User Handle (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"",
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.handle) {",
+									"    pm.collectionVariables.set(\"randomUser\", jsonData.handle);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var uuid = require('uuid')",
+									"pm.collectionVariables.set(\"newHandle\", uuid.v4());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"handle\": \"{{newHandle}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/handle",
+						"description": "Updates a user's handle. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Primary Email (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"if (pm.response.code === 200) {",
+									"     pm.environment.set(\"userEmail\", pm.collectionVariables.get(\"newEmail\"));",
+									"  }"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									" var uuid = require('uuid')",
+									" pm.collectionVariables.set(\"newEmail\", uuid.v4() + '@test.com');"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"email\": \"{{newEmail}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email",
+						"description": "Updates a user's primary email. This will set the new email to unverified and trigger verification. Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Request One-Time Token (for Email Update)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.token) {",
+									"    pm.collectionVariables.set(\"oneTimeEmailUpdateToken\", jsonData.token);",
+									"    console.log('One Time Token ' + jsonData.token);",
+									"}",
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"userId\": \"{{newlyRegisteredUserId}}\",\n    \"password\": \"{{userPassword}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/oneTimeToken",
+						"description": "Requests a one-time token for email update, requires current user credentials (userId and password)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Email with One-Time Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"if (pm.response.code === 200) {",
+									"     pm.environment.set(\"userEmail\", pm.collectionVariables.get(\"newEmail\"));",
+									"  }"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									" var uuid = require('uuid')",
+									" pm.collectionVariables.set(\"newEmail\", uuid.v4() + '@test.com');"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{oneTimeEmailUpdateToken}}"
+							}
+						},
+						"method": "POST",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email/{{newEmail}}",
+						"description": "Updates the user's primary email using a one-time token obtained from the `/oneTimeToken` endpoint. The one-time token is passed as a Bearer token."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Status (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"status\": \"A\" \n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/status",
+						"description": "Updates a user's status (e.g., 'A' for Active, 'I' for Inactive, 'U' for Unverified). Admin role required."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Primary Role (Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessTokenUser}}"
+							}
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"primaryRole\": \"Topcoder Talent\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/updatePrimaryRole",
+						"description": "Updates the primary role for the authenticated user. Self-service only."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for updating user profile information, typically requiring authentication."
+		},
+		{
+			"name": "Validation (Public)",
+			"item": [
+				{
+					"name": "Validate Handle",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/v3/users/validateHandle?handle=randomhandle",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"validateHandle"
+							],
+							"query": [
+								{
+									"key": "handle",
+									"value": "randomhandle"
+								}
+							]
+						},
+						"description": "Validates user handle availability and format."
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/v3/users/validateEmail?email=random23423@email.com",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"validateEmail"
+							],
+							"query": [
+								{
+									"key": "email",
+									"value": "random23423@email.com"
+								}
+							]
+						},
+						"description": "Validates email availability and format."
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Social Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/v3/users/validateSocial?socialUserId=123random&socialProvider=github",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"validateSocial"
+							],
+							"query": [
+								{
+									"key": "socialUserId",
+									"value": "123random"
+								},
+								{
+									"key": "socialProvider",
+									"value": "github"
+								}
+							]
+						},
+						"description": "Validates social profile link availability."
+					},
+					"response": []
+				}
+			],
+			"description": "Publicly accessible endpoints for validating user data like handles, emails, and social profiles."
+		},
+		{
+			"name": "2FA / DICE",
+			"item": [
+				{
+					"name": "Get User 2FA Status (Admin/Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+						"description": "Gets the user's 2FA status (MFA and DICE). Allowed for self or admin."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User 2FA Status (Admin/Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"mfaEnabled\": true,\n        \"diceUserId\": \"dice-user-uuid-123\",\n        \"diceUuid\": \"dice-session-uuid-456\",\n        \"diceEnrolled\": true\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+						"description": "Updates the user's 2FA status. Allowed for self or admin."
+					},
+					"response": []
+				},
+				{
+					"name": "Get/Initiate DICE Connection (Self)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessTokenUser}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/diceConnection",
+						"description": "Gets or initiates a DICE connection for the authenticated user. Self-service only."
+					},
+					"response": []
+				},
+				{
+					"name": "Handle DICE Webhook",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{diceWebhookApiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"event\": \"connection-invitation\",\n    \"connectionId\": \"512f4da6-2874-4ad7-8e4f-e72c406f77ed\",\n    \"emailId\": \"some@soskd.com\",\n    \"shortUrl\": \"https://m.diceid.com/WIPDID/sHHdmACzigTAMU50h\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/dice-status",
+						"description": "Webhook endpoint for DICE to post status updates. Requires a specific API key (`diceWebhookApiKey`) for authorization."
+					},
+					"response": []
+				},
+				{
+					"name": "Send 2FA OTP (for Login Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.resendToken) {",
+									"    pm.environment.set(\"otpResendToken\", jsonData.resendToken);",
+									"    console.log('otpResendToken set: ' + jsonData.resendToken);",
+									"}",
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"userId\": \"{{newlyRegisteredUserId}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/sendOtp",
+						"description": "Sends a 2FA OTP for a partially authenticated user (e.g., after password verification during login)."
+					},
+					"response": []
+				},
+				{
+					"name": "Resend 2FA OTP Email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"param\": {\n        \"resendToken\": \"{{otpResendToken}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{host}}/v3/users/resendOtpEmail",
+						"description": "Resends the 2FA OTP email using a resend token obtained from the `sendOtp` endpoint."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for Two-Factor Authentication (2FA) and DICE integration."
+		},
+		{
+			"name": "Other",
+			"item": [
+				{
+					"name": "Get User Achievements (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": {
+								"token": "{{accessToken}}"
+							}
+						},
+						"method": "GET",
+						"header": [],
+						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/achievements",
+						"description": "Gets achievements for a specific user. Admin role required."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "host",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "ui_reset_password_url_prefix",
+			"value": "http://localhost:3001/reset-password?token=",
+			"type": "string"
+		},
+		{
+			"key": "randomUser",
+			"value": ""
+		},
+		{
+			"key": "userPassword",
+			"value": ""
+		},
+		{
+			"key": "newlyRegisteredUserId",
+			"value": ""
+		},
+		{
+			"key": "newPassword",
+			"value": ""
+		},
+		{
+			"key": "oneTimeEmailUpdateToken",
+			"value": ""
+		},
+		{
+			"key": "newEmail",
+			"value": ""
+		},
+		{
+			"key": "newHandle",
+			"value": ""
+		}
+	]
+}
