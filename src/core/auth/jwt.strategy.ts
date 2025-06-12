@@ -39,6 +39,7 @@ export interface AuthenticatedUser {
   roles: string[]; // Populated from DB lookup
   scopes: string[]; // Populated from JWT payload
   isAdmin: boolean; // Determined from DB roles
+  isMachine: boolean; // Determined from JWT payload
   handle?: string; // From JWT payload
   email?: string; // From JWT payload
   payload: JwtPayload; // Original JWT payload
@@ -215,12 +216,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       scopes = payload.permissions;
     }
 
+    // Check if this is a machine token
+    const isMachine = payload.azp === 'machine' || payload.aud === 'machine';
+
     // 3. Construct the AuthenticatedUser object
     const authenticatedUser: AuthenticatedUser = {
       userId: userId,
       roles: dbRoles, // Use roles fetched from the database
       scopes: scopes, // Use scopes from the token
       isAdmin: isAdmin, // Use admin status derived from DB roles
+      isMachine: isMachine, // Use machine status derived from JWT payload
       handle: payload.handle,
       email: payload.email,
       payload: payload,

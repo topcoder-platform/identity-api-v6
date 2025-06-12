@@ -1,0 +1,6 @@
+Dockerfile
+deployment/
+docker-compose.yml
+scripts/
+.circleci/
+old_stuff/

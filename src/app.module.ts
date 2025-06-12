@@ -6,6 +6,7 @@ import { EventModule } from './shared/event/event.module';
 import { RoleModule } from './api/role/role.module';
 import { AuthModule } from './core/auth/auth.module';
 import { UserModule } from './api/user/user.module';
+import { GroupModule } from './api/group/group.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { UserModule } from './api/user/user.module';
     // UserModule,
     RoleModule,
     UserModule,
+    GroupModule,
   ],
   controllers: [], // No root controller
   providers: [], // No root service

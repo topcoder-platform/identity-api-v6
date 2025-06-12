@@ -27,7 +27,8 @@
     "db:migrate-legacy": "npx ts-node scripts/migrate-mysql-to-postgres.ts",
     "postinstall": "npm run prisma:generate",
     "test:postman:roles": "newman run 'doc/roles api.postman_collection.json' -e doc/postman_environment.json -r cli,json --reporter-json-export roles-report.json",
-    "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json"
+    "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json",
+    "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.0",

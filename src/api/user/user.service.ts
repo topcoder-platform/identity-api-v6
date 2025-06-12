@@ -378,6 +378,41 @@ export class UserService {
       throw error;
     }
 
+    if (userParams.country != null) {
+      try {
+        await this.validationService.validateCountryAndMutate(
+          userParams.country,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Country validation failed for '${userParams.country}': ${error.message}`,
+        );
+        throw error;
+      }
+    }
+
+    if (userParams.profile != null) {
+      try {
+        await this.validationService.validateProfile(userParams.profile);
+      } catch (error) {
+        this.logger.warn(
+          `Country validation failed for '${userParams.country}': ${error.message}`,
+        );
+        throw error;
+      }
+    }
+
+    if (userParams.regSource == 'ReferralProgram') {
+      try {
+        await this.validationService.validateReferral(userParams.regSource);
+      } catch (error) {
+        this.logger.warn(
+          `Country validation failed for '${userParams.country}': ${error.message}`,
+        );
+        throw error;
+      }
+    }
+
     // Generate OTP first, as it will be stored as the activation_code
     const otpForActivation = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
 
@@ -822,10 +857,12 @@ export class UserService {
     if (isNaN(userId)) {
       throw new BadRequestException('Invalid user ID format.');
     }
+
     this.logger.log(
       `Attempting to update primary email for user ID: ${userId} to ${newEmail} by admin ${authUser.userId}`,
     );
 
+    // Validate new email
     if (!newEmail) {
       throw new BadRequestException('New email cannot be empty.');
     }
@@ -834,186 +871,120 @@ export class UserService {
     }
 
     await this.checkEmailAvailabilityForUser(newEmail, userId);
-
-    let otpForNewEmail: string | null = null;
-    let resendTokenForNewEmail: string | null = null;
-
     const updatedUserInTx = await this.prismaOltp.$transaction(async (tx) => {
-      let emailRecord = await tx.email.findFirst({
+      // Find the user first
+      const userInDB = await tx.user.findUnique({
+        where: { user_id: userId },
+      });
+
+      if (!userInDB) {
+        throw new NotFoundException(`User ${userId} not found.`);
+      }
+
+      // Find the current primary email record for this user
+      const currentPrimaryEmailRecord = await tx.email.findFirst({
         where: {
-          address: newEmail.toLowerCase(),
+          user_id: userId,
+          primary_ind: 1,
         },
       });
 
-      if (!emailRecord) {
-        let nextEmailId: number;
-        try {
-          const result: { nextval: bigint }[] =
-            await tx.$queryRaw`SELECT nextval('common_oltp.sequence_email_seq'::regclass)`;
-          if (!result || result.length === 0 || !result[0].nextval) {
-            throw new Error('Failed to retrieve next email ID from sequence.');
-          }
-          nextEmailId = Number(result[0].nextval);
-          this.logger.debug(
-            `[updatePrimaryEmail Tx] Fetched next email ID: ${nextEmailId}`,
-          );
-        } catch (seqError) {
-          this.logger.error(
-            `[updatePrimaryEmail Tx] Error fetching next email ID: ${seqError.message}`,
-            seqError.stack,
-          );
-          throw new InternalServerErrorException(
-            'Failed to generate email ID for update.',
-          );
-        }
-
-        emailRecord = await tx.email.create({
-          data: {
-            email_id: nextEmailId,
-            address: newEmail.toLowerCase(),
-            status_id: new Decimal(2),
-            create_date: new Date(),
-            modify_date: new Date(),
-            user_id: userId,
-            primary_ind: 0,
-            email_type_id: 1,
-          },
-        });
-        this.logger.log(
-          `[updatePrimaryEmail Tx] Created new email record ID ${emailRecord.email_id} for address ${newEmail}, user ${userId}`,
+      if (!currentPrimaryEmailRecord) {
+        throw new NotFoundException(
+          `No primary email found for user ${userId}.`,
         );
-      } else {
-        // Ensure userId in emailRecord is compared as number if it's Decimal
-        if (
-          emailRecord.user_id !== null &&
-          Number(emailRecord.user_id) !== userId
-        ) {
-          this.logger.warn(
-            `[updatePrimaryEmail Tx] Existing email record ${emailRecord.email_id} for ${newEmail} is not associated with user ${userId}. Attempting to associate.`,
-          );
-          await tx.email.update({
-            where: { email_id: emailRecord.email_id },
-            data: {
-              user_id: userId,
-              status_id: new Decimal(2), // Correct: Assign new Decimal
-              modify_date: new Date(),
-            },
-          });
-          emailRecord.user_id = new Decimal(userId); // Correct: Assign new Decimal to local record
-          emailRecord.status_id = new Decimal(2); // Correct: Assign new Decimal to local record
-          this.logger.log(
-            `[updatePrimaryEmail Tx] Associated existing email record ${emailRecord.email_id} with user ${userId}.`,
-          );
-        }
-        // Correct: Compare Number(status_id) with number
-        else if (
-          emailRecord.status_id !== null &&
-          Number(emailRecord.status_id) !== 2
-        ) {
-          await tx.email.update({
-            where: { email_id: emailRecord.email_id },
-            data: { status_id: new Decimal(2), modify_date: new Date() }, // Correct: Assign new Decimal
-          });
-          emailRecord.status_id = new Decimal(2); // Correct: Assign new Decimal to local record
-          this.logger.log(
-            `[updatePrimaryEmail Tx] Updated existing email record ${emailRecord.email_id} to Unverified status for user ${userId}.`,
-          );
-        }
       }
 
-      const currentPrimaryEmailRecord = await tx.email.findFirst({
-        where: { user_id: userId, primary_ind: 1 },
+      const oldEmail = currentPrimaryEmailRecord.address;
+
+      // If the new email is the same as current, return user as-is
+      if (oldEmail === newEmail.toLowerCase()) {
+        this.logger.log(
+          `Email ${newEmail} is already the primary email for user ${userId}. No changes needed.`,
+        );
+        return userInDB;
+      }
+
+      // Check if new email is already taken by another user as primary
+      const existingEmailRecord = await tx.email.findFirst({
+        where: {
+          address: newEmail.toLowerCase(),
+          user_id: { not: userId },
+          primary_ind: 1,
+        },
       });
 
-      // Correct: Compare Number(email_id), Number(primary_ind), and Number(status_id) with numbers
-      if (
-        currentPrimaryEmailRecord &&
-        currentPrimaryEmailRecord.email_id !== null &&
-        emailRecord.email_id !== null &&
-        Number(currentPrimaryEmailRecord.email_id) ===
-          Number(emailRecord.email_id) &&
-        emailRecord.primary_ind !== null &&
-        Number(emailRecord.primary_ind) === 1 &&
-        emailRecord.status_id !== null &&
-        Number(emailRecord.status_id) === 1
-      ) {
-        this.logger.log(
-          `[updatePrimaryEmail Tx] Email ${newEmail} (ID: ${emailRecord.email_id}) is already the primary and verified email for user ${userId}.`,
+      if (existingEmailRecord) {
+        throw new BadRequestException(
+          'Email address is already in use by another user.',
         );
-        const user = await tx.user.findUnique({ where: { user_id: userId } });
-        if (!user)
-          throw new NotFoundException(`User ${userId} not found unexpectedly.`);
-        return user;
       }
 
-      otpForNewEmail = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
-      const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${emailRecord.email_id}`;
+      // Simply UPDATE the existing primary email record with the new email address
+      await tx.email.update({
+        where: { email_id: currentPrimaryEmailRecord.email_id },
+        data: {
+          address: newEmail.toLowerCase(),
+          status_id: new Decimal(2), // Set to unverified status
+          modify_date: new Date(),
+        },
+      });
+
+      this.logger.log(
+        `Updated existing primary email record ${currentPrimaryEmailRecord.email_id} from ${oldEmail} to ${newEmail} for user ${userId}`,
+      );
+
+      // Update the user record
+      const updatedUser = await tx.user.update({
+        where: { user_id: userId },
+        data: {
+          modify_date: new Date(),
+          // modified_by: authUser.userId
+        },
+      });
+
+      this.logger.log(
+        `Successfully updated primary email for user ${userId} from ${oldEmail} to ${newEmail}`,
+      );
+
+      return updatedUser;
+    });
+
+    // Generate OTP and resend token for email verification using the updated email record
+    const updatedEmailRecord = await this.prismaOltp.email.findFirst({
+      where: {
+        user_id: userId,
+        primary_ind: 1,
+      },
+    });
+
+    if (updatedEmailRecord) {
+      const otpForNewEmail = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
+      const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${updatedEmailRecord.email_id}`;
       const otpExpiry =
         this.configService.get<number>(
           'ACTIVATION_OTP_EXPIRY_SECONDS',
           ACTIVATION_OTP_EXPIRY_SECONDS,
         ) * 1000;
+
       await this.cacheManager.set(otpCacheKey, otpForNewEmail, otpExpiry);
-      this.logger.log(
-        `[updatePrimaryEmail Tx] OTP ${otpForNewEmail} for new primary email ${newEmail} (user ${userId}, email_id ${emailRecord.email_id}) cached. Key: ${otpCacheKey}`,
-      );
 
       const resendPayload = {
         sub: userId.toString(),
         aud: 'emailupdate_activation',
-        emailId: emailRecord.email_id.toString(),
+        emailId: updatedEmailRecord.email_id.toString(),
       };
       const resendTokenExpiry = this.configService.get<string>(
         'ACTIVATION_RESEND_JWT_EXPIRY',
         '1h',
       );
-      resendTokenForNewEmail = jwt.sign(
+      const resendTokenForNewEmail = jwt.sign(
         resendPayload,
         this.configService.get<string>('JWT_SECRET'),
         { expiresIn: resendTokenExpiry },
       );
-      this.logger.log(
-        `[updatePrimaryEmail Tx] Resend token generated for new primary email ${newEmail} (user ${userId}, email_id ${emailRecord.email_id})`,
-      );
 
-      if (
-        currentPrimaryEmailRecord &&
-        currentPrimaryEmailRecord.email_id !== emailRecord.email_id
-      ) {
-        await tx.email.update({
-          where: { email_id: currentPrimaryEmailRecord.email_id },
-          data: { primary_ind: 0, modify_date: new Date() },
-        });
-        this.logger.log(
-          `[updatePrimaryEmail Tx] Unset primary_ind for old primary email (ID: ${currentPrimaryEmailRecord.email_id}) for user ${userId}`,
-        );
-      }
-
-      await tx.email.update({
-        where: { email_id: emailRecord.email_id },
-        data: {
-          primary_ind: 1,
-          status_id: 2,
-          user_id: userId,
-          modify_date: new Date(),
-        },
-      });
-      this.logger.log(
-        `[updatePrimaryEmail Tx] Set email (ID: ${emailRecord.email_id}, Address: ${newEmail}) as primary (primary_ind=1, status_id=2) for user ${userId}`,
-      );
-
-      const user = await tx.user.update({
-        where: { user_id: userId },
-        data: { modify_date: new Date() },
-      });
-      if (!user)
-        throw new NotFoundException(
-          `User ${userId} not found unexpectedly during final update.`,
-        );
-      return user;
-    });
-
-    if (otpForNewEmail && resendTokenForNewEmail) {
+      // Send verification email
       try {
         await this.eventService.postEnvelopedNotification(
           'email.verification_required',
@@ -1026,7 +997,7 @@ export class UserService {
           },
         );
         this.logger.log(
-          `Published 'email.verification_required' event for new primary email ${newEmail}, user ${userIdString}`,
+          `Published 'email.verification_required' event for updated primary email ${newEmail}, user ${userIdString}`,
         );
       } catch (eventError) {
         this.logger.error(
@@ -1036,15 +1007,15 @@ export class UserService {
       }
     }
 
+    // Publish user updated event
     try {
-      // 'event.user.updated' is the notificationType
       const eventAttributes = this.toCamelCase(updatedUserInTx);
       await this.eventService.postEnvelopedNotification(
         'event.user.updated',
         eventAttributes,
       );
       this.logger.log(
-        `Published 'event.user.updated' notification for primary email change to ${newEmail}, user ${userIdString}. Attributes: ${JSON.stringify(eventAttributes, null, 2)}`,
+        `Published 'event.user.updated' notification for primary email change to ${newEmail}, user ${userIdString}`,
       );
     } catch (eventError) {
       this.logger.error(
@@ -1404,39 +1375,61 @@ export class UserService {
     }
   }
 
-  /**
-   * Generates an SSO token (e.g., tcsso).
-   * Placeholder implementation. The actual logic from Java's UserDAO.generateSSOToken needs to be replicated.
-   * This is used by AuthorizationService for the tcsso cookie.
-   */
-  async generateSSOToken(
-    userId: number,
-    handle?: string,
-    email?: string,
-  ): Promise<string> {
-    this.logger.debug(`Generating SSO token for user ID: ${userId}`);
-    // TODO: Replace with actual logic from Java UserDAO.generateSSOToken
-    // For now, creating a simple JWT as a placeholder. This is LIKELY NOT THE CORRECT FINAL IMPLEMENTATION.
-    // The original tcsso might be an opaque token or have specific claims/signature.
-    const user = await this.findUserById(userId);
-    if (!user) {
-      throw new NotFoundException(
-        `User with ID ${userId} not found for SSO token generation.`,
+  async generateSSOToken(userId: number): Promise<string> {
+    this.logger.debug(
+      `Attempting to generate SSO token for user ID: ${userId}`,
+    );
+
+    if (userId === null || userId === undefined) {
+      this.logger.error(
+        'generateSSOToken called with null or undefined userId.',
       );
+      throw new BadRequestException('userId must be specified.'); // Matches Java message
     }
 
-    const payload = {
-      userId: user.user_id.toString(), // Ensure it's a string if TCID was string based
-      handle: user.handle,
-      // email: user.email, // Need to fetch primary email
-      // Add other claims as per original tcsso token
-    };
-    // Use a strong, configured secret for this token, different from internal JWT if necessary
-    const secret =
-      process.env.TCSSO_SECRET || 'placeholder-tcsso-secret-key-replace-me';
-    const expiresIn = process.env.TCSSO_EXPIRES_IN || '7d';
+    const user = await this.findUserById(userId);
+    if (!user) {
+      // Match Java's approach - same exception type for both cases
+      throw new BadRequestException("userId doesn't exist."); // Exact Java message
+    }
 
-    return jwt.sign(payload, secret, { expiresIn });
+    const encodedPassword = user.password;
+    const status = user.status;
+
+    // Delegate to another method like Java does
+    return this.generateSSOTokenWithCredentials(
+      userId,
+      encodedPassword,
+      status,
+    );
+  }
+
+  private generateSSOTokenWithCredentials(
+    userId: number,
+    password: string,
+    status: string,
+  ): string {
+    // Your existing token generation logic here
+    const salt = this.getSSOTokenSalt();
+    const plainText = `${salt}${userId}${password}${status}`;
+    const hash = crypto
+      .createHash('sha256')
+      .update(plainText, 'utf-8')
+      .digest('hex');
+    return `${userId}|${hash}`;
+  }
+
+  private getSSOTokenSalt(): string | null {
+    // In NestJS, configuration is typically handled via ConfigService
+    // and environment variables.
+    const salt = this.configService.get<string>('SSO_TOKEN_SALT');
+    if (!salt) {
+      this.logger.error(
+        'SSO_TOKEN_SALT is not defined in environment configuration.',
+      );
+      return null;
+    }
+    return salt;
   }
 
   async placeholderFindUserByAuth0Sub(

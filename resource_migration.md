@@ -1,4 +1,4 @@
-# Identity Service Migration Analysis: Authorization, Group, and User Resources
+<!-- # Identity Service Migration Analysis: Authorization, Group, and User Resources
 
 This document outlines the functionalities of the existing Java `AuthorizationResource`, `GroupResource`, and `UserResource` and proposes a corresponding structure using TypeScript, Express (implied framework), and Prisma for the migration. The goal is to replicate the existing functionality while adhering to a controller-service pattern.
 
@@ -751,4 +751,233 @@ This structure provides a modular approach to migrating the complex functionalit
             *   `Validations`: User existence, User status, Password verification.
             *   `External Calls`: None.
             *   `Cache`: Write one-time token to Redis.
-            *   `Cookies`: None.
+            *   `Cookies`: None. -->
+
+# Identity Service Migration Guide
+
+## Java to TypeScript/Express/Prisma
+
+This document outlines how to migrate the existing Java identity service to TypeScript using Express and Prisma.
+
+## Required Dependencies
+
+### Available (Already Set Up)
+
+- **Prisma**: Database access to `common_oltp` and `authorization` schemas
+- **Redis**: Caching for tokens, OTPs, sessions
+- **Event Bus**: For publishing events (user creation, email triggers)
+
+### Need Integration
+
+- **Auth0**: User authentication and management
+- **DICE**: Digital identity verification platform
+- **Slack**: System notifications
+
+### Need Libraries
+
+- `jsonwebtoken`: JWT token generation
+- `bcrypt`: Password hashing
+
+## User Management (`/users`)
+
+### Core User Operations
+
+#### List Users - `GET /users`
+
+- **Purpose**: Search and list users
+- **Auth**: Admin or `read` scope required
+- **Database**: Read from `user` table
+- **Logic**: Filter by handle/email/status, paginate results
+
+#### Get User Details - `GET /users/{id}`
+
+- **Purpose**: Get single user with profile data
+- **Auth**: Self access or Admin/`read` scope
+- **Database**: Read `user`, `email`, `social_user_profile`, roles
+- **Logic**: Combine user data with related profiles and permissions
+
+#### Create User - `POST /users`
+
+- **Purpose**: Register new user account
+- **Auth**: Public endpoint
+- **Database**: Create `user`, `credential`, `email` records
+- **Logic**:
+  1. Validate input (handle, email, password)
+  2. Check for duplicates
+  3. Hash password with bcrypt
+  4. Create user records
+  5. Generate activation OTP
+  6. Store OTP in Redis
+  7. Assign default role
+  8. Send activation email via Event Bus
+
+#### Update User - `PATCH /users/{id}`
+
+- **Purpose**: Update user information
+- **Auth**: Self or Admin/`update` scope
+- **Database**: Update `user` and `credential` tables
+- **Logic**:
+  1. Verify permissions
+  2. If changing password, verify current password
+  3. Hash new password if provided
+  4. Update user record
+  5. Publish update event
+
+### Authentication Flow
+
+#### Login - `POST /users/login`
+
+- **Purpose**: Authenticate user credentials
+- **Auth**: Public (used by Auth0)
+- **Database**: Read `user`, `credential`, `email`, roles
+- **Logic**:
+  1. Find user by handle or email
+  2. Verify password with bcrypt
+  3. Check user status is active
+  4. Return user details and roles
+
+#### Password Reset
+
+- **Request Reset** - `GET /users/resetToken`
+  - Generate reset token, store in Redis
+  - Send reset email via Event Bus
+- **Complete Reset** - `PUT /users/resetPassword`
+  - Validate reset token from Redis
+  - Hash new password and update
+
+#### Account Activation
+
+- **Activate** - `PUT /users/activate`
+  - Validate OTP from Redis
+  - Set user status to ACTIVE
+  - Mark email as verified
+  - Send welcome email
+- **Resend Activation** - `POST /users/resendActivationEmail`
+  - Decode JWT token
+  - Generate new OTP
+  - Send new activation email
+
+### Profile Management
+
+#### Handle Update - `PATCH /users/{id}/handle`
+
+- **Auth**: Admin/`update` scope
+- **Logic**: Check uniqueness, update handle
+
+#### Email Update - `PATCH /users/{id}/email`
+
+- **Auth**: Admin/`update` scope
+- **Logic**:
+  1. Validate new email
+  2. Create/update email record
+  3. Send verification OTP
+  4. Generate activation email
+
+#### Social Profiles
+
+- **Add** - `POST /users/{id}/profiles`
+- **Delete** - `DELETE /users/{id}/profiles/{provider}`
+- **Auth**: Admin scope required
+
+### Two-Factor Authentication
+
+#### 2FA Status
+
+- **Get** - `GET /users/{id}/2fa`
+- **Update** - `PATCH /users/{id}/2fa`
+- **Auth**: Self or Admin access
+
+#### OTP Flow
+
+- **Send OTP** - `POST /users/sendOtp`
+  - Generate 6-digit code
+  - Store in Redis with 5-minute expiry
+  - Send via email
+- **Resend OTP** - `POST /users/resendOtpEmail`
+  - Validate resend token
+  - Generate new OTP
+- **Check OTP** - `POST /users/checkOtp`
+  - Validate OTP from Redis
+  - Complete login process
+
+### DICE Integration
+
+#### Connection Status - `GET /users/{id}/diceConnection`
+
+- **Auth**: Self access only
+- **Logic**:
+  1. Check if already verified
+  2. If not, call DICE API to send invitation
+  3. Notify Slack of invitation
+  4. Return connection status
+
+#### Webhook - `POST /users/dice-status`
+
+- **Purpose**: Receive updates from DICE
+- **Auth**: Validate DICE signature/API key
+- **Logic**:
+  1. Update user verification status
+  2. Notify Slack of status change
+
+### Validation Endpoints
+
+#### Check Availability
+
+- **Handle** - `GET /users/validateHandle`
+- **Email** - `GET /users/validateEmail`
+- **Social Profile** - `GET /users/validateSocial`
+
+All return `{ valid: boolean, message?: string }`
+
+## Proposed TypeScript Structure
+
+### Controllers
+
+- `UserController` - Handle HTTP requests, validate input, format responses
+
+### Services
+
+- `UserService` - Core user CRUD operations
+- `AuthFlowService` - Login, password reset, activation flows
+- `UserProfileService` - Social profiles, SSO logins
+- `TwoFactorAuthService` - 2FA and OTP management
+- `ValidationService` - Handle/email/social validation
+- `NotificationService` - Event Bus publishing
+- `DiceIntegrationService` - DICE API interactions
+
+### Shared Services
+
+- `RoleService` - Role management (may exist from other migrations)
+- `CacheService` - Redis operations
+- `Auth0Service` - Auth0 API wrapper
+
+## Implementation Notes
+
+### Security
+
+- All passwords hashed with bcrypt
+- OTPs stored in Redis with expiration
+- JWT tokens for temporary operations
+- Scope-based authorization
+
+### Database
+
+- Use Prisma for all database operations
+- Two schemas: `common_oltp` and `authorization`
+- Maintain referential integrity
+
+### External Integrations
+
+- Event Bus for async operations (emails, notifications)
+- Redis for temporary data (OTPs, tokens, sessions)
+- Auth0 for identity management
+- DICE for verification
+- Slack for system notifications
+
+### Error Handling
+
+- Return appropriate HTTP status codes
+- Don't leak user existence in validation responses
+- Log security events appropriately
+
+This structure provides a clean separation of concerns while maintaining all existing functionality.

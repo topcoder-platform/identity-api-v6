@@ -1,0 +1,821 @@
+{
+	"info": {
+		"_postman_id": "5956bbd6-4aee-4886-bb8c-89941cc578bc",
+		"name": "User GroupResource - Topcoder",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "44133962",
+		"_collection_link": "https://jay-3053401.postman.co/workspace/Jay's-Workspace~5639ed7b-6eff-4c04-8556-f67cb97f6366/collection/44133962-5956bbd6-4aee-4886-bb8c-89941cc578bc?action=share&source=collection_link&creator=44133962"
+	},
+	"item": [
+		{
+			"name": "Create Group",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Set groupId in environment variable\", function () {",
+							"    // Parse the response JSON",
+							"    var jsonData = pm.response.json();",
+							"    ",
+							"    // Check if response is successful and contains the id",
+							"    pm.expect(jsonData.result.success).to.be.true;",
+							"    pm.expect(jsonData.result.content.id).to.exist;",
+							"    ",
+							"    // Set the groupId environment variable",
+							"    pm.environment.set(\"groupId\", parseInt(jsonData.result.content.id));",
+							"    ",
+							"    // Optional: Log the set value for verification",
+							"    console.log(\"groupId set to: \" + jsonData.result.content.id);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate random number between 1000 and 4500",
+							"const randomNum = Math.floor(Math.random() * (4500 - 1000 + 1)) + 1000;",
+							"",
+							"// Generate dynamic values",
+							"const groupName = `group-demo-${randomNum}`;",
+							"const groupDescription = `description-${randomNum}`;",
+							"",
+							"// Set variables for use in the request body",
+							"pm.environment.set(\"group_name\", groupName);",
+							"pm.environment.set(\"group_description\", groupDescription);",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"param\": {\n        \"name\": \"{{group_name}}\",\n        \"description\": \"{{group_description}}\",\n        \"privateGroup\": true,\n        \"selfRegister\": false\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Security Groups",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate random number between 1000 and 4500",
+							"const randomNum = Math.floor(Math.random() * (4500 - 1000 + 1)) + 1000;",
+							"",
+							"// Generate dynamic values",
+							"const groupName = `test-security-group-testing-${randomNum}`;",
+							"const groupDescription = `description-${randomNum}`;",
+							"",
+							"// Set variables for use in the request body",
+							"pm.environment.set(\"group_name\", groupName);",
+							"pm.environment.set(\"group_description\", groupDescription);",
+							"    ",
+							"const groupId = pm.environment.get(\"groupId\");",
+							"console.log(\"Fetched groupId:\", groupId);",
+							"pm.environment.set(\"id\", groupId);",
+							"",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"param\": {\n        \"id\": \"{{id}}\",\n        \"name\": \"{{group_name}}\",\n        \"createuserId\": \"40029484\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/securityGroups",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"securityGroups"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Group",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate random number between 1000 and 4500",
+							"const randomNum = Math.floor(Math.random() * (4500 - 1000 + 1)) + 1000;",
+							"",
+							"// Generate dynamic values",
+							"const groupName = `update-group-demo-${randomNum}`;",
+							"const groupDescription = `update-description-${randomNum}`;",
+							"",
+							"// Set variables for use in the request body",
+							"pm.environment.set(\"group_name\", groupName);",
+							"pm.environment.set(\"group_description\", groupDescription);",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_AUTH_TOKEN",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"param\": {\n        \"name\": \"{{group_name}}\",\n        \"description\": \"e2w2w2\",\n        \"privateGroup\": true,\n        \"selfRegister\": false\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Add Member",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Set membershipId in environment variable\", function () {",
+							"    // Parse the response JSON",
+							"    var jsonData = pm.response.json();",
+							"    ",
+							"    // Check if response is successful and contains the id",
+							"    pm.expect(jsonData.result.success).to.be.true;",
+							"    pm.expect(jsonData.result.content.id).to.exist;",
+							"    ",
+							"    // Set the groupId environment variable",
+							"    pm.environment.set(\"membershipId\", parseInt(jsonData.result.content.id));",
+							"    ",
+							"    // Optional: Log the set value for verification",
+							"    console.log(\"membershipId set to: \" + jsonData.result.content.id);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"const randomNum = Math.floor(Math.random() * (4500 - 1000 + 1)) + 1000;",
+							"",
+							"pm.environment.set(\"memberId\", randomNum);",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_ADMIN_JWT_TOKEN",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"param\": {\n        \"groupId\": \"{{groupId}}\",\n        \"memberId\": \"{{memberId}}\",\n        \"membershipType\": \"user\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/members",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"members"
+					],
+					"query": [
+						{
+							"key": "resourceId",
+							"value": "20000000",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Group by Id",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}?fields=id,name",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}"
+					],
+					"query": [
+						{
+							"key": "fields",
+							"value": "id,name"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Single Member",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/singleMember/{{memberId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"singleMember",
+						"{{memberId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Group Member Count",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/membersCount",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"membersCount"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Group Member Count With Sub Groups",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/membersCount?includeSubGroups=true",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"membersCount"
+					],
+					"query": [
+						{
+							"key": "includeSubGroups",
+							"value": "true"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Sub Groups",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/getSubGroups?includeSubGroups=true&",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"getSubGroups"
+					],
+					"query": [
+						{
+							"key": "includeSubGroups",
+							"value": "true"
+						},
+						{
+							"key": "oneLevel",
+							"value": "true",
+							"disabled": true
+						},
+						{
+							"key": "",
+							"value": null
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Parent Group",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/getParentGroup?oneLevel=false",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"getParentGroup"
+					],
+					"query": [
+						{
+							"key": "oneLevel",
+							"value": "false"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get members",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/members",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"members"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Member by memberid and type",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_JWT_TOKEN"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/?memberId={{memberId}}&membershipType=user",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						""
+					],
+					"query": [
+						{
+							"key": "memberId",
+							"value": "{{memberId}}"
+						},
+						{
+							"key": "membershipType",
+							"value": "user"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete/Remove Member",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}/members/{{membershipId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}",
+						"members",
+						"{{membershipId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Group",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{accessToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/{{version}}/groups/{{groupId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"{{version}}",
+						"groups",
+						"{{groupId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "accessToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiNDAxNDEyMzUiLCJyb2xlcyI6WyJhZG1pbmlzdHJhdG9yIiwiVG9wY29kZXIgVXNlciJdLCJoYW5kbGUiOiJUb255SiIsImVtYWlsIjoidGplZnRocytmaXhAdG9wY29kZXIuY29tIiwic2NvcGVzIjpbInJlYWQ6ZGljZSIsIndyaXRlOmRpY2UiLCJyZWFkOnVzZXJzIiwid3JpdGU6dXNlcnMiXSwiaWF0IjoxNzQ5NTEyNDUzLCJleHAiOjE3NDk1NDEyNTN9.ftzrxwkk5ppjYrYLvAVbD5hZkWOvxYrEluQZJU_N__8",
+			"type": "string"
+		},
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "version",
+			"value": "v3",
+			"type": "string"
+		}
+	]
+}

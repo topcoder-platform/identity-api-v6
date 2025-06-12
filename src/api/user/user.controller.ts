@@ -50,6 +50,7 @@ import { checkAdminOrScope } from '../../shared/auth/auth.helpers'; // Import he
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaClient as PrismaClientCommonOltp } from '@prisma/client-common-oltp'; // Import PrismaClient
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module'; // Import injection token
+import { ValidationResponseDto } from '../../dto/user/user.dto';
 
 // Helper function for manual auth checks (Example)
 function checkPermission(
@@ -241,12 +242,12 @@ export class UserController {
     description:
       'Base URL for the reset link, e.g., http://localhost:3001/reset?token=',
   })
-  @ApiResponse({ status: 200, description: 'Reset token sent (simulated)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Reset token sent (simulated)' })
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'Email or handle is required, or invalid input',
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async getResetToken(
     @Query('email') email?: string,
     @Query('handle') handle?: string,
@@ -271,8 +272,8 @@ export class UserController {
   @Get('validateHandle')
   @ApiOperation({ summary: 'Validate if a user handle is available' })
   @ApiQuery({ name: 'handle', required: true, type: String })
-  @ApiResponse({ status: 200, type: DTOs.ValidationResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: HttpStatus.OK, type: DTOs.ValidationResponseDto })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
   async validateHandle(
     @Query('handle') handle: string,
   ): Promise<DTOs.ValidationResponseDto> {
@@ -286,8 +287,8 @@ export class UserController {
   @Get('validateEmail')
   @ApiOperation({ summary: 'Validate if an email address is available' })
   @ApiQuery({ name: 'email', required: true, type: String })
-  @ApiResponse({ status: 200, type: DTOs.ValidationResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: HttpStatus.OK, type: DTOs.ValidationResponseDto })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
   async validateEmail(
     @Query('email') email: string,
   ): Promise<DTOs.ValidationResponseDto> {
@@ -299,23 +300,53 @@ export class UserController {
   }
 
   @Get('validateSocial')
-  @ApiOperation({ summary: 'Validate social provider and user ID linkage' })
-  @ApiQuery({ name: 'socialUserId', required: true, type: String })
-  @ApiQuery({ name: 'socialProvider', required: true, type: String })
-  @ApiResponse({ status: 200, type: DTOs.ValidationResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiOperation({
+    summary: 'Validate social provider and user ID availability',
+  })
+  @ApiQuery({
+    name: 'socialUserId',
+    required: true,
+    type: String,
+    description: "The user's ID within the social provider.",
+  })
+  @ApiQuery({
+    name: 'socialProvider',
+    required: true,
+    type: String,
+    description:
+      "Key of the social provider (e.g., 'google-oauth2', 'facebook').",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Validation result.',
+    type: DTOs.ValidationResponseDto,
+  }) // Update Swagger DTO if wrapped
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input or unsupported provider.',
+  }) // Update Swagger DTO if wrapped
   async validateSocial(
     @Query('socialUserId') socialUserId: string,
     @Query('socialProvider') socialProvider: string,
   ): Promise<DTOs.ValidationResponseDto> {
+    // Interceptor will wrap this
     this.logger.log(
-      `Validating social provider ${socialProvider} for user ID ${socialUserId}`,
+      `Request to validate social provider ${socialProvider} for user ID ${socialUserId}`,
     );
-    if (!socialUserId || !socialProvider) {
+
+    if (!socialUserId || socialUserId.trim() === '') {
       throw new BadRequestException(
-        'socialUserId and socialProvider query parameters are required.',
+        '%s is required'.replace('%s', 'socialUserId'),
       );
     }
+    if (!socialProvider || socialProvider.trim() === '') {
+      throw new BadRequestException(
+        '%s is required'.replace('%s', 'socialProvider'),
+      );
+    }
+
+    // Service handles the core logic and specific error mapping for BadRequestException (unsupported provider)
+    // and the boolean validation result.
     return this.validationService.validateSocial(socialProvider, socialUserId);
   }
 
@@ -339,7 +370,7 @@ export class UserController {
     description: 'Default 0',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'List of users found',
     type: [DTOs.UserResponseDto],
   })
@@ -376,11 +407,11 @@ export class UserController {
   @ApiOperation({ summary: 'Get a specific user by ID' })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'User found',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async findUserById(
     @Param('resourceId') resourceId: string,
     @Req() req: Request,
@@ -403,12 +434,12 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.CreateUserBodyDto })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'User created',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiResponse({ status: 409, description: 'Handle or email already exists' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Handle or email already exists' })
   @HttpCode(HttpStatus.CREATED)
   async registerUser(
     @Body() createUserDto: DTOs.CreateUserBodyDto,
@@ -424,11 +455,11 @@ export class UserController {
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiBody({ type: DTOs.UpdateUserBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'User updated',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async updateBasicInfo(
     @Param('resourceId') resourceId: string,
     @Body() updateUserDto: DTOs.UpdateUserBodyDto,
@@ -459,8 +490,8 @@ export class UserController {
     status: HttpStatus.NOT_IMPLEMENTED,
     description: 'This endpoint is not implemented.',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
   @HttpCode(HttpStatus.NOT_IMPLEMENTED) // Set default status code
   async deleteUser(
     @Param('resourceId') resourceId: string,
@@ -487,18 +518,18 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.CreateUpdateSSOBodyDto })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'SSO profile linked successfully',
     type: DTOs.UserProfileDto,
   })
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input or missing provider/providerUserId',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
-  @ApiResponse({ status: 404, description: 'User or SSO Provider not found' })
-  @ApiResponse({ status: 409, description: 'SSO profile already linked' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User or SSO Provider not found' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'SSO profile already linked' })
   async createSSOUserLogin(
     @Param('userId', ParseIntPipe) userId: number,
     @Body() createSSODto: DTOs.CreateUpdateSSOBodyDto,
@@ -535,18 +566,18 @@ export class UserController {
       'The provider and userId in the DTO identify the link. Other fields are updated.',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'SSO profile updated successfully',
     type: DTOs.UserProfileDto,
   })
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input or missing provider/providerUserId',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
   @ApiResponse({
-    status: 404,
+    status: HttpStatus.NOT_FOUND,
     description: 'User, SSO Provider, or specific SSO link not found',
   })
   async updateSSOUserLogin(
@@ -600,14 +631,14 @@ export class UserController {
     description: 'User ID from the external SSO provider',
   })
   @ApiResponse({
-    status: 204,
+    status: HttpStatus.NO_CONTENT,
     description: 'SSO login link deleted successfully',
   })
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'Missing required parameters or provider not found',
   })
-  @ApiResponse({ status: 404, description: 'User or SSO link not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User or SSO link not found' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteSSOUserLogin(
     @Param('userId', ParseIntPipe) userId: number,
@@ -679,13 +710,13 @@ export class UserController {
   })
   @ApiParam({ name: 'userId', description: 'Numeric User ID', type: Number })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'List of linked SSO profiles',
     type: [DTOs.UserProfileDto],
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async getSSOUserLogins(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() req: Request,
@@ -719,12 +750,12 @@ export class UserController {
     description: 'External profile added successfully',
     type: DTOs.UserProfileDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   @ApiResponse({
-    status: 409,
+    status: HttpStatus.CONFLICT,
     description: 'Profile already exists for this provider/user',
   })
   @HttpCode(HttpStatus.CREATED)
@@ -756,13 +787,13 @@ export class UserController {
   })
   @ApiParam({ name: 'userId', description: 'Numeric User ID', type: Number })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'List of external profiles',
     type: [DTOs.UserProfileDto],
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async getAllExternalProfiles(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() req: Request,
@@ -795,9 +826,9 @@ export class UserController {
     status: HttpStatus.NO_CONTENT,
     description: 'External profiles for the provider deleted successfully',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'User or profile not found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User or profile not found' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteExternalProfile(
     @Param('resourceId', ParseIntPipe) resourceId: number,
@@ -834,12 +865,12 @@ export class UserController {
     },
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description:
       'User authenticated' /* type: Auth0CustomDbUserDto - define if needed */,
   })
-  @ApiResponse({ status: 400, description: 'Missing parameters' })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Missing parameters' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid credentials' })
   async auth0Login(
     @Body() loginData: { handleOrEmail?: string; password?: string },
   ): Promise<any> {
@@ -868,9 +899,9 @@ export class UserController {
       properties: { email: { type: 'string' }, handle: { type: 'string' } },
     },
   })
-  @ApiResponse({ status: 200, description: 'User profile and roles' })
-  @ApiResponse({ status: 400, description: 'Missing email or handle' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'User profile and roles' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Missing email or handle' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async auth0Roles(
     @Body() rolesData: { email?: string; handle?: string },
   ): Promise<any> {
@@ -898,16 +929,16 @@ export class UserController {
       properties: { email: { type: 'string' }, password: { type: 'string' } },
     },
   })
-  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password changed successfully' })
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'Missing parameters or invalid password',
   })
   @ApiResponse({
-    status: 403,
+    status: HttpStatus.FORBIDDEN,
     description: 'Password change not allowed (e.g., SSO user)',
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async auth0ChangePassword(
     @Body() changePasswordData: { email?: string; password?: string },
   ): Promise<{ message: string }> {
@@ -925,41 +956,41 @@ export class UserController {
 
   // --- Password/Activation Flows (Public) ---
 
-  @Post('resetPassword')
-  @ApiOperation({ summary: 'Reset user password using a valid reset token' })
-  @ApiBody({ type: DTOs.ResetPasswordBodyDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Password has been reset successfully.',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input, token, or password format.',
-  })
-  @ApiResponse({ status: 401, description: 'Invalid or expired reset token.' })
-  @ApiResponse({ status: 404, description: 'User not found.' })
-  async resetPassword(
-    @Body() resetPasswordDto: DTOs.ResetPasswordBodyDto,
-  ): Promise<{ message: string }> {
-    this.logger.log(`Attempting to reset password.`);
-    // The DTO structure is { param: { handleOrEmail?, credential: { resetToken, password } } }
-    // AuthFlowService.resetPassword expects { handleOrEmail?, resetToken, newPassword }
-    if (
-      !resetPasswordDto.param?.credential?.resetToken ||
-      !resetPasswordDto.param?.credential?.password
-    ) {
-      throw new BadRequestException(
-        'Reset token and new password are required within credential parameter.',
-      );
-    }
-    await this.authFlowService.resetPassword({
-      handleOrEmail:
-        resetPasswordDto.param.handle || resetPasswordDto.param.email, // Use handle or email from param
-      resetToken: resetPasswordDto.param.credential.resetToken,
-      newPassword: resetPasswordDto.param.credential.password,
-    });
-    return { message: 'Password has been reset successfully.' };
-  }
+  // @Post('resetPassword')
+  // @ApiOperation({ summary: 'Reset user password using a valid reset token' })
+  // @ApiBody({ type: DTOs.ResetPasswordBodyDto })
+  // @ApiResponse({
+  //   status: HttpStatus.OK,
+  //   description: 'Password has been reset successfully.',
+  // })
+  // @ApiResponse({
+  //   status: HttpStatus.BAD_REQUEST,
+  //   description: 'Invalid input, token, or password format.',
+  // })
+  // @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or expired reset token.' })
+  // @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
+  // async resetPassword(
+  //   @Body() resetPasswordDto: DTOs.ResetPasswordBodyDto,
+  // ): Promise<{ message: string }> {
+  //   this.logger.log(`Attempting to reset password.`);
+  //   // The DTO structure is { param: { handleOrEmail?, credential: { resetToken, password } } }
+  //   // AuthFlowService.resetPassword expects { handleOrEmail?, resetToken, newPassword }
+  //   if (
+  //     !resetPasswordDto.param?.credential?.resetToken ||
+  //     !resetPasswordDto.param?.credential?.password
+  //   ) {
+  //     throw new BadRequestException(
+  //       'Reset token and new password are required within credential parameter.',
+  //     );
+  //   }
+  //   await this.authFlowService.resetPassword({
+  //     handleOrEmail:
+  //       resetPasswordDto.param.handle || resetPasswordDto.param.email, // Use handle or email from param
+  //     resetToken: resetPasswordDto.param.credential.resetToken,
+  //     newPassword: resetPasswordDto.param.credential.password,
+  //   });
+  //   return { message: 'Password has been reset successfully.' };
+  // }
 
   @Put('activate')
   @ApiOperation({
@@ -967,14 +998,14 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.ActivateUserBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'User activated successfully',
     type: DTOs.UserResponseDto,
   }) // Assuming it returns the user
-  @ApiResponse({ status: 400, description: 'Invalid input, OTP, or token' })
-  @ApiResponse({ status: 403, description: 'Forbidden (e.g., token mismatch)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 410, description: 'Token or OTP expired' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input, OTP, or token' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (e.g., token mismatch)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Token or OTP expired' })
   async activateUser(
     @Body() activateUserDto: DTOs.ActivateUserBodyDto,
   ): Promise<DTOs.UserResponseDto> {
@@ -1005,13 +1036,13 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.UserOtpDto }) // UserOtpDto contains userId and resendToken for this flow
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'Activation email resent successfully',
   })
-  @ApiResponse({ status: 400, description: 'Invalid input or token' })
-  @ApiResponse({ status: 403, description: 'Forbidden (e.g., token mismatch)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 410, description: 'Token expired' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or token' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (e.g., token mismatch)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Token expired' })
   async resendActivationEmail(
     @Body() resendActivationDto: DTOs.UserOtpDto,
   ): Promise<{ message: string }> {
@@ -1029,15 +1060,15 @@ export class UserController {
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateHandleBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'Handle updated',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid input or handle format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 409, description: 'Handle already exists' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or handle format' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Handle already exists' })
   async updateHandle(
     @Param('resourceId') resourceId: string,
     @Body() updateHandleDto: DTOs.UpdateHandleBodyDto,
@@ -1068,16 +1099,16 @@ export class UserController {
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateEmailBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'Primary email update process initiated',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid input or email format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or email format' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   @ApiResponse({
-    status: 409,
+    status: HttpStatus.CONFLICT,
     description: 'Email already in use by another account',
   })
   async updatePrimaryEmail(
@@ -1113,14 +1144,14 @@ export class UserController {
     },
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'One-time token generated',
     type: DTOs.OneTimeTokenResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing userId or password' })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  @ApiResponse({ status: 403, description: 'User account not active' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Missing userId or password' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid credentials' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'User account not active' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async getOneTimeToken(
     @Body() tokenData: { userId: string; password?: string },
   ): Promise<DTOs.OneTimeTokenResponseDto> {
@@ -1148,22 +1179,22 @@ export class UserController {
     description: 'Bearer token (the one-time token)',
     required: true,
   })
-  @ApiResponse({ status: 200, description: 'Email updated successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid input or token format' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Email updated successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or token format' })
   @ApiResponse({
-    status: 401,
+    status: HttpStatus.UNAUTHORIZED,
     description: 'One-time token missing or invalid',
   })
   @ApiResponse({
-    status: 403,
+    status: HttpStatus.FORBIDDEN,
     description: 'Token subject mismatch or already used',
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   @ApiResponse({
-    status: 409,
+    status: HttpStatus.CONFLICT,
     description: 'New email already in use by another account',
   })
-  @ApiResponse({ status: 410, description: 'One-time token expired' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'One-time token expired' })
   @HttpCode(HttpStatus.OK) // Changed from previous 204 to allow message body
   async updateEmailWithOneTimeToken(
     @Param('resourceId') resourceId: string,
@@ -1197,14 +1228,14 @@ export class UserController {
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateStatusBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'Status updated',
     type: DTOs.UserResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid status code' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden (Admin role required)' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid status code' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden (Admin role required)' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async updateStatus(
     @Param('resourceId') resourceId: string,
     @Body() updateStatusDto: DTOs.UpdateStatusBodyDto,
@@ -1235,17 +1266,17 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.UpdatePrimaryRoleBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'Primary role updated successfully.',
     schema: { type: 'object', properties: { message: { type: 'string' } } },
   })
-  @ApiResponse({ status: 400, description: 'Invalid input or role name.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or role name.' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   @ApiResponse({
-    status: 403,
+    status: HttpStatus.FORBIDDEN,
     description: 'Forbidden (e.g., role not assignable or not owned by user)',
   })
-  @ApiResponse({ status: 404, description: 'Role not found.' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Role not found.' })
   async updatePrimaryRole(
     @Req() req: Request,
     @Body() updatePrimaryRoleDto: DTOs.UpdatePrimaryRoleBodyDto,
@@ -1276,7 +1307,7 @@ export class UserController {
     description: 'User ID (string representation of number)',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: '2FA status',
     type: DTOs.User2faDto,
   })
@@ -1301,7 +1332,7 @@ export class UserController {
   })
   @ApiBody({ type: DTOs.UpdateUser2faBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: '2FA status updated',
     type: DTOs.User2faDto,
   })
@@ -1332,7 +1363,7 @@ export class UserController {
     description: 'User ID (string representation of number)',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'DICE connection details/status',
     type: DTOs.DiceConnectionResponseDto,
   })
@@ -1364,8 +1395,8 @@ export class UserController {
     required: true,
   })
   @ApiBody({ type: DTOs.DiceStatusWebhookBodyDto })
-  @ApiResponse({ status: 200, description: 'Webhook received' })
-  @ApiResponse({ status: 401, description: 'Invalid API Key' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Webhook received' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid API Key' })
   async handleDiceWebhook(
     @Body() diceStatusDto: DTOs.DiceStatusWebhookBodyDto,
     @Headers('x-api-key') apiKey: string,
@@ -1383,7 +1414,7 @@ export class UserController {
     description: 'Requires userId of the user who needs OTP for 2FA.',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: '2FA OTP sent, returns resend token.',
     type: DTOs.UserOtpResponseDto,
   })
@@ -1400,10 +1431,10 @@ export class UserController {
     );
   }
 
-  @Post('resendOtpEmail') // 2FA Resend OTP
+  @Post('/resendOtpEmail') // 2FA Resend OTP
   @ApiOperation({ summary: 'Resend 2FA OTP email using a resend token.' })
   @ApiBody({ type: DTOs.ResendOtpEmailBodyDto })
-  @ApiResponse({ status: 200, description: '2FA OTP resent successfully.' })
+  @ApiResponse({ status: HttpStatus.OK, description: '2FA OTP resent successfully.' })
   async resendOtpEmail(
     @Body() resendOtpDto: DTOs.ResendOtpEmailBodyDto,
   ): Promise<{ message: string }> {
@@ -1419,12 +1450,12 @@ export class UserController {
   @ApiOperation({ summary: 'Check 2FA OTP and complete login.' })
   @ApiBody({ type: DTOs.CheckOtpBodyDto })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description:
       'OTP verified, returns login completion details (e.g. user/JWTs).',
   }) // Actual type depends on what AuthFlowService.completeLoginAfter2fa returns
   @ApiResponse({
-    status: 400,
+    status: HttpStatus.BAD_REQUEST,
     description: 'OTP invalid or expired, or missing params.',
   })
   async checkOtp(@Body() checkOtpDto: DTOs.CheckOtpBodyDto): Promise<any> {
@@ -1447,7 +1478,7 @@ export class UserController {
     description: 'User ID (string representation of number)',
   })
   @ApiResponse({
-    status: 200,
+    status: HttpStatus.OK,
     description: 'List of user achievements',
     type: [DTOs.AchievementDto],
   })

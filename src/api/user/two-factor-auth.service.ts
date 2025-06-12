@@ -86,69 +86,69 @@ export class TwoFactorAuthService {
     return otp;
   }
 
-  private async generateResendToken(
-    userId: string,
-    email: string,
-  ): Promise<string> {
-    const payload = { userId, email, type: '2fa-resend' };
-    return jwt.sign(payload, this.resendTokenSecret, {
-      expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
-    });
-  }
+  // private async generateResendToken(
+  //   userId: string,
+  //   email: string,
+  // ): Promise<string> {
+  //   const payload = { userId, email, type: '2fa-resend' };
+  //   return jwt.sign(payload, this.resendTokenSecret, {
+  //     expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
+  //   });
+  // }
 
-  private async verifyResendToken(
-    token: string,
-  ): Promise<{ userId: string; email: string; aud?: string } | null> {
-    try {
-      const decoded = jwt.verify(
-        token,
-        this.resendTokenSecret,
-      ) as DecodedResendToken;
+  // private async verifyResendToken(
+  //   token: string,
+  // ): Promise<{ userId: string; email: string; aud?: string } | null> {
+  //   try {
+  //     const decoded = jwt.verify(
+  //       token,
+  //       this.resendTokenSecret,
+  //     ) as DecodedResendToken;
 
-      if (typeof decoded === 'string') {
-        this.logger.warn(
-          'JWT verification returned a string, expected an object.',
-        );
-        return null;
-      }
+  //     if (typeof decoded === 'string') {
+  //       this.logger.warn(
+  //         'JWT verification returned a string, expected an object.',
+  //       );
+  //       return null;
+  //     }
 
-      // Allow general resend tokens or specific '2fa-resend' type
-      if (decoded.type && decoded.type !== '2fa-resend') {
-        this.logger.warn(
-          `Invalid JWT type provided for 2FA resend: ${decoded.type}`,
-        );
-        return null;
-      }
-      // Add audience check if present
-      // decoded.aud can be string or string[]
-      const audience = Array.isArray(decoded.aud)
-        ? decoded.aud[0]
-        : decoded.aud;
+  //     // Allow general resend tokens or specific '2fa-resend' type
+  //     if (decoded.type && decoded.type !== '2fa-resend') {
+  //       this.logger.warn(
+  //         `Invalid JWT type provided for 2FA resend: ${decoded.type}`,
+  //       );
+  //       return null;
+  //     }
+  //     // Add audience check if present
+  //     // decoded.aud can be string or string[]
+  //     const audience = Array.isArray(decoded.aud)
+  //       ? decoded.aud[0]
+  //       : decoded.aud;
 
-      if (
-        audience &&
-        audience !== this.otp2faAudience &&
-        audience !== 'emailactivation' // also allow activation resend for now
-      ) {
-        this.logger.warn(`Invalid JWT audience for 2FA resend: ${audience}`);
-        return null;
-      }
+  //     if (
+  //       audience &&
+  //       audience !== this.otp2faAudience &&
+  //       audience !== 'emailactivation' // also allow activation resend for now
+  //     ) {
+  //       this.logger.warn(`Invalid JWT audience for 2FA resend: ${audience}`);
+  //       return null;
+  //     }
 
-      if (!decoded.userId || !decoded.email) {
-        this.logger.warn('JWT for 2FA resend missing userId or email.');
-        return null;
-      }
+  //     if (!decoded.userId || !decoded.email) {
+  //       this.logger.warn('JWT for 2FA resend missing userId or email.');
+  //       return null;
+  //     }
 
-      return {
-        userId: decoded.userId,
-        email: decoded.email,
-        aud: audience,
-      };
-    } catch (error) {
-      this.logger.error(`Error verifying 2FA resend token: ${error.message}`);
-      return null;
-    }
-  }
+  //     return {
+  //       userId: decoded.userId,
+  //       email: decoded.email,
+  //       aud: audience,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Error verifying 2FA resend token: ${error.message}`);
+  //     return null;
+  //   }
+  // }
 
   async getUser2faStatus(userIdString: string): Promise<DTOs.User2faDto> {
     this.logger.log(`Getting 2FA status for user: ${userIdString}`);
@@ -714,16 +714,29 @@ export class TwoFactorAuthService {
       expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
     });
 
+    const domain =
+      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const fromEmail = `Topcoder <noreply@${domain}>`;
+    // Use the specific template ID for resending activation emails
+    const sendgridTemplateId = this.configService.get<string>(
+      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
     try {
-      await this.eventService.postEnvelopedNotification('email.send.2fa_otp', {
-        userId: userIdString,
-        email: primaryEmail,
-        handle: user.handle,
-        otp: otp,
-        durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+      await this.eventService.postDirectBusMessage('external.action.email', {
+        data: {
+          userId: userIdString,
+          email: primaryEmail,
+          handle: user.handle,
+          code: otp,
+          durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+        },
+        from: { email: fromEmail },
+        version: 'v3',
+        sendgrid_template_id: sendgridTemplateId,
+        recipients: [primaryEmail], // The original email used for registration
       });
       this.logger.log(
-        `Published 'email.send.2fa_otp' event for user ${userIdString}`,
+        `Published 'external.action.email' event for user ${userIdString}`,
       );
     } catch (eventError) {
       this.logger.error(
@@ -797,17 +810,29 @@ export class TwoFactorAuthService {
     this.logger.log(
       `New 2FA OTP ${newOtp} generated and cached for user ${userIdString} (key: ${otpCacheKey}) during resend.`,
     );
-
+    const domain =
+      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const fromEmail = `Topcoder <noreply@${domain}>`;
+    // Use the specific template ID for resending activation emails
+    const sendgridTemplateId = this.configService.get<string>(
+      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
     try {
-      await this.eventService.postEnvelopedNotification('email.send.2fa_otp', {
-        userId: userIdString,
-        email: primaryEmail,
-        handle: user.handle,
-        otp: newOtp,
-        durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+      await this.eventService.postDirectBusMessage('external.action.email', {
+        data: {
+          userId: userIdString,
+          email: primaryEmail,
+          handle: user.handle,
+          code: newOtp,
+          durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+        },
+        from: { email: fromEmail },
+        version: 'v3',
+        sendgrid_template_id: sendgridTemplateId,
+        recipients: [primaryEmail], // The original email used for registration
       });
       this.logger.log(
-        `Published 'email.send.2fa_otp' (resend) event for user ${userIdString}`,
+        `Published 'external.action.email' (resend) event for user ${userIdString}`,
       );
     } catch (eventError) {
       this.logger.error(

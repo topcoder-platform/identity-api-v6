@@ -40,7 +40,7 @@ class CredentialDto {
   // Add other credential-related fields if needed (activationCode, etc.)
 }
 
-class CountryDto {
+export class CountryDto {
   @IsString()
   @IsNotEmpty()
   code: string;
