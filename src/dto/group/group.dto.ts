@@ -87,7 +87,7 @@ export class SecurityGroups {
   })
   name: string;
 
-  // @IsNumber({}, { message: 'Create User ID must be a number' })
+  @IsNumber({}, { message: 'Create User ID must be a number' })
   createuserId: number;
 }
 

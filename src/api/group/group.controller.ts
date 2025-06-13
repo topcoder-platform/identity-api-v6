@@ -83,7 +83,7 @@ export class GroupController {
 
     const response = await this.groupService.create(dataToSubmit, user);
 
-    return createBaseResponse(response, 201);
+    return createBaseResponse(response, HttpStatus.CREATED);
   }
 
   //create security group
@@ -247,7 +247,6 @@ export class GroupController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    // Change to Promise<void> if 204
     const user = req.user as AuthenticatedUser;
     this.logger.debug(`User ${user.userId} deleting group ID: ${groupId}`);
 
