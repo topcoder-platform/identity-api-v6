@@ -10,18 +10,18 @@ This zip contains submission for challenge `Topcoder Identity Service: updating 
 Please use correct variables after copying `.env.example`
 
 ```
-AUTH_SECRET="test"
-AUTH0_CLIENT_SECRET="ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP"        # Client Secret of M2M App
-DICEAUTH_DICE_API_URL="https://console-api-uat.diceid.com/v1"
-DICEAUTH_DICE_API_KEY="wGu5zRfmgJ8zPQWVLO2jb7820kicVgr221Qteyua"
-DICEAUTH_ORG_ID="4f541723-f581-44de-b61c-5f83e8b8ef1e"
-DICEAUTH_USER_ID="a5e7e72a-fa5e-4acf-9eca-741d1443279b"
-DICEAUTH_TC_API_KEY="iQEErpTqL7ZiXqS2yU03DAsLx2owdR8igE9h9bUymLjHe86hh9eSvOLEXwNmwY8O5uUOtfrDHIWGuYv2Al8F2cvnJpVnQ6yU1PiNV8hEkEpxv3z548UFIpqWudN84GE8"
+AUTH_SECRET=""
+AUTH0_CLIENT_SECRET=""        # Client Secret of M2M App
+DICEAUTH_DICE_API_URL=""
+DICEAUTH_DICE_API_KEY=""
+DICEAUTH_ORG_ID=""
+DICEAUTH_USER_ID=""
+DICEAUTH_TC_API_KEY=""
 DICEAUTH_SCHEMA_NAME="Topcoder"
 DICEAUTH_SCHEMA_VERSION="1.4"
 DICEAUTH_OTP_DURATION="10"
-SLACK_BOT_KEY="xoxb-3858018789-4313088279844-TtviiFrGQlvEUuwhMSr5gaE3"
-SLACK_CHANNEL_ID="C04ENKCU4TZ"
+SLACK_BOT_KEY="3"
+SLACK_CHANNEL_ID=""
 JWT_SECRET="just-a-random-string"
 ```
 
@@ -35,7 +35,7 @@ LEGACY_BLOWFISH_KEY=!!!_REPLACE_WITH_BASE64_ENCODED_KEY_!!!
 Here is an example
 
 ```
-LEGACY_BLOWFISH_KEY=dGhpc2lzRGVmYXVmZlZhbHVl
+LEGACY_BLOWFISH_KEY=
 ```
 `.env.example has only sample values`.
 
