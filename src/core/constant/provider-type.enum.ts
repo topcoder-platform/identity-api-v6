@@ -21,7 +21,7 @@ export interface ProviderDetails {
   key: string; // The string identifier like 'google-oauth2'
   isSocial: boolean;
   isEnterprise: boolean;
-  // nameKey?: string; // Java code had 'screen_name', 'username'
+  nameKey?: string; // Java code had 'screen_name', 'username'
 }
 
 export const ProviderTypes: Record<string, ProviderDetails> = {
@@ -48,6 +48,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'twitter',
     isSocial: true,
     isEnterprise: false,
+    nameKey: 'screen_name'
   },
   github: {
     id: ProviderId.GITHUB,
@@ -66,18 +67,21 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'dribbble',
     isSocial: true,
     isEnterprise: false,
+    nameKey: 'username'
   },
   behance: {
     id: ProviderId.BEHANCE,
     key: 'behance',
     isSocial: true,
     isEnterprise: false,
+    nameKey: 'username'
   },
   stackoverflow: {
     id: ProviderId.STACKOVERFLOW,
     key: 'stackoverflow',
     isSocial: true,
     isEnterprise: false,
+    nameKey: 'username'
   },
   linkedin: {
     id: ProviderId.LINKEDIN,
@@ -90,6 +94,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'bitbucket',
     isSocial: true,
     isEnterprise: false,
+    nameKey: 'username'
   },
   ad: { id: ProviderId.LDAP, key: 'ad', isSocial: false, isEnterprise: true }, // LDAP
   samlp: {

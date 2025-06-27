@@ -45,6 +45,7 @@ import {
   BaseResponse,
   createBaseResponse,
 } from '../../shared/util/responseBuilder';
+import { Constants } from '../../core/constant/constants';
 
 @ApiTags('groups')
 @Controller('groups')
@@ -173,7 +174,7 @@ export class GroupController {
     const count = await this.groupService.getMemberCount(
       groupId,
       includeSubGroups,
-      1,
+      Constants.memberGroupMembershipType,
     );
     return createBaseResponse({ count });
   }

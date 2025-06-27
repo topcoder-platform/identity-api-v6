@@ -29,6 +29,7 @@ import {
 } from 'src/dto/group/group-membership.dto';
 import { AuthenticatedUser } from 'src/core/auth/jwt.strategy';
 import { MembershipType, MembershipTypeHelper } from './membership-type.enum';
+import { Constants } from '../../core/constant/constants';
 
 // Mock Prisma Clients
 const mockPrismaAuth = {
@@ -687,7 +688,7 @@ describe('GroupService', () => {
     const groupId = 1;
     const memberData: GroupMemberDto = {
       memberId: 2,
-      membershipType: MembershipType.User,
+      membershipType: Constants.memberGroupMembershipName,
       createdAt: new Date(),
       createdBy: '1',
       groupId: groupId,

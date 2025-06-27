@@ -28,7 +28,8 @@
     "postinstall": "npm run prisma:generate",
     "test:postman:roles": "newman run 'doc/roles api.postman_collection.json' -e doc/postman_environment.json -r cli,json --reporter-json-export roles-report.json",
     "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json",
-    "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json"
+    "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json",
+    "test:postman:authorization": "newman run --ignore-redirects \"doc/authorizations.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export authorizations-report.json"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.0",
@@ -43,6 +44,7 @@
     "@prisma/client": "^6.5.0",
     "@topcoder-platform/topcoder-bus-api-wrapper": "github:topcoder-platform/tc-bus-api-wrapper",
     "@types/crypto-js": "^4.2.2",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
     "cache-manager": "^6.4.2",
@@ -54,6 +56,7 @@
     "csv": "^6.3.11",
     "csv-stringify": "^6.5.2",
     "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^16.5.0",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",

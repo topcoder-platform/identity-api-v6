@@ -35,6 +35,7 @@ import {
 } from 'src/dto/group/group-membership.dto';
 import { AuthenticatedUser } from 'src/core/auth/jwt.strategy';
 import { MembershipTypeHelper } from './membership-type.enum';
+import { Constants } from '../../core/constant/constants';
 
 // Extended Group type with subGroups
 interface Group extends PrismaGroupFromDb {
@@ -396,7 +397,7 @@ export class GroupService {
   async getMemberCount(
     groupId: number,
     includeSubGroups: boolean,
-    memberType: number = 1,
+    memberType: number = Constants.memberGroupMembershipType,
   ): Promise<number> {
     // const group = await this.findGroupById(groupId);
     // if (!group) {
@@ -605,7 +606,7 @@ export class GroupService {
     await this.validateAdminRoleOrPrivateGroupMembership(
       user,
       group,
-      1,
+      Constants.memberGroupMembershipType,
       this.readScopes,
       this.adminRoles,
     );
@@ -706,7 +707,7 @@ export class GroupService {
 
     try {
       const membershipRecords = await this.prismaAuth.groupMembership.findMany({
-        where: { groupId: parent.id, membershipType: 2 },
+        where: { groupId: parent.id, membershipType: Constants.subGroupMembershipType },
         select: { memberId: true },
       });
 
@@ -847,7 +848,7 @@ export class GroupService {
     await this.validateAdminRoleOrPrivateGroupMembership(
       user,
       group,
-      1,
+      Constants.memberGroupMembershipType,
       this.readScopes,
       this.adminRoles,
     );
@@ -955,6 +956,11 @@ export class GroupService {
     }
 
     if (request.membershipType == null) {
+      throw new InternalServerErrorException("Mandatory field missing: membershipType");
+    }
+
+    const allTypes = [Constants.memberGroupMembershipName, Constants.subGroupMembershipName];
+    if (!allTypes.includes(request.membershipType as string)) {
       throw new InternalServerErrorException("Mandatory field missing: membershipType");
     }
   }

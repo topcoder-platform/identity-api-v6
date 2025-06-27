@@ -7,6 +7,7 @@ import { RoleModule } from './api/role/role.module';
 import { AuthModule } from './core/auth/auth.module';
 import { UserModule } from './api/user/user.module';
 import { GroupModule } from './api/group/group.module';
+import { AuthorizationModule } from './api/authorization/authorization.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { GroupModule } from './api/group/group.module';
     RoleModule,
     UserModule,
     GroupModule,
+    AuthorizationModule,
   ],
   controllers: [], // No root controller
   providers: [], // No root service

@@ -11,8 +11,7 @@ This migration relies on several external systems and core libraries. The necess
 *   **Event Bus:** The messaging backbone abstraction used for publishing asynchronous events (e.g., user creation, triggers for email notifications). Requires connection details/endpoint for the Event Bus API client and configured topic names (e.g., `EVENT_ORIGINATOR`). The `EventService` wrapping the `EventBusServiceClient` is set up to handle publishing. *Note: Email sending itself is triggered by publishing events (e.g., to `external.action.email`) which are consumed by a separate downstream service.* (Status: **Available**)
 *   **Auth0:** The primary Identity Provider (IdP) handling user login/signup via OAuth2/OIDC, M2M token validation, and user profile management. Requires Auth0 Domain, Client ID, Client Secret, M2M Client ID/Secret, and Audience configuration. (Status: **Integration Needed**)
 *   **Zendesk (SSO JWT Generation):** Configuration is required (shared secret, ID prefix) to generate a specific JWT for Zendesk Single Sign-On. This service *generates* the JWT, but does not directly call Zendesk APIs. The client uses the generated JWT. (Status: **Configuration Required**)
-*   **DICE:** Appears to be an external **SaaS platform or dedicated internal service** for digital identity/verifiable credentials. Interaction involves direct, authenticated API calls *from* this service (to initiate invitations) and receiving webhook callbacks *from* DICE (for status updates). Requires DICE API URL, API Key, Org ID, invoking User ID, and potentially specific schema/credential definition details. (Status: **Integration Needed**)
-*   **Slack:** Communication platform used for sending internal system notifications, primarily related to the DICE integration status. Integration involves **direct API calls** to the Slack `chat.postMessage` endpoint using a Bot Token. Requires a Slack Bot Token and Channel ID. (Status: **Integration Needed**)
+*   **Slack:** Communication platform used for sending internal system notifications, primarily related to the 2FA integration status. Integration involves **direct API calls** to the Slack `chat.postMessage` endpoint using a Bot Token. Requires a Slack Bot Token and Channel ID. (Status: **Integration Needed**)
 *   **`jsonwebtoken`:** A library needed for *generating* various JWTs (internal session tokens, reset tokens, activation resend tokens, one-time tokens). Must be added as a dependency. (Status: **Library Needed**)
 *   **`bcrypt`:** A library needed for securely hashing user passwords and comparing hashes during authentication. Must be added as a dependency. (Status: **Library Needed**)
 
@@ -505,8 +504,7 @@ This is a large resource covering user lifecycle, authentication aspects, profil
 *   Event publishing via Event Bus (`user.created`, `user.updated`, `user.activated`, email notifications).
 *   Email sending orchestration via events (using SendGrid templates).
 *   Auth0 integration (fetching IdP tokens).
-*   DICE integration (invitation flow, status webhooks).
-*   Slack notifications for DICE events.
+*   Slack notifications for 2FA events.
 *   M2M scope-based authorization (`UserProfilesFactory`).
 
 **Proposed TypeScript Structure:**
@@ -534,9 +532,8 @@ Given the complexity, splitting `UserService` is recommended.
     *   Interacts with `NotificationService` (for emails).
     *   Generates/validates various tokens (reset, resend, OTP, one-time).
 *   **Service:** `TwoFactorAuthService` (`src/services/twoFactorAuth.service.ts`)
-    *   Manages 2FA settings (`/2fa`), DICE connection (`/diceConnection`, `/dice-status`), OTP handling (`/sendOtp`, `/resendOtpEmail`, `/checkOtp`).
-    *   Interacts with Prisma Client (`User2fa`, `DiceConnection`, `UserOtp` tables).
-    *   Interacts with `DICEService`.
+    *   Manages 2FA settings (`/2fa`), OTP handling (`/sendOtp`, `/resendOtpEmail`, `/checkOtp`).
+    *   Interacts with Prisma Client (`User2fa`, `UserOtp` tables).
     *   Interacts with `NotificationService` (for OTP emails, Slack).
 *   **Service:** `RoleService` (`src/services/role.service.ts`) - *May already exist from RoleResource migration*
     *   Handles role lookup (`/roles`) and assignment (`/updatePrimaryRole`, default role assignment).
@@ -550,8 +547,6 @@ Given the complexity, splitting `UserService` is recommended.
     *   Sends Slack notifications.
 *   **Service:** `CacheService` (`src/services/cache.service.ts`) - *Likely shared*
     *   Wrapper around Redis client for get/put/delete operations with expiry.
-*   **Service:** `DICEService` (`src/services/dice.service.ts`)
-    *   Wrapper around DICE SDK/API client.
 *   **Service:** `Auth0Service` (`src/services/auth0.service.ts`) - *Likely shared with AuthService*
     *   Wrapper around Auth0 SDK/API client.
 
@@ -562,11 +557,10 @@ Given the complexity, splitting `UserService` is recommended.
 *   Event Bus client library (e.g., `kafkajs`)
 *   `jsonwebtoken` library
 *   Auth0 Node.js SDK
-*   DICE SDK/client library (if available, otherwise HTTP client)
 *   SendGrid client library
 *   Slack client library
 *   Auth module/middleware
-*   Configuration for DB, Redis, Event Bus, Auth0, DICE, SendGrid, Slack, JWT secrets.
+*   Configuration for DB, Redis, Event Bus, Auth0, SendGrid, Slack, JWT secrets.
 
 ## 4. General Considerations
 
@@ -579,7 +573,7 @@ Given the complexity, splitting `UserService` is recommended.
 
 This structure provides a modular approach to migrating the complex functionalities of these resources into a maintainable TypeScript codebase.
 
-*   **2FA/DICE:**
+*   **2FA:**
     *   `GET /{resourceId}/2fa`: Get 2FA status (`UserDAO`). Requires self or Admin.
         *   **Dependencies:** Prisma(common_oltp). (Requires auth middleware). (Status: Available)
         *   **Implementation Details:**
@@ -609,52 +603,6 @@ This structure provides a modular approach to migrating the complex functionalit
                 6.  Return success.
             *   `Validations`: Permission check (self or Admin).
             *   `External Calls`: None.
-            *   `Cache`: None.
-            *   `Cookies`: None.
-    *   `GET /{resourceId}/diceConnection`: Get/initiate DICE connection (`UserDAO`, `DICEAuth`, Slack). Requires self. **Makes direct API call to DICE** via `sendDiceInvitation` under certain conditions.
-        *   **Dependencies:** Prisma(common_oltp), DICE (API Call), Slack. (Requires auth middleware). (Status: Prisma Available; DICE, Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `UserService`, `NotificationService`.
-            *   `Prisma Models`: `common_oltp.user` (Read, Update), `common_oltp.credential` (Read).
-            *   `Core Logic`:
-                1.  Extract `resourceId` from path.
-                2.  Check permissions: Requires self (`AuthUser.userId == resourceId`).
-                3.  Find user by `resourceId`. If not found, throw 404.
-                4.  Find user's credential record to get `verified` status (related to DICE).
-                5.  If `credential.verified == true`, return existing DICE connection details (e.g., { verified: true }).
-                6.  If not verified, call `DiceIntegrationService.sendDiceInvitation(user)`:
-                    *   Construct DICE API payload (org ID, user ID, schema ID, etc. from config/user).
-                    *   Make POST request to DICE API endpoint (`diceApiUrl/invitation`) with payload and Auth header (API Key). (DICE API Call).
-                    *   Handle response from DICE.
-                    *   If successful, call `NotificationService.sendSlackNotification` with invitation details. (Slack API Call).
-                    *   Update `user` or `credential` record with DICE connection status (e.g., 'pending').
-                7.  Return current DICE connection status (e.g., { verified: false, status: 'pending' }).
-            *   `Validations`: Permission check (self).
-            *   `External Calls`: DICE API (`/invitation`), Slack API (`chat.postMessage`).
-            *   `Cache`: None.
-            *   `Cookies`: None.
-    *   `POST /dice-invitation`: Internal helper endpoint, not a direct HTTP endpoint. **Makes direct API call to DICE.** Called by `GET /{resourceId}/diceConnection`.
-        *   **Dependencies:** DICE (API Call), Slack. (Status: DICE, Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `NotificationService`.
-            *   `Core Logic`: (See step 6 within `GET /{resourceId}/diceConnection` logic).
-    *   `POST /dice-status`: DICE webhook callback endpoint. **Receives calls from DICE.** Updates local DB and notifies Slack.
-        *   **Dependencies:** Prisma(common_oltp), Slack. (Requires DICE API Key validation). (Status: Prisma Available; Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `UserService`, `NotificationService`.
-            *   `Prisma Models`: `common_oltp.user` (Read), `common_oltp.credential` (Read, Update).
-            *   `Core Logic`:
-                1.  Receive webhook payload from DICE (contains status, user identifier).
-                2.  Validate the incoming request (e.g., check a signature or API key provided by DICE if applicable). *Requires understanding DICE webhook security.*
-                3.  Extract user identifier from payload.
-                4.  Find the corresponding user in `user` table.
-                5.  Find the user's credential record.
-                6.  Parse the status from the DICE payload (e.g., 'verified', 'rejected').
-                7.  Update the `credential.verified` status based on the payload.
-                8.  Call `NotificationService.sendSlackNotification` with the status update.
-                9.  Return success response (e.g., 200 OK) to DICE.
-            *   `Validations`: Incoming webhook validation (API Key/Signature).
-            *   `External Calls`: Slack API (`chat.postMessage`).
             *   `Cache`: None.
             *   `Cookies`: None.
     *   `POST /sendOtp`: Send 2FA OTP (`UserDAO`, Email event via Event Bus). Generates resend token.
@@ -770,7 +718,6 @@ This document outlines how to migrate the existing Java identity service to Type
 ### Need Integration
 
 - **Auth0**: User authentication and management
-- **DICE**: Digital identity verification platform
 - **Slack**: System notifications
 
 ### Need Libraries
@@ -900,25 +847,6 @@ This document outlines how to migrate the existing Java identity service to Type
   - Validate OTP from Redis
   - Complete login process
 
-### DICE Integration
-
-#### Connection Status - `GET /users/{id}/diceConnection`
-
-- **Auth**: Self access only
-- **Logic**:
-  1. Check if already verified
-  2. If not, call DICE API to send invitation
-  3. Notify Slack of invitation
-  4. Return connection status
-
-#### Webhook - `POST /users/dice-status`
-
-- **Purpose**: Receive updates from DICE
-- **Auth**: Validate DICE signature/API key
-- **Logic**:
-  1. Update user verification status
-  2. Notify Slack of status change
-
 ### Validation Endpoints
 
 #### Check Availability
@@ -943,7 +871,6 @@ All return `{ valid: boolean, message?: string }`
 - `TwoFactorAuthService` - 2FA and OTP management
 - `ValidationService` - Handle/email/social validation
 - `NotificationService` - Event Bus publishing
-- `DiceIntegrationService` - DICE API interactions
 
 ### Shared Services
 
@@ -971,7 +898,6 @@ All return `{ valid: boolean, message?: string }`
 - Event Bus for async operations (emails, notifications)
 - Redis for temporary data (OTPs, tokens, sessions)
 - Auth0 for identity management
-- DICE for verification
 - Slack for system notifications
 
 ### Error Handling

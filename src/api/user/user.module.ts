@@ -11,7 +11,6 @@ import { ValidationService } from './validation.service';
 // Potentially import other necessary modules like RoleModule, EventModule
 import { RoleModule } from '../role/role.module';
 import { EventModule } from '../../shared/event/event.module';
-import { DiceModule } from '../../shared/dice/dice.module';
 import { SlackModule } from '../../shared/slack/slack.module';
 // Assuming NotificationService and CacheService are global or provided elsewhere
 
@@ -22,7 +21,6 @@ import { SlackModule } from '../../shared/slack/slack.module';
     HttpModule, // For making external HTTP calls
     forwardRef(() => RoleModule), // RoleService needed for roles
     EventModule, // For publishing events (via NotificationService?)
-    DiceModule,
     SlackModule,
     // forwardRef(() => AuthorizationModule) // Might be needed if Auth flows depend on AuthorizationService
   ],
@@ -33,7 +31,7 @@ import { SlackModule } from '../../shared/slack/slack.module';
     AuthFlowService,
     TwoFactorAuthService,
     ValidationService,
-    // Add NotificationService, DICEService, SlackService if they belong here
+    // Add NotificationService, SlackService if they belong here
   ],
   // Export services needed by other modules (e.g., AuthorizationService needs UserService?)
   exports: [

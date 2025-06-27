@@ -1,10 +1,10 @@
 {
 	"info": {
-		"_postman_id": "7e37c499-3e9f-4e48-8e5d-7179adfabbc3",
+		"_postman_id": "9de0f63a-8f51-4fee-bb21-8ac4eaca5d7c",
 		"name": "Topcoder - Identity v3 - Users",
 		"description": "Postman collection for the v3 Identity User Service.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
-		"_exporter_id": "2487006"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28573934"
 	},
 	"item": [
 		{
@@ -32,9 +32,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
@@ -121,7 +125,16 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users",
+						"url": {
+							"raw": "{{host}}/v3/users",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users"
+							]
+						},
 						"description": "Registers a new user. Activation will be required separately."
 					},
 					"response": []
@@ -148,13 +161,27 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}"
+							]
+						},
 						"description": "Get a specific user by their ID. Allowed for self or admin."
 					},
 					"response": []
@@ -176,9 +203,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PATCH",
 						"header": [
@@ -196,7 +227,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}"
+							]
+						},
 						"description": "Updates basic information for a user. Allowed for self or admin. `targetUserId` should be the ID of the user to update (can be `{{userId}}` for self)."
 					},
 					"response": []
@@ -218,13 +259,27 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "DELETE",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}"
+							]
+						},
 						"description": "Deletes/anonymizes a user. Admin role required. `userIdToDelete` should be the ID of the user to delete."
 					},
 					"response": []
@@ -252,9 +307,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "POST",
 						"header": [
@@ -272,7 +331,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"SSOUserLogin"
+							]
+						},
 						"description": "Links an SSO profile to a user. Admin role required."
 					},
 					"response": []
@@ -294,13 +364,28 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogins",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogins",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"SSOUserLogins"
+							]
+						},
 						"description": "Gets all SSO profiles linked to a user. Admin role required."
 					},
 					"response": []
@@ -322,9 +407,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PUT",
 						"header": [
@@ -342,7 +431,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"SSOUserLogin"
+							]
+						},
 						"description": "Updates an existing SSO profile linked to a user. Admin role required."
 					},
 					"response": []
@@ -364,9 +464,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "DELETE",
 						"header": [],
@@ -419,9 +523,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "POST",
 						"header": [
@@ -439,7 +547,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"profiles"
+							]
+						},
 						"description": "Adds an external profile (e.g., social media link) to a user. Admin role required."
 					},
 					"response": []
@@ -461,13 +580,28 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"profiles"
+							]
+						},
 						"description": "Gets all external profiles (SSO, social, etc.) for a user. Allowed for self or admin."
 					},
 					"response": []
@@ -489,13 +623,29 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "DELETE",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles/github",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles/github",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"profiles",
+								"github"
+							]
+						},
 						"description": "Deletes all external profiles for a user under a specific provider (e.g., all 'github' profiles). Admin role required."
 					},
 					"response": []
@@ -543,7 +693,17 @@
 								}
 							]
 						},
-						"url": "{{host}}/v3/users/login",
+						"url": {
+							"raw": "{{host}}/v3/users/login",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"login"
+							]
+						},
 						"description": "Authenticates a user for Auth0 Custom Database script. Expects form data."
 					},
 					"response": []
@@ -586,7 +746,17 @@
 								}
 							]
 						},
-						"url": "{{host}}/v3/users/roles",
+						"url": {
+							"raw": "{{host}}/v3/users/roles",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"roles"
+							]
+						},
 						"description": "Gets user profile and roles for Auth0 Rules/Actions. Expects form data with email OR handle."
 					},
 					"response": []
@@ -643,7 +813,17 @@
 								}
 							]
 						},
-						"url": "{{host}}/v3/users/changePassword",
+						"url": {
+							"raw": "{{host}}/v3/users/changePassword",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"changePassword"
+							]
+						},
 						"description": "Changes password for Auth0 Action (e.g., post-password-reset flow). Expects form data."
 					},
 					"response": []
@@ -753,7 +933,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/resetPassword",
+						"url": {
+							"raw": "{{host}}/v3/users/resetPassword",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"resetPassword"
+							]
+						},
 						"description": "Resets the user password using a valid reset token and new password."
 					},
 					"response": []
@@ -789,7 +979,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/activate",
+						"url": {
+							"raw": "{{host}}/v3/users/activate",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"activate"
+							]
+						},
 						"description": "Activates a new user account using OTP and a resend token. `newlyRegisteredUserId` can be set from the Register New User response."
 					},
 					"response": []
@@ -825,7 +1025,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/resendActivationEmail",
+						"url": {
+							"raw": "{{host}}/v3/users/resendActivationEmail",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"resendActivationEmail"
+							]
+						},
 						"description": "Resends the activation email/OTP using a resend token (obtained from initial registration or a previous resend attempt)."
 					},
 					"response": []
@@ -869,9 +1079,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PATCH",
 						"header": [
@@ -889,7 +1103,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/handle",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/handle",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"handle"
+							]
+						},
 						"description": "Updates a user's handle. Admin role required."
 					},
 					"response": []
@@ -925,9 +1150,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PATCH",
 						"header": [
@@ -945,7 +1174,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"email"
+							]
+						},
 						"description": "Updates a user's primary email. This will set the new email to unverified and trigger verification. Admin role required."
 					},
 					"response": []
@@ -986,7 +1226,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/oneTimeToken",
+						"url": {
+							"raw": "{{host}}/v3/users/oneTimeToken",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"oneTimeToken"
+							]
+						},
 						"description": "Requests a one-time token for email update, requires current user credentials (userId and password)."
 					},
 					"response": []
@@ -1022,13 +1272,29 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{oneTimeEmailUpdateToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{oneTimeEmailUpdateToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "POST",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email/{{newEmail}}",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email/{{newEmail}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"email",
+								"{{newEmail}}"
+							]
+						},
 						"description": "Updates the user's primary email using a one-time token obtained from the `/oneTimeToken` endpoint. The one-time token is passed as a Bearer token."
 					},
 					"response": []
@@ -1050,9 +1316,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PATCH",
 						"header": [
@@ -1070,7 +1340,18 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/status",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/status",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"status"
+							]
+						},
 						"description": "Updates a user's status (e.g., 'A' for Active, 'I' for Inactive, 'U' for Unverified). Admin role required."
 					},
 					"response": []
@@ -1092,9 +1373,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessTokenUser}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessTokenUser}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "POST",
 						"header": [
@@ -1112,7 +1397,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/updatePrimaryRole",
+						"url": {
+							"raw": "{{host}}/v3/users/updatePrimaryRole",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"updatePrimaryRole"
+							]
+						},
 						"description": "Updates the primary role for the authenticated user. Self-service only."
 					},
 					"response": []
@@ -1248,7 +1543,7 @@
 			"description": "Publicly accessible endpoints for validating user data like handles, emails, and social profiles."
 		},
 		{
-			"name": "2FA / DICE",
+			"name": "2FA",
 			"item": [
 				{
 					"name": "Get User 2FA Status (Admin/Self)",
@@ -1267,14 +1562,29 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
-						"description": "Gets the user's 2FA status (MFA and DICE). Allowed for self or admin."
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"2fa"
+							]
+						},
+						"description": "Gets the user's 2FA status (MFA). Allowed for self or admin."
 					},
 					"response": []
 				},
@@ -1295,9 +1605,13 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "PATCH",
 						"header": [
@@ -1315,76 +1629,19 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"2fa"
+							]
+						},
 						"description": "Updates the user's 2FA status. Allowed for self or admin."
-					},
-					"response": []
-				},
-				{
-					"name": "Get/Initiate DICE Connection (Self)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
-								],
-								"type": "text/javascript",
-								"packages": {}
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": {
-								"token": "{{accessTokenUser}}"
-							}
-						},
-						"method": "GET",
-						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/diceConnection",
-						"description": "Gets or initiates a DICE connection for the authenticated user. Self-service only."
-					},
-					"response": []
-				},
-				{
-					"name": "Handle DICE Webhook",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
-								],
-								"type": "text/javascript",
-								"packages": {}
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "x-api-key",
-								"value": "{{diceWebhookApiKey}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"event\": \"connection-invitation\",\n    \"connectionId\": \"512f4da6-2874-4ad7-8e4f-e72c406f77ed\",\n    \"emailId\": \"some@soskd.com\",\n    \"shortUrl\": \"https://m.diceid.com/WIPDID/sHHdmACzigTAMU50h\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": "{{host}}/v3/users/dice-status",
-						"description": "Webhook endpoint for DICE to post status updates. Requires a specific API key (`diceWebhookApiKey`) for authorization."
 					},
 					"response": []
 				},
@@ -1424,7 +1681,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/sendOtp",
+						"url": {
+							"raw": "{{host}}/v3/users/sendOtp",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"sendOtp"
+							]
+						},
 						"description": "Sends a 2FA OTP for a partially authenticated user (e.g., after password verification during login)."
 					},
 					"response": []
@@ -1459,7 +1726,17 @@
 								}
 							}
 						},
-						"url": "{{host}}/v3/users/resendOtpEmail",
+						"url": {
+							"raw": "{{host}}/v3/users/resendOtpEmail",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"resendOtpEmail"
+							]
+						},
 						"description": "Resends the 2FA OTP email using a resend token obtained from the `sendOtp` endpoint."
 					},
 					"response": []
@@ -1487,13 +1764,28 @@
 					"request": {
 						"auth": {
 							"type": "bearer",
-							"bearer": {
-								"token": "{{accessToken}}"
-							}
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
-						"url": "{{host}}/v3/users/{{newlyRegisteredUserId}}/achievements",
+						"url": {
+							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/achievements",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"v3",
+								"users",
+								"{{newlyRegisteredUserId}}",
+								"achievements"
+							]
+						},
 						"description": "Gets achievements for a specific user. Admin role required."
 					},
 					"response": []

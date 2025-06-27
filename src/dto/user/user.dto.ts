@@ -74,6 +74,10 @@ export class UserProfileDto {
   @IsObject()
   @IsOptional()
   context?: Record<string, any>; // For things like access tokens
+
+  @IsOptional()
+  @IsBoolean()
+  isEmailVerified?: boolean = false;
 }
 
 // --- Request Body Wrapper (Common Pattern) ---

@@ -15,5 +15,23 @@ declare module 'tc-core-library-js/lib/auth/m2m' {
   export = m2mAuth;
 }
 
+declare module 'tc-core-library-js/lib/auth/verifier' {
+
+  interface JwtVerifier {
+    validateToken(
+      token: string, 
+      secret: string, 
+      callback: (error: Error | null, decoded?: Record<string, any>) => void 
+    ): void
+  }
+
+  function createJwtVerifier(
+    validIssuers: string[], 
+    jwtKeyCacheTime?: number
+  ): JwtVerifier
+
+  export = createJwtVerifier;
+}
+
 // Add other declarations for different parts of tc-core-library-js if needed
 // declare module 'tc-core-library-js/lib/some/other/part' { ... }

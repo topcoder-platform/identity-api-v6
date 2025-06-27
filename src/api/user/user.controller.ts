@@ -1355,58 +1355,6 @@ export class UserController {
     );
   }
 
-  @Get(':resourceId/diceConnection')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: 'Get/Initiate DICE connection (Self only).' })
-  @ApiParam({
-    name: 'resourceId',
-    description: 'User ID (string representation of number)',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'DICE connection details/status',
-    type: DTOs.DiceConnectionResponseDto,
-  })
-  async getDiceConnection(
-    @Param('resourceId') resourceId: string,
-    @Req() req: Request,
-  ): Promise<DTOs.DiceConnectionResponseDto> {
-    const authUser = getAuthenticatedUser(req);
-    // Explicit self-check as per migration doc
-    if (authUser.userId !== resourceId)
-      throw new ForbiddenException(
-        'Cannot access DICE connection for another user.',
-      );
-    this.logger.log(
-      `Getting DICE connection for user: ${resourceId} (self-initiated)`,
-    );
-    return this.twoFactorAuthService.getDiceConnection(resourceId, authUser);
-  }
-
-  @Post('dice-status') // Webhook from DICE - requires separate auth (e.g. API Key)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Webhook endpoint for DICE to post status updates.',
-    description: 'Requires specific API key auth.',
-  })
-  @ApiHeader({
-    name: 'x-api-key',
-    description: 'API Key for DICE webhook validation',
-    required: true,
-  })
-  @ApiBody({ type: DTOs.DiceStatusWebhookBodyDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Webhook received' })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid API Key' })
-  async handleDiceWebhook(
-    @Body() diceStatusDto: DTOs.DiceStatusWebhookBodyDto,
-    @Headers('x-api-key') apiKey: string,
-  ): Promise<{ message: string }> {
-    this.logger.log(`Received DICE webhook status: ${diceStatusDto.event}`);
-    // const isValid = await this.twoFactorAuthService.isValidDiceApiKey(apiKey); // Service method needed
-    // if (!isValid) throw new UnauthorizedException('Invalid API Key for DICE webhook');
-    return this.twoFactorAuthService.handleDiceWebhook(diceStatusDto);
-  }
-
   @Post('sendOtp') // 2FA OTP for login flow - requires partial auth state (user identified)
   @ApiOperation({ summary: 'Send 2FA OTP for a partially authenticated user.' })
   @ApiBody({

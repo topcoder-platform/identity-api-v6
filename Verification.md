@@ -12,14 +12,6 @@ Please use correct variables after copying `.env.example`
 ```
 AUTH_SECRET=""
 AUTH0_CLIENT_SECRET=""        # Client Secret of M2M App
-DICEAUTH_DICE_API_URL=""
-DICEAUTH_DICE_API_KEY=""
-DICEAUTH_ORG_ID=""
-DICEAUTH_USER_ID=""
-DICEAUTH_TC_API_KEY=""
-DICEAUTH_SCHEMA_NAME="Topcoder"
-DICEAUTH_SCHEMA_VERSION="1.4"
-DICEAUTH_OTP_DURATION="10"
 SLACK_BOT_KEY=""
 SLACK_CHANNEL_ID=""
 JWT_SECRET="just-a-random-string"

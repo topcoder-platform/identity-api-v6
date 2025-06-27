@@ -11,7 +11,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { EventService } from '../../shared/event/event.service';
 import { UserService } from './user.service';
-import { DiceService } from '../../shared/dice/dice.service';
 import { SlackService } from '../../shared/slack/slack.service';
 import { AuthFlowService } from './auth-flow.service';
 import { RoleService } from '../role/role.service';
@@ -102,14 +101,6 @@ const mockEventService = {
 };
 const mockUserService = {
   // No methods seem to be directly called in the provided service code
-};
-const mockDiceService = {
-  sendDiceInvitation: jest
-    .fn()
-    .mockResolvedValue({
-      jobId: 'default-dice-job-id',
-      shortUrl: 'https://default.dice.short/url',
-    }),
 };
 const mockSlackService = {
   sendNotification: jest.fn().mockResolvedValue(undefined),
@@ -240,7 +231,6 @@ describe('TwoFactorAuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EventService, useValue: mockEventService },
         { provide: UserService, useValue: mockUserService },
-        { provide: DiceService, useValue: mockDiceService },
         { provide: SlackService, useValue: mockSlackService },
         { provide: AuthFlowService, useValue: mockAuthFlowService },
         { provide: RoleService, useValue: mockRoleService },
@@ -269,7 +259,6 @@ describe('TwoFactorAuthService', () => {
             mockConfigService as any,
             mockEventService as any,
             mockUserService as any,
-            mockDiceService as any,
             mockSlackService as any,
             mockAuthFlowService as any,
             mockRoleService as any,
@@ -298,7 +287,6 @@ describe('TwoFactorAuthService', () => {
         mockConfigService as any,
         mockEventService as any,
         mockUserService as any,
-        mockDiceService as any,
         mockSlackService as any,
         mockAuthFlowService as any,
         mockRoleService as any,
@@ -590,268 +578,6 @@ describe('TwoFactorAuthService', () => {
     });
   });
 
-  // ... (getDiceConnection tests from previous response, ensure they are also thorough)
-  describe('getDiceConnection', () => {
-    const userIdNum = 1;
-    const userIdString = '1';
-    const authUser = createMockAuthUser(userIdString);
-
-    const mockUserRecord = createMockUserModel({
-      user_id: new Decimal(userIdNum),
-      handle: 'diceUser',
-      first_name: 'Dice',
-      last_name: 'Test',
-    });
-    const mockPrimaryEmailRecord = createMockEmailModel({
-      user_id: new Decimal(userIdNum),
-      address: 'dice@example.com',
-    });
-    const mockUser2faEnabledRecord = createMockUser2faModel({
-      user_id: new Decimal(userIdNum),
-      mfa_enabled: true,
-      dice_enabled: false,
-    });
-    const mockRolesResponse: RoleResponseDto[] = [
-      { id: 1, roleName: 'Topcoder User' } as RoleResponseDto,
-    ];
-
-    beforeEach(() => {
-      mockPrismaOltp.user.findUnique.mockResolvedValue(mockUserRecord);
-      mockPrismaOltp.email.findFirst.mockResolvedValue(mockPrimaryEmailRecord);
-      mockPrismaOltp.user_2fa.findUnique.mockResolvedValue(
-        mockUser2faEnabledRecord,
-      );
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(null);
-      mockRoleService.findAll.mockResolvedValue(mockRolesResponse);
-      mockDiceService.sendDiceInvitation.mockResolvedValue({
-        jobId: 'dice-job-1',
-        shortUrl: 'https://dice.short/new',
-      });
-      mockPrismaOltp.dice_connection.upsert.mockResolvedValue(
-        createMockDiceConnectionModel({ user_id: new Decimal(userIdNum) }),
-      );
-      mockSlackService.sendNotification.mockResolvedValue(undefined);
-    });
-
-    it('should throw ForbiddenException if userIdString is NaN or does not match authUser.userId', async () => {
-      await expect(
-        service.getDiceConnection('abc', createMockAuthUser('abc')),
-      ).rejects.toThrow(ForbiddenException);
-      await expect(
-        service.getDiceConnection(userIdString, createMockAuthUser('2')),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should throw NotFoundException if user is not found', async () => {
-      mockPrismaOltp.user.findUnique.mockResolvedValue(null);
-      await expect(
-        service.getDiceConnection(userIdString, authUser),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException if MFA is not enabled for the user', async () => {
-      mockPrismaOltp.user_2fa.findUnique.mockResolvedValue(
-        createMockUser2faModel({
-          user_id: new Decimal(userIdNum),
-          mfa_enabled: false,
-        }),
-      );
-      await expect(
-        service.getDiceConnection(userIdString, authUser),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should return existing non-accepted DICE connection if present', async () => {
-      const existingConn = createMockDiceConnectionModel({
-        user_id: new Decimal(userIdNum),
-        short_url: 'existing.url',
-        accepted: false,
-      });
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(existingConn);
-      const result = await service.getDiceConnection(userIdString, authUser);
-      expect(result).toEqual({
-        diceEnabled: false,
-        connection: 'existing.url',
-        accepted: false,
-      });
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Existing non-accepted DICE connection found'),
-      );
-      expect(mockDiceService.sendDiceInvitation).not.toHaveBeenCalled();
-    });
-
-    it('should throw InternalServerErrorException if primary email is not found when initiating', async () => {
-      mockPrismaOltp.email.findFirst.mockResolvedValue(null);
-      await expect(
-        service.getDiceConnection(userIdString, authUser),
-      ).rejects.toThrow(InternalServerErrorException);
-    });
-
-    it('should successfully initiate a new DICE connection', async () => {
-      const result = await service.getDiceConnection(userIdString, authUser);
-      expect(mockDiceService.sendDiceInvitation).toHaveBeenCalledWith(
-        mockPrimaryEmailRecord.address,
-        mockUserRecord.handle,
-        `${mockUserRecord.first_name} ${mockUserRecord.last_name}`,
-        [mockRolesResponse[0].roleName],
-        expect.any(String), // formattedValidTill
-      );
-      expect(mockPrismaOltp.dice_connection.upsert).toHaveBeenCalled();
-      expect(mockSlackService.sendNotification).toHaveBeenCalledWith(
-        'DICE connection process initiated.',
-        mockUserRecord.handle,
-      );
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('DICE Job created/invitation sent'),
-      );
-      expect(result).toEqual({ diceEnabled: false });
-    });
-
-    it('should log error if Slack notification fails during DICE initiation', async () => {
-      const slackError = new Error('Slack is down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.getDiceConnection(userIdString, authUser); // Should not throw, just log
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed for DICE initiation',
-        slackError,
-      );
-    });
-  });
-
-  // ... (handleDiceWebhook tests from previous response, ensure they are also thorough for each case)
-  describe('handleDiceWebhook', () => {
-    const connectionId = 'whConnId';
-    const emailId = 'wh@example.com';
-    const shortUrl = 'whShortUrl';
-    const userForWebhook = createMockUserModel({
-      user_id: new Decimal(5),
-      handle: 'webhookHandle',
-    });
-    const baseDiceConn = createMockDiceConnectionModel({
-      connection: connectionId,
-      user_id: new Decimal(5),
-      user: userForWebhook,
-    });
-
-    it('event "connection-invitation": upserts correctly if diceConnectionRecord exists without user_id but userToLink found', async () => {
-      const connWithoutUserId = createMockDiceConnectionModel({
-        connection: connectionId,
-        user_id: undefined,
-        user: undefined,
-      });
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(
-        connWithoutUserId,
-      );
-      mockPrismaOltp.user.findFirst.mockResolvedValue(userForWebhook); // User found by email
-      await service.handleDiceWebhook({
-        event: 'connection-invitation',
-        connectionId,
-        emailId,
-        shortUrl,
-      });
-      expect(mockPrismaOltp.dice_connection.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { user_id: 5 } }),
-      );
-    });
-
-    it('event "connection-invitation": logs Slack error on failure', async () => {
-      mockPrismaOltp.user.findFirst.mockResolvedValue(userForWebhook);
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(null);
-      const slackError = new Error('Slack down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.handleDiceWebhook({
-        event: 'connection-invitation',
-        connectionId,
-        emailId,
-        shortUrl,
-      });
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed',
-        slackError,
-      );
-    });
-
-    it('event "connection-response": logs Slack error on failure', async () => {
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(baseDiceConn);
-      const slackError = new Error('Slack down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.handleDiceWebhook({
-        event: 'connection-response',
-        connectionId,
-        emailId: null,
-        shortUrl: null,
-      });
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed',
-        slackError,
-      );
-    });
-
-    it('event "credential-issuance": logs Slack error on failure', async () => {
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(baseDiceConn);
-      const slackError = new Error('Slack down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.handleDiceWebhook({
-        event: 'credential-issuance',
-        connectionId,
-        emailId: null,
-        shortUrl: null,
-      });
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed',
-        slackError,
-      );
-    });
-
-    it('event "connection-declined" or "credential-declined": logs warning if connectionId missing', async () => {
-      await service.handleDiceWebhook({
-        event: 'connection-declined',
-        connectionId: null,
-        emailId,
-        shortUrl,
-      } as any);
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'connection-declined received without connectionId',
-        ),
-      );
-    });
-
-    it('event "connection-declined" or "credential-declined": logs Slack error on failure', async () => {
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(baseDiceConn);
-      const slackError = new Error('Slack down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.handleDiceWebhook({
-        event: 'connection-declined',
-        connectionId,
-        emailId: null,
-        shortUrl: null,
-      });
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed',
-        slackError,
-      );
-    });
-
-    it('event "default": logs warning for unhandled event and logs Slack error on failure', async () => {
-      mockPrismaOltp.dice_connection.findFirst.mockResolvedValue(baseDiceConn);
-      const slackError = new Error('Slack down');
-      mockSlackService.sendNotification.mockRejectedValueOnce(slackError);
-      await service.handleDiceWebhook({
-        event: 'some-unknown-event',
-        connectionId,
-        emailId,
-        shortUrl,
-      } as any);
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        'Received unhandled DICE webhook event: some-unknown-event',
-      );
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Slack notification failed',
-        slackError,
-      );
-    });
-  });
 
   describe('sendOtpFor2fa', () => {
     const userIdStr = '1';

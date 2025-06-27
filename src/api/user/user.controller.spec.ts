@@ -67,8 +67,6 @@ const mockAuthFlowService = {
 const mockTwoFactorAuthService = {
   getUser2faStatus: jest.fn(),
   updateUser2faStatus: jest.fn(),
-  getDiceConnection: jest.fn(),
-  handleDiceWebhook: jest.fn(),
   isValidDiceApiKey: jest.fn(),
   sendOtpFor2fa: jest.fn(),
   resendOtpEmailFor2fa: jest.fn(),
@@ -1099,48 +1097,6 @@ describe('UserController', () => {
           mockReq,
         ),
       ).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('getDiceConnection', () => {
-    it('should allow user to get their own DICE connection', async () => {
-      const mockReq = createMockRequest(mockRegularUser, {
-        authorization: 'Bearer user-token',
-      });
-      const mockResponse: DTOs.DiceConnectionResponseDto = {
-        diceEnabled: true,
-        connection: 'dice-url',
-        accepted: false,
-      };
-      mockTwoFactorAuthService.getDiceConnection.mockResolvedValue(
-        mockResponse,
-      );
-      const result = await controller.getDiceConnection(
-        mockRegularUser.userId,
-        mockReq,
-      );
-      expect(result).toEqual(mockResponse);
-    });
-  });
-
-  describe('handleDiceWebhook', () => {
-    it('should handle DICE webhook successfully', async () => {
-      const diceDto: DTOs.DiceStatusWebhookBodyDto = {
-        event: 'completed',
-        connectionId: 'conn123',
-        emailId: 'test@dice.com',
-      }; // Corrected: removed userId
-      mockTwoFactorAuthService.handleDiceWebhook.mockResolvedValue({
-        message: 'Webhook processed',
-      });
-      const result = await controller.handleDiceWebhook(
-        diceDto,
-        'valid-api-key',
-      );
-      expect(mockTwoFactorAuthService.handleDiceWebhook).toHaveBeenCalledWith(
-        diceDto,
-      );
-      expect(result.message).toBe('Webhook processed');
     });
   });
 
