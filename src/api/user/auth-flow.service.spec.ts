@@ -17,21 +17,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
   user as UserModel,
   email as EmailModel,
   security_user as SecurityUserModel,
-  user_sso_login as UserSsoLoginModel,
-  sso_login_provider as SsoLoginProviderModel,
-  user_2fa as User2faModel,
-  Prisma,
 } from '@prisma/client-common-oltp';
 import { ActivateUserBodyDto, UserOtpDto } from '../../dto/user/user.dto';
 import { RoleResponseDto } from 'src/dto/role/role.dto';
 import {
   ACTIVATION_OTP_CACHE_PREFIX_KEY,
   ACTIVATION_OTP_EXPIRY_SECONDS,
-  ACTIVATION_OTP_LENGTH,
 } from './user.service'; // Constants from UserService
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
@@ -41,7 +35,6 @@ import { v4 as uuidv4 } from 'uuid';
 // Constants from AuthFlowService
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
 const ONE_TIME_TOKEN_JWT_AUDIENCE = 'onetime_email_update';
-const ONE_TIME_TOKEN_CACHE_PREFIX_JTI = 'USED_JTI_OTT';
 const PASSWORD_RESET_TOKEN_CACHE_PREFIX = 'PWD_RESET_TOKEN';
 
 // Null logger
@@ -73,7 +66,9 @@ const mockPrismaOltp = {
   },
   $transaction: jest
     .fn()
-    .mockImplementation(async (callback) => callback(mockPrismaOltp)),
+    .mockImplementation(async (callback) =>
+      Promise.resolve(callback(mockPrismaOltp)),
+    ),
   $queryRaw: jest.fn(),
 };
 
@@ -205,19 +200,6 @@ const createMockSecurityUserModel = (
     ...input,
   };
 };
-const createMockUser2faModel = (input: Partial<User2faModel>): User2faModel => {
-  return {
-    id: input.id || 1,
-    user_id: input.user_id || new Decimal(1),
-    mfa_enabled: input.mfa_enabled === undefined ? false : input.mfa_enabled,
-    dice_enabled: input.dice_enabled === undefined ? false : input.dice_enabled,
-    created_by: input.created_by || new Decimal(1),
-    created_at: input.created_at || new Date(),
-    modified_by: input.modified_by || new Decimal(1),
-    modified_at: input.modified_at || new Date(),
-    ...input,
-  };
-};
 
 describe('AuthFlowService', () => {
   let service: AuthFlowService;
@@ -266,7 +248,7 @@ describe('AuthFlowService', () => {
       jest.requireActual('crypto-js').enc.Base64.parse(val),
     );
     (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-      (cipherParams, key, cfg) => {
+      (cipherParams) => {
         // Simulate decryption success by returning a WordArray that can be stringified
         // This needs to be robust enough for the `toString(CryptoJS.enc.Utf8)` call
         const actualCryptoJS = jest.requireActual('crypto-js');
@@ -377,11 +359,11 @@ describe('AuthFlowService', () => {
         where: { email_id: mockPrimaryEmail.email_id },
         data: { status_id: 1, modify_date: expect.any(Date) },
       });
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'user.activated',
         { userId: userId.toString() },
       );
-      expect(eventService.postDirectBusMessage).toHaveBeenCalledWith(
+      expect(mockEventService.postDirectBusMessage).toHaveBeenCalledWith(
         'external.action.email',
         expect.objectContaining({ sendgrid_template_id: 'd-welcome' }),
       );
@@ -530,7 +512,7 @@ describe('AuthFlowService', () => {
         expect.any(String),
         expect.any(Number),
       );
-      expect(eventService.postDirectBusMessage).toHaveBeenCalledWith(
+      expect(mockEventService.postDirectBusMessage).toHaveBeenCalledWith(
         'external.action.email',
         expect.objectContaining({
           sendgrid_template_id: 'd-resend-activation',
@@ -621,6 +603,7 @@ describe('AuthFlowService', () => {
       password: 'expectedEncryptedPassword',
     });
 
+    let mockDecrypt;
     beforeEach(() => {
       prismaOltp.user.findUnique.mockResolvedValue(mockUser);
       prismaOltp.security_user.findUnique.mockResolvedValue(mockSecurityUser);
@@ -628,8 +611,8 @@ describe('AuthFlowService', () => {
         'parsedBlowfishKey',
       );
       // Configure Blowfish.decrypt to return a specific decrypted value for a specific encrypted input
-      (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-        (cipherParams, key, cfg) => {
+      mockDecrypt = (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
+        (cipherParams, key) => {
           const actualCryptoJS = jest.requireActual('crypto-js');
           if (
             cipherParams === 'expectedEncryptedPassword' &&
@@ -657,7 +640,7 @@ describe('AuthFlowService', () => {
         where: { user_id: mockUser.handle },
         select: { password: true },
       });
-      expect(CryptoJS.Blowfish.decrypt).toHaveBeenCalledWith(
+      expect(mockDecrypt).toHaveBeenCalledWith(
         'expectedEncryptedPassword',
         'parsedBlowfishKey',
         expect.any(Object),
@@ -841,18 +824,18 @@ describe('AuthFlowService', () => {
 
     it('should initiate password reset and send notification', async () => {
       await service.initiatePasswordReset(emailOrHandle);
-      expect(userService.findUserByEmailOrHandle).toHaveBeenCalledWith(
+      expect(mockUserService.findUserByEmailOrHandle).toHaveBeenCalledWith(
         emailOrHandle,
       );
       expect(cacheManager.get).toHaveBeenCalledWith(
-        `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${mockUser.user_id}`,
+        `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${mockUser.user_id.toNumber()}`,
       );
       expect(cacheManager.set).toHaveBeenCalledWith(
-        `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${mockUser.user_id}`,
+        `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${mockUser.user_id.toNumber()}`,
         expect.any(String),
         expect.any(Number),
       );
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'userpasswordreset',
         expect.objectContaining({
           recipients: [
@@ -901,7 +884,7 @@ describe('AuthFlowService', () => {
         primaryEmail: undefined,
       } as any);
       await service.initiatePasswordReset(emailOrHandle);
-      expect(eventService.postEnvelopedNotification).not.toHaveBeenCalled();
+      expect(mockEventService.postEnvelopedNotification).not.toHaveBeenCalled();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('no primary email address is associated'),
       );
@@ -943,7 +926,7 @@ describe('AuthFlowService', () => {
         'parsedBlowfishKey',
       );
       (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-        (cipherParams, key, cfg) => {
+        (cipherParams, key) => {
           const actualCryptoJS = jest.requireActual('crypto-js');
           if (
             cipherParams === 'expectedEncryptedPassword' &&
@@ -963,9 +946,9 @@ describe('AuthFlowService', () => {
         service.authenticateForAuth0('unknownHandle', passwordPlain),
       ).rejects.toThrow(UnauthorizedException);
     });
-    it('should throw UnauthorizedException for user not found (by email)', async () => {
+    it('should throw UnauthorizedException for user not found (by email)', () => {
       prismaOltp.email.findFirst.mockResolvedValueOnce(null); // Email not found
-      await expect(
+      expect(
         service.authenticateForAuth0('unknown@example.com', passwordPlain),
       );
     });
@@ -1078,9 +1061,14 @@ describe('AuthFlowService', () => {
     };
     const encodedNewPassword = 'encodedNewLegacyPasswordForAuth0';
 
+    let mockEncode;
+    let mockFindUserEmail;
     beforeEach(() => {
-      userService.findUserByEmailOrHandle.mockResolvedValue(mockUser as any);
-      userService.encodePasswordLegacy.mockReturnValue(encodedNewPassword);
+      mockFindUserEmail = userService.findUserByEmailOrHandle.mockResolvedValue(
+        mockUser as any,
+      );
+      mockEncode =
+        userService.encodePasswordLegacy.mockReturnValue(encodedNewPassword);
       prismaOltp.security_user.update.mockResolvedValue(
         {} as SecurityUserModel,
       );
@@ -1092,10 +1080,8 @@ describe('AuthFlowService', () => {
         email,
         newPasswordPlain,
       );
-      expect(userService.findUserByEmailOrHandle).toHaveBeenCalledWith(email);
-      expect(userService.encodePasswordLegacy).toHaveBeenCalledWith(
-        newPasswordPlain,
-      );
+      expect(mockFindUserEmail).toHaveBeenCalledWith(email);
+      expect(mockEncode).toHaveBeenCalledWith(newPasswordPlain);
       expect(prismaOltp.security_user.update).toHaveBeenCalledWith({
         where: { user_id: mockUser.handle },
         data: { password: encodedNewPassword },

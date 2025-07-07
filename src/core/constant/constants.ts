@@ -1,10 +1,32 @@
-
 export const Constants = {
   memberGroupMembershipType: 1,
   subGroupMembershipType: 2,
 
-  memberGroupMembershipName: 'member',
+  memberGroupMembershipName: 'user',
   subGroupMembershipName: 'group',
 
   AdminRoles: ['administrator'],
+
+  // default values in authorization service
+  defaultTargetId: '1',
+  defaultRedirectUrl: 'https://www.topcoder.com',
+  defaultAuthStateLength: 12,
+
+  // default subjectType in roleAssignment for members
+  memberSubjectType: 1,
+
+  // auth0 token "sub" field prefix
+  auth0SubPrefix: 'auth0|',
+
+  // flag to remember token. Search request header with this key.
+  rememberMeFlag: 'rememberme',
+
+  // jwt digest algorithm. Can be HS256 or RS256.
+  jwtRs256Algorithm: 'RS256',
+  jwtHs256Algorithm: 'HS256',
+
+  // cookie names used to set token and sso
+  tcJwtCookieName: 'tcjwt',
+  tcSsoCookieName: 'tcsso',
+  tcV3JwtCookieName: 'v3jwt',
 };

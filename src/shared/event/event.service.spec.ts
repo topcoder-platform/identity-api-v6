@@ -231,11 +231,9 @@ describe('EventService', () => {
       it('should log error when notificationType is invalid', async () => {
         const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error');
 
-        try {
-          await service.postEnvelopedNotification('', validAttributes);
-        } catch (error) {
-          // Expected to throw
-        }
+        await expect(
+          service.postEnvelopedNotification('', validAttributes),
+        ).rejects.toThrow();
 
         expect(loggerErrorSpy).toHaveBeenCalledWith(
           'postEnvelopedNotification called without a notificationType.',
@@ -272,7 +270,7 @@ describe('EventService', () => {
           `Failed to post ENVELOPED notification (type: ${validNotificationType}) to bus topic ${expectedNotificationTopic}: ${mockError.message}`,
         );
         expect(loggerErrorSpy).toHaveBeenCalledWith(
-          `--> Event Bus Request Error Details: Status: ${mockError.response!.status}, Method: ${mockError.response!.request!.method}, URL: ${mockError.response!.request!.url}`,
+          `--> Event Bus Request Error Details: Status: ${mockError.response.status}, Method: ${mockError.response.request.method}, URL: ${mockError.response.request.url}`,
         );
         expect(loggerErrorSpy).toHaveBeenCalledWith(
           `--> Full Error Stack: ${mockError.stack}`,
@@ -298,7 +296,7 @@ describe('EventService', () => {
 
         const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error');
         expect(loggerErrorSpy).toHaveBeenCalledWith(
-          `--> Event Bus Request Error Details: Method: ${mockError.request!.method}, URL: ${mockError.request!.url}`,
+          `--> Event Bus Request Error Details: Method: ${mockError.request.method}, URL: ${mockError.request.url}`,
         );
       });
 
@@ -360,7 +358,6 @@ describe('EventService', () => {
 
       it('should handle empty object payload', async () => {
         await service.postDirectBusMessage(validTopic, {});
-
         expect(mockBusClient.postEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: {},
@@ -414,11 +411,9 @@ describe('EventService', () => {
       it('should log validation errors', async () => {
         const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error');
 
-        try {
-          await service.postDirectBusMessage('', validPayload);
-        } catch (error) {
-          // Expected to throw
-        }
+        await expect(
+          service.postDirectBusMessage('', validPayload),
+        ).rejects.toThrow();
 
         expect(loggerErrorSpy).toHaveBeenCalledWith(
           'postDirectBusMessage called without a topic.',
@@ -463,7 +458,7 @@ describe('EventService', () => {
 
         const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error');
         expect(loggerErrorSpy).toHaveBeenCalledWith(
-          `--> Event Bus Request Error Details: Status: ${mockError.response!.status}, Method: ${mockError.response!.request!.method}, URL: ${mockError.response!.request!.url}`,
+          `--> Event Bus Request Error Details: Status: ${mockError.response.status}, Method: ${mockError.response.request.method}, URL: ${mockError.response.request.url}`,
         );
       });
     });
@@ -515,7 +510,6 @@ describe('EventService', () => {
         specialNotificationType,
         attributes,
       );
-
       expect(mockBusClient.postEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({
@@ -537,7 +531,6 @@ describe('EventService', () => {
       };
 
       await service.postDirectBusMessage('test.topic', largePayload);
-
       expect(mockBusClient.postEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: largePayload,
@@ -551,7 +544,6 @@ describe('EventService', () => {
       );
 
       await Promise.all(promises);
-
       expect(mockBusClient.postEvent).toHaveBeenCalledTimes(5);
     });
   });

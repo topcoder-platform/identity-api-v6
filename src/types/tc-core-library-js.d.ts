@@ -16,19 +16,18 @@ declare module 'tc-core-library-js/lib/auth/m2m' {
 }
 
 declare module 'tc-core-library-js/lib/auth/verifier' {
-
   interface JwtVerifier {
     validateToken(
-      token: string, 
-      secret: string, 
-      callback: (error: Error | null, decoded?: Record<string, any>) => void 
-    ): void
+      token: string,
+      secret: string,
+      callback: (error: Error | null, decoded?: Record<string, any>) => void,
+    ): void;
   }
 
   function createJwtVerifier(
-    validIssuers: string[], 
-    jwtKeyCacheTime?: number
-  ): JwtVerifier
+    validIssuers: string[],
+    jwtKeyCacheTime?: number,
+  ): JwtVerifier;
 
   export = createJwtVerifier;
 }

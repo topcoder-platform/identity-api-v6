@@ -8,12 +8,10 @@ import busApi from '@topcoder-platform/topcoder-bus-api-wrapper';
 
 // Mock the external bus API
 jest.mock('@topcoder-platform/topcoder-bus-api-wrapper');
-const mockBusApi = busApi as jest.MockedFunction<typeof busApi>;
+const mockBusApi = busApi;
 
 describe('EventModule', () => {
   let module: TestingModule;
-  let configService: ConfigService;
-  let logger: Logger;
 
   const mockConfig = {
     AUTH0_URL: 'https://auth0.example.com',
@@ -28,16 +26,21 @@ describe('EventModule', () => {
     HTTP_MAX_REDIRECTS: 5,
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('Bus API Client Provider', () => {
     it('should create bus API client with valid configuration', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       const mockBusApiInstance = { publish: jest.fn(), subscribe: jest.fn() };
@@ -73,9 +76,14 @@ describe('EventModule', () => {
       };
 
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return incompleteConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return incompleteConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       const loggerWarnSpy = jest
@@ -112,9 +120,14 @@ describe('EventModule', () => {
 
     it('should log successful initialization', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       const loggerLogSpy = jest
@@ -140,9 +153,14 @@ describe('EventModule', () => {
 
     it('should handle bus API initialization errors', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       const initError = new Error('Bus API initialization failed');
@@ -177,9 +195,14 @@ describe('EventModule', () => {
   describe('Module Structure', () => {
     it('should be defined and compile successfully', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       mockBusApi.mockReturnValue({ publish: jest.fn() });
@@ -196,9 +219,14 @@ describe('EventModule', () => {
 
     it('should provide EventService', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       mockBusApi.mockReturnValue({ publish: jest.fn() });
@@ -216,9 +244,14 @@ describe('EventModule', () => {
 
     it('should provide BUS_API_CLIENT', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       mockBusApi.mockReturnValue({ publish: jest.fn() });
@@ -238,9 +271,14 @@ describe('EventModule', () => {
   describe('HTTP Module Configuration', () => {
     it('should configure HTTP module with correct timeout and redirects', async () => {
       const mockConfigService = {
-        get: jest.fn((key: string, defaultValue?: any) => {
-          return mockConfig[key] || defaultValue;
-        }),
+        get: jest.fn(
+          (
+            key: string,
+            defaultValue?: string | number,
+          ): string | number | undefined => {
+            return mockConfig[key] ?? defaultValue;
+          },
+        ),
       };
 
       mockBusApi.mockReturnValue({ publish: jest.fn() });

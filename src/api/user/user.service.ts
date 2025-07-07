@@ -13,8 +13,6 @@ import {
   PrismaClient as PrismaClientCommonOltp,
   user as UserModel,
   Prisma,
-  user_achievement as UserAchievementModel,
-  email as EmailModel,
   user_sso_login as UserSsoLoginModel,
   sso_login_provider as SsoLoginProviderModel,
 } from '@prisma/client-common-oltp';
@@ -36,7 +34,6 @@ import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
 import * as CryptoJS from 'crypto-js';
 import { Decimal } from '@prisma/client/runtime/library';
-import * as bcrypt from 'bcryptjs';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -385,7 +382,7 @@ export class UserService {
         );
       } catch (error) {
         this.logger.warn(
-          `Country validation failed for '${userParams.country}': ${error.message}`,
+          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
         );
         throw error;
       }
@@ -396,7 +393,7 @@ export class UserService {
         await this.validationService.validateProfile(userParams.profile);
       } catch (error) {
         this.logger.warn(
-          `Country validation failed for '${userParams.country}': ${error.message}`,
+          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
         );
         throw error;
       }
@@ -407,7 +404,7 @@ export class UserService {
         await this.validationService.validateReferral(userParams.regSource);
       } catch (error) {
         this.logger.warn(
-          `Country validation failed for '${userParams.country}': ${error.message}`,
+          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
         );
         throw error;
       }
@@ -461,7 +458,7 @@ export class UserService {
           data: userData,
         });
         this.logger.log(
-          `User record created for ${handle} (ID: ${createdUser.user_id})`,
+          `User record created for ${handle} (ID: ${createdUser.user_id.toNumber()})`,
         );
 
         // Use the existing service method for consistent password encoding
@@ -525,11 +522,11 @@ export class UserService {
             },
           });
           this.logger.debug(
-            `Email record created for ${email} (ID: ${emailRecord.email_id})`,
+            `Email record created for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
         } else {
           this.logger.debug(
-            `Existing email record found for ${email} (ID: ${emailRecord.email_id})`,
+            `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
         }
 
@@ -539,7 +536,7 @@ export class UserService {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           this.logger.warn(
-            `Registration failed due to unique constraint: ${error.message}. Fields: ${error.meta?.target}`,
+            `Registration failed due to unique constraint: ${error.message}. Fields: ${JSON.stringify(error.meta?.target)}`,
           );
           if ((error.meta?.target as string[])?.includes('handle_lower')) {
             throw new ConflictException(`Handle '${handle}' already exists.`);
@@ -560,7 +557,7 @@ export class UserService {
       );
     }
 
-    const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${newUser.user_id}`;
+    const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${newUser.user_id.toNumber()}`;
     const otpExpiry =
       this.configService.get<number>(
         'ACTIVATION_OTP_EXPIRY_SECONDS',
@@ -569,11 +566,11 @@ export class UserService {
     try {
       await this.cacheManager.set(otpCacheKey, otpForActivation, otpExpiry);
       this.logger.log(
-        `Activation OTP ${otpForActivation} generated and cached for user ${newUser.user_id} (key: ${otpCacheKey})`,
+        `Activation OTP ${otpForActivation} generated and cached for user ${newUser.user_id.toNumber()} (key: ${otpCacheKey})`,
       );
     } catch (cacheError) {
       this.logger.error(
-        `Failed to cache OTP for user ${newUser.user_id}: ${cacheError.message}`,
+        `Failed to cache OTP for user ${newUser.user_id.toNumber()}: ${cacheError.message}`,
         cacheError.stack,
       );
     }
@@ -586,10 +583,12 @@ export class UserService {
         Number(newUser.user_id),
         operatorIdForRoleAssignment,
       );
-      this.logger.log(`Default role(s) assigned to user ${newUser.user_id}`);
+      this.logger.log(
+        `Default role(s) assigned to user ${newUser.user_id.toNumber()}`,
+      );
     } catch (roleError) {
       this.logger.error(
-        `Failed to assign default roles to user ${newUser.user_id}: ${roleError.message}`,
+        `Failed to assign default roles to user ${newUser.user_id.toNumber()}: ${roleError.message}`,
         roleError.stack,
       );
     }
@@ -603,7 +602,7 @@ export class UserService {
         createdEventAttributes,
       );
       this.logger.log(
-        `Published 'event.user.created' notification for ${newUser.user_id}. Attributes: ${JSON.stringify(createdEventAttributes, null, 2)}`,
+        `Published 'event.user.created' notification for ${newUser.user_id.toNumber()}. Attributes: ${JSON.stringify(createdEventAttributes, null, 2)}`,
       );
 
       // For activation email, use postDirectBusMessage to match legacy Java structure
@@ -631,18 +630,18 @@ export class UserService {
           activationEmailPayload,
         );
         this.logger.log(
-          `Published 'external.action.email' (activation) for ${newUser.user_id} to ${email}. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
+          `Published 'external.action.email' (activation) for ${newUser.user_id.toNumber()} to ${email}. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
         );
       }
     } catch (eventError) {
       this.logger.error(
-        `Failed to publish events for user ${newUser.user_id}: ${eventError.message}`,
+        `Failed to publish events for user ${newUser.user_id.toNumber()}: ${eventError.message}`,
         eventError.stack,
       );
     }
 
     this.logger.log(
-      `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id}). Status: U. Activation OTP sent for eventing.`,
+      `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
     );
     return newUser;
   }
@@ -650,7 +649,6 @@ export class UserService {
   async updateBasicInfo(
     userIdString: string,
     updateUserDto: UpdateUserBodyDto,
-    authUser: AuthenticatedUser,
   ): Promise<UserModel> {
     const userId = parseInt(userIdString, 10);
     if (isNaN(userId)) {
@@ -931,7 +929,7 @@ export class UserService {
       });
 
       this.logger.log(
-        `Updated existing primary email record ${currentPrimaryEmailRecord.email_id} from ${oldEmail} to ${newEmail} for user ${userId}`,
+        `Updated existing primary email record ${currentPrimaryEmailRecord.email_id.toNumber()} from ${oldEmail} to ${newEmail} for user ${userId}`,
       );
 
       // Update the user record
@@ -960,7 +958,7 @@ export class UserService {
 
     if (updatedEmailRecord) {
       const otpForNewEmail = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
-      const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${updatedEmailRecord.email_id}`;
+      const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${updatedEmailRecord.email_id.toNumber()}`;
       const otpExpiry =
         this.configService.get<number>(
           'ACTIVATION_OTP_EXPIRY_SECONDS',
@@ -1240,7 +1238,7 @@ export class UserService {
 
     if (existingSsoLogin && existingSsoLogin.user) {
       this.logger.log(
-        `User found by Auth0 sub ${auth0Profile.sub}: ID ${existingSsoLogin.user.user_id}`,
+        `User found by Auth0 sub ${auth0Profile.sub}: ID ${existingSsoLogin.user.user_id.toNumber()}`,
       );
       // Optionally update user's basic info from Auth0 profile here if needed
       // e.g., first_name, last_name, picture_url (if field exists)
@@ -1268,7 +1266,7 @@ export class UserService {
       ) {
         userByEmail = emailRecord.user_email_xref[0].user;
         this.logger.log(
-          `User found by email ${auth0Profile.email}: ID ${userByEmail.user_id}. Linking Auth0 sub.`,
+          `User found by email ${auth0Profile.email}: ID ${userByEmail.user_id.toNumber()}. Linking Auth0 sub.`,
         );
         // Link Auth0 sub to this existing user
         await this.prismaOltp.user_sso_login.create({
@@ -1333,7 +1331,7 @@ export class UserService {
         });
 
         this.logger.log(
-          `New user created with ID ${newUser.user_id} and handle ${newUser.handle}`,
+          `New user created with ID ${newUser.user_id.toNumber()} and handle ${newUser.handle}`,
         );
 
         // Publish user.created event
@@ -1346,7 +1344,7 @@ export class UserService {
           });
         } catch (eventError) {
           this.logger.error(
-            `Failed to publish user.created event for ${newUser.user_id}: ${eventError.message}`,
+            `Failed to publish user.created event for ${newUser.user_id.toNumber()}: ${eventError.message}`,
             eventError.stack,
           );
         }
@@ -1483,7 +1481,7 @@ export class UserService {
 
     if (conflictingEmail) {
       this.logger.warn(
-        `Email ${emailAddress} is already in use as primary by another user (user_id: ${conflictingEmail.user_id}).`,
+        `Email ${emailAddress} is already in use as primary by another user (user_id: ${conflictingEmail.user_id.toNumber()}).`,
       );
       throw new ConflictException(
         `Email address ${emailAddress} is already in use by another account.`,

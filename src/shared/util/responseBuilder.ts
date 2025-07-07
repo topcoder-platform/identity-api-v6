@@ -1,11 +1,10 @@
-import { HttpStatus } from "@nestjs/common";
-import { Http } from "winston/lib/winston/transports";
+import { HttpStatus } from '@nestjs/common';
 
 export interface BaseResponse<T> {
   result: {
     success: boolean;
     status: number;
-    metadata: any | null;
+    metadata: any;
     content: T;
   };
   version: string;
@@ -15,7 +14,7 @@ export function createBaseResponse<T extends object>(
   data: T,
   status = HttpStatus.OK,
   fields?: string,
-): any {
+): BaseResponse<T> {
   return {
     result: {
       success: true,
@@ -40,26 +39,6 @@ export function createErrorResponse(
     },
     version: 'v3',
   };
-}
-
-function filterFields<T extends object>(data: T, fields?: string): Partial<T> {
-  const parsedFields = fields
-    ?.split(',')
-    .map((f) => f.trim())
-    .filter(Boolean); // Correct way
-
-  if (!parsedFields || parsedFields.length === 0) {
-    return data;
-  }
-  const filtered: Partial<T> = {};
-  for (const key of parsedFields) {
-    if (key in data) {
-      filtered[key] = data[key];
-    } else {
-      console.warn(`Field '${key}' does not exist in object`);
-    }
-  }
-  return filtered;
 }
 
 export function filterFieldsNested<T extends object>(

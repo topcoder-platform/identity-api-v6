@@ -1,12 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ConfigurationService } from "../../config/configuration.service";
-import { AuthorizationResponse } from "../../dto/authorization/authorization.dto";
-import { CommonUtils } from "../../shared/util/common.utils";
+import { ConfigurationService } from '../../config/configuration.service';
+import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
+import { CommonUtils } from '../../shared/util/common.utils';
 import { Injectable } from '@nestjs/common';
+import { Constants } from '../../core/constant/constants';
 
 @Injectable()
 export class ZendeskAuthPlugin {
-
   private readonly secret: string;
   private readonly idPrefix: string;
 
@@ -28,13 +28,13 @@ export class ZendeskAuthPlugin {
       name: this.decorateForTest(handle),
       email: this.decorateForTest(email),
       jti: uuidv4(),
-      iat: Math.floor(Date.now() / 1000)
-    }
+      iat: Math.floor(Date.now() / 1000),
+    };
     const zendeskJwt = CommonUtils.generateJwt(payload, this.secret, {
-      algorithm: 'HS256'
+      algorithm: Constants.jwtHs256Algorithm,
     });
     auth.zendeskJwt = zendeskJwt;
-    return auth;
+    return Promise.resolve(auth);
   }
 
   private createExternalId(id: string): string {
@@ -42,15 +42,14 @@ export class ZendeskAuthPlugin {
   }
 
   private decorateForTest(value: string): string {
-    return (this.isProduction(this.idPrefix)) ?
-        value :
-        value + "." + this.idPrefix;
+    return this.isProduction(this.idPrefix)
+      ? value
+      : value + '.' + this.idPrefix;
   }
 
   private isProduction(idPrefix: string): boolean {
-    if(idPrefix==null)
-      return true;
+    if (idPrefix == null) return true;
     const lower = idPrefix.toLowerCase();
-    return !lower.includes("dev") && ! lower.includes("qa"); 
+    return !lower.includes('dev') && !lower.includes('qa');
   }
 }

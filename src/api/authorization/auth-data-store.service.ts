@@ -1,13 +1,13 @@
-import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
-import { ConfigurationService } from "../../config/configuration.service";
-import { AuthorizationResponse } from "../../dto/authorization/authorization.dto";
-import { CommonUtils } from "../../shared/util/common.utils";
+import { ConfigurationService } from '../../config/configuration.service';
+import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
+import { CommonUtils } from '../../shared/util/common.utils';
 
 @Injectable()
 export class AuthDataStore {
   private readonly storeConfig;
-  
+
   private readonly store: DataStoreService;
   constructor(private readonly config: ConfigurationService) {
     this.storeConfig = this.config.getAuthStore();
@@ -39,7 +39,10 @@ abstract class DataStoreService {
   protected readonly logger = new Logger(DataStoreService.name);
 
   public abstract put(auth: AuthorizationResponse): Promise<void>;
-  public abstract get(token: string, target: string): Promise<AuthorizationResponse | null>;
+  public abstract get(
+    token: string,
+    target: string,
+  ): Promise<AuthorizationResponse | null>;
   public abstract delete(token: string, target: string): Promise<void>;
 
   protected getAuthKey(auth: AuthorizationResponse) {
@@ -56,7 +59,10 @@ abstract class DataStoreService {
       const decoded = CommonUtils.parseJWTClaims(token);
       return String(decoded['userId']);
     } catch (error) {
-      this.logger.warn(`Failed to extract user-id from JWT token. token: ${token}`, error);
+      this.logger.warn(
+        `Failed to extract user-id from JWT token. token: ${token}`,
+        error,
+      );
       throw new Error('Failed to extract user-id from JWT token.');
     }
   }
@@ -80,22 +86,26 @@ export class InMemoryDataStore extends DataStoreService {
       return;
     }
     const key = this.getAuthKey(auth);
-    this.logger.debug(`Put (${key}, ${auth})`);
+    this.logger.debug(`Put (${key}, ${JSON.stringify(auth)})`);
     this.store[key] = auth;
     // create task to clear cache
     setTimeout(() => {
       delete this.store[key];
     }, DEFAULT_EXPIRY_SECONDS * 1000);
+    return Promise.resolve();
   }
 
-  async get(token: string, target: string): Promise<AuthorizationResponse | null> {
+  async get(
+    token: string,
+    target: string,
+  ): Promise<AuthorizationResponse | null> {
     if (token == null || token.trim().length === 0) {
       return null;
     }
     const key = this.getKey(token, target);
     const auth = this.store[key];
-    this.logger.debug(`Get (${key}, ${auth})`);
-    return auth;
+    this.logger.debug(`Get (${key}, ${JSON.stringify(auth)})`);
+    return Promise.resolve(auth);
   }
 
   async delete(token: string, target: string): Promise<void> {
@@ -105,12 +115,14 @@ export class InMemoryDataStore extends DataStoreService {
     const key = this.getKey(token, target);
     this.logger.debug(`delete (${key})`);
     delete this.store[key];
+    return Promise.resolve();
   }
 }
 
-
-export class RedisDataStore extends DataStoreService implements OnModuleDestroy {
-
+export class RedisDataStore
+  extends DataStoreService
+  implements OnModuleDestroy
+{
   private redisClient: Redis;
   private readonly expirySeconds: number;
   private readonly redisOptions: RedisOptions;
@@ -120,7 +132,7 @@ export class RedisDataStore extends DataStoreService implements OnModuleDestroy 
     // create redis connection
     this.redisOptions = {
       host: config.spec.host || 'localhost',
-      port: parseInt(config.spec.port) || 6379
+      port: parseInt(config.spec.port) || 6379,
     };
     this.expirySeconds = config.spec.expirySeconds;
   }
@@ -134,7 +146,7 @@ export class RedisDataStore extends DataStoreService implements OnModuleDestroy 
       } catch (error) {
         this.redisClient = null;
         this.logger.error('Cannot connect to redis.', error);
-        throw new Error('authDataStore can\'t connect to redis');
+        throw new Error("authDataStore can't connect to redis");
       }
     }
     return this.redisClient;
@@ -160,7 +172,10 @@ export class RedisDataStore extends DataStoreService implements OnModuleDestroy 
     await redis.setex(key, this.expirySeconds, JSON.stringify(auth));
   }
 
-  async get(token: string, target: string): Promise<AuthorizationResponse | null> {
+  async get(
+    token: string,
+    target: string,
+  ): Promise<AuthorizationResponse | null> {
     if (token == null || token.trim().length === 0) {
       return null;
     }

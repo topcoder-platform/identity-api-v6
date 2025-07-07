@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BadRequestException, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthorizationService } from './authorization.service';
 import { Auth0Service } from '../../shared/auth0/auth0.service';
 import { UserService } from '../user/user.service';
@@ -8,18 +12,23 @@ import { AuthDataStore } from './auth-data-store.service';
 import { ZendeskAuthPlugin } from './zendesk.service';
 import { ConfigurationService } from '../../config/configuration.service';
 import { UserProfileHelper } from './user-profile.helper';
-import { AuthorizationCreateDto, AuthorizationForm, GetTokenQueryDto, ValidateClientQueryDto } from '../../dto/authorization/authorization.dto';
+import {
+  AuthorizationCreateDto,
+  AuthorizationForm,
+  GetTokenQueryDto,
+  ValidateClientQueryDto,
+} from '../../dto/authorization/authorization.dto';
 import { UserProfileDto } from '../../dto/user/user.dto';
 import { CommonUtils } from '../../shared/util/common.utils';
 
 describe('AuthorizationService', () => {
   let service: AuthorizationService;
-  let mockCacheManager = {
+  const mockCacheManager = {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
   };
-  let mockAuth0Service = {
+  const mockAuth0Service = {
     getToken: jest.fn(),
     refreshToken: jest.fn(),
     verifyToken: jest.fn(),
@@ -27,19 +36,19 @@ describe('AuthorizationService', () => {
     domain: 'test.auth0.com',
     clientId: 'test-client-id',
   };
-  let mockUserService = {
+  const mockUserService = {
     generateSSOToken: jest.fn(),
     findUserById: jest.fn(),
   };
-  let mockAuthDataStore = {
+  const mockAuthDataStore = {
     put: jest.fn(),
     get: jest.fn(),
     delete: jest.fn(),
   };
-  let mockZendeskPlugin = {
+  const mockZendeskPlugin = {
     process: jest.fn(),
   };
-  let mockPrismaAuth = {
+  const mockPrismaAuth = {
     client: {
       findUnique: jest.fn(),
     },
@@ -47,16 +56,16 @@ describe('AuthorizationService', () => {
       findMany: jest.fn(),
     },
   };
-  let mockPrismaCommonClient = {
+  const mockPrismaCommonClient = {
     user: {
       update: jest.fn(),
     },
   };
-  let mockUserProfileHelper = {
+  const mockUserProfileHelper = {
     createProfile: jest.fn(),
     getUserIdByProfile: jest.fn(),
   };
-  let mockConfigService = {
+  const mockConfigService = {
     getAuthorizationService: jest.fn().mockReturnValue({
       cookieExpirySeconds: 3600,
     }),
@@ -66,9 +75,11 @@ describe('AuthorizationService', () => {
       authSecret: 'secret',
       validIssuers: ['https://test.com'],
     }),
-    getServiceAccounts: jest.fn().mockReturnValue([
-      { clientId: 'client1', secret: 'secret1', contextUserId: '123' }
-    ]),
+    getServiceAccounts: jest
+      .fn()
+      .mockReturnValue([
+        { clientId: 'client1', secret: 'secret1', contextUserId: '123' },
+      ]),
   };
 
   let parseHeaderSpy: jest.SpyInstance;
@@ -78,20 +89,24 @@ describe('AuthorizationService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    parseHeaderSpy = jest.spyOn(CommonUtils, 'parseJWTHeader')
-      .mockImplementation((token) => {
+    parseHeaderSpy = jest
+      .spyOn(CommonUtils, 'parseJWTHeader')
+      .mockImplementation(() => {
         return { alg: 'HS256' };
       });
-    parseClaimsSpy = jest.spyOn(CommonUtils, 'parseJWTClaims')
-      .mockImplementation((token) => {
+    parseClaimsSpy = jest
+      .spyOn(CommonUtils, 'parseJWTClaims')
+      .mockImplementation(() => {
         return {
-          'iss': 'https://api.test.com'
+          iss: 'https://api.test.com',
         };
       });
     jest.spyOn(CommonUtils, 'verifyJwtToken').mockResolvedValue({});
-    generateJwtSpy = jest.spyOn(CommonUtils, 'generateJwt').mockImplementation(() => {
-      return '';
-    });
+    generateJwtSpy = jest
+      .spyOn(CommonUtils, 'generateJwt')
+      .mockImplementation(() => {
+        return '';
+      });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -102,7 +117,10 @@ describe('AuthorizationService', () => {
         { provide: AuthDataStore, useValue: mockAuthDataStore },
         { provide: ZendeskAuthPlugin, useValue: mockZendeskPlugin },
         { provide: 'PRISMA_CLIENT_AUTHORIZATION', useValue: mockPrismaAuth },
-        { provide: 'PRISMA_CLIENT_COMMON_OLTP', useValue: mockPrismaCommonClient },
+        {
+          provide: 'PRISMA_CLIENT_COMMON_OLTP',
+          useValue: mockPrismaCommonClient,
+        },
         { provide: UserProfileHelper, useValue: mockUserProfileHelper },
         { provide: ConfigurationService, useValue: mockConfigService },
       ],
@@ -111,7 +129,7 @@ describe('AuthorizationService', () => {
     service = module.get<AuthorizationService>(AuthorizationService);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     parseHeaderSpy.mockRestore();
     parseClaimsSpy.mockRestore();
     generateJwtSpy.mockRestore();
@@ -123,6 +141,7 @@ describe('AuthorizationService', () => {
         hostname: 'test.com',
         secure: true,
         headers: { referer: 'https://test.com' },
+        get: () => 'test.com',
       } as any;
       const mockRes = { redirect: jest.fn() } as any;
 
@@ -134,12 +153,12 @@ describe('AuthorizationService', () => {
       expect(mockRes.redirect.mock.calls[0][1]).toContain('test.auth0.com');
     });
 
-    
     it('should redirect to https when hostname is in tc domains', async () => {
       const mockReq = {
         hostname: 'topcoder.com',
         secure: false,
         headers: { referer: 'https://test.com' },
+        get: () => 'test.com',
       } as any;
       const mockRes = { redirect: jest.fn() } as any;
 
@@ -148,7 +167,9 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
-      expect(mockRes.redirect.mock.calls[0][1]).toContain('https://test.auth0.com');
+      expect(mockRes.redirect.mock.calls[0][1]).toContain(
+        'https://test.auth0.com',
+      );
     });
 
     it('should redirect to "next" parameter', async () => {
@@ -156,6 +177,7 @@ describe('AuthorizationService', () => {
         hostname: 'topcoder.com',
         secure: false,
         headers: { referer: 'https://test.com' },
+        get: () => 'test.com',
       } as any;
       const mockRes = { redirect: jest.fn() } as any;
 
@@ -164,7 +186,9 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
-      expect(mockRes.redirect.mock.calls[0][1]).toContain('http://another-test.com');
+      expect(mockRes.redirect.mock.calls[0][1]).toContain(
+        'http://another-test.com',
+      );
     });
 
     it('should redirect to topcoder if redirect url is empty', async () => {
@@ -172,6 +196,7 @@ describe('AuthorizationService', () => {
         hostname: 'topcoder.com',
         secure: false,
         headers: {},
+        get: () => 'test.com',
       } as any;
       const mockRes = { redirect: jest.fn() } as any;
 
@@ -180,13 +205,19 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
-      expect(mockRes.redirect.mock.calls[0][1]).toContain('https://www.topcoder.com');
+      expect(mockRes.redirect.mock.calls[0][1]).toContain(
+        'https://www.topcoder.com',
+      );
     });
   });
 
   describe('getTokenByAuthorizationCode', () => {
     it('should handle login_required error by redirecting', async () => {
-      const mockReq = { hostname: 'test.com', secure: true } as any;
+      const mockReq = {
+        hostname: 'test.com',
+        secure: true,
+        get: () => 'test.com',
+      } as any;
       const mockRes = { redirect: jest.fn() } as any;
       const dto: GetTokenQueryDto = {
         error: 'login_required',
@@ -201,7 +232,7 @@ describe('AuthorizationService', () => {
     });
 
     it('should throw BadRequestException for missing code', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = {} as any;
       const dto: GetTokenQueryDto = {
         code: '',
@@ -209,12 +240,13 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://test.com',
       };
 
-      await expect(service.getTokenByAuthorizationCode(mockReq, mockRes, dto))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for missing redirectUrl', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = {} as any;
       const dto: GetTokenQueryDto = {
         code: 'test code',
@@ -222,12 +254,13 @@ describe('AuthorizationService', () => {
         redirectUrl: '',
       };
 
-      await expect(service.getTokenByAuthorizationCode(mockReq, mockRes, dto))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for missing state', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = {} as any;
       const dto: GetTokenQueryDto = {
         code: 'test code',
@@ -235,12 +268,13 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://test.com',
       };
 
-      await expect(service.getTokenByAuthorizationCode(mockReq, mockRes, dto))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw InternalServerErrorException if no cache state found', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = {} as any;
       const dto: GetTokenQueryDto = {
         code: 'test code',
@@ -249,12 +283,13 @@ describe('AuthorizationService', () => {
       };
       mockCacheManager.get.mockResolvedValue(null);
 
-      await expect(service.getTokenByAuthorizationCode(mockReq, mockRes, dto))
-        .rejects.toThrow(InternalServerErrorException);
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('should process valid authorization code', async () => {
-      const mockReq = { hostname: 'test.com' } as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -284,11 +319,12 @@ describe('AuthorizationService', () => {
   describe('createObject', () => {
     it('should create authorization from request', async () => {
       const mockReq = {
-        headers: { 
+        headers: {
           authorization: 'Auth0Code test-code',
-          referer: 'https://topcoder-dev.com'
+          referer: 'https://topcoder-dev.com',
         },
         cookies: { rememberMe: true },
+        get: () => 'test.com',
       } as any;
       const mockRes = { cookie: jest.fn() } as any;
 
@@ -301,8 +337,8 @@ describe('AuthorizationService', () => {
       profile.provider = 'twitter';
       profile.userId = 'test-user';
       profile.name = 'test-user';
-      mockUserProfileHelper.createProfile.mockResolvedValue(profile);
-      mockUserProfileHelper.getUserIdByProfile.mockResolvedValue(123);
+      mockUserProfileHelper.createProfile.mockReturnValue(profile);
+      mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
         handle: 'testuser',
@@ -318,14 +354,14 @@ describe('AuthorizationService', () => {
     });
 
     it('should create authorization from DTO', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = { cookie: jest.fn() } as any;
       const dto: AuthorizationCreateDto = {
         externalToken: 'test-token',
         refreshToken: 'refresh-token',
       };
 
-      mockUserProfileHelper.getUserIdByProfile.mockResolvedValue(123);
+      mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
         handle: 'testuser',
@@ -333,7 +369,7 @@ describe('AuthorizationService', () => {
       });
       mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
       (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
-        alg: 'HS256'
+        alg: 'HS256',
       });
 
       const result = await service.createObject(mockReq, mockRes, dto);
@@ -344,7 +380,7 @@ describe('AuthorizationService', () => {
     });
 
     it('should create authorization from DTO for RS256 algorithm token', async () => {
-      const mockReq = {} as any;
+      const mockReq = { get: () => 'test.com' } as any;
       const mockRes = { cookie: jest.fn() } as any;
       const dto: AuthorizationCreateDto = {
         externalToken: 'test-token',
@@ -354,9 +390,9 @@ describe('AuthorizationService', () => {
       mockCacheManager.del.mockResolvedValue(null);
       mockCacheManager.set.mockResolvedValue(null);
       mockAuth0Service.refreshToken.mockResolvedValue({
-        access_token: 'test-token'
+        access_token: 'test-token',
       });
-      mockUserProfileHelper.getUserIdByProfile.mockResolvedValue(123);
+      mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
         handle: 'testuser',
@@ -364,7 +400,7 @@ describe('AuthorizationService', () => {
       });
       mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
       (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
-        alg: 'RS256'
+        alg: 'RS256',
       });
 
       const result = await service.createObject(mockReq, mockRes, dto);
@@ -397,8 +433,9 @@ describe('AuthorizationService', () => {
         secret: 'invalid',
       };
 
-      await expect(service.createObjectForm(form))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.createObjectForm(form)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw error when error occurs while putting auth data store', async () => {
@@ -410,8 +447,7 @@ describe('AuthorizationService', () => {
       mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
       mockAuthDataStore.put.mockRejectedValueOnce(new Error('Store error'));
 
-      await expect(service.createObjectForm(form))
-        .rejects.toThrow(Error);
+      await expect(service.createObjectForm(form)).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).toHaveBeenCalled();
     });
@@ -464,7 +500,9 @@ describe('AuthorizationService', () => {
         externalToken: 'ext-token',
         refreshToken: 'refresh-token',
       });
-      mockAuth0Service.revokeRefreshToken.mockRejectedValueOnce(new Error('revoke error'));
+      mockAuth0Service.revokeRefreshToken.mockRejectedValueOnce(
+        new Error('revoke error'),
+      );
 
       await service.deleteObject(targetId, mockReq, mockRes);
 
@@ -478,8 +516,9 @@ describe('AuthorizationService', () => {
       const mockRes = {} as any;
       const targetId = '1';
 
-      await expect(service.deleteObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.deleteObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -489,8 +528,9 @@ describe('AuthorizationService', () => {
         headers: { authorization: 'Bearer' },
       } as any;
       const mockRes = { cookie: jest.fn() } as any;
-      await expect(service.getObject('', mockReq, mockRes))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.getObject('', mockReq, mockRes)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException if token failed to verify', async () => {
@@ -498,12 +538,14 @@ describe('AuthorizationService', () => {
         headers: { authorization: 'Bearer valid-token' },
       } as any;
       const mockRes = { cookie: jest.fn() } as any;
-      const targetId = '1';
 
-      (CommonUtils.verifyJwtToken as jest.Mock).mockRejectedValueOnce(new Error('verified failed'));
+      (CommonUtils.verifyJwtToken as jest.Mock).mockRejectedValueOnce(
+        new Error('verified failed'),
+      );
 
-      await expect(service.getObject('', mockReq, mockRes))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.getObject('', mockReq, mockRes)).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -567,8 +609,9 @@ describe('AuthorizationService', () => {
       });
       (CommonUtils.generateJwt as jest.Mock).mockResolvedValueOnce(null);
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(Error);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -586,10 +629,13 @@ describe('AuthorizationService', () => {
         externalToken: 'ext-token',
         refreshToken: 'refresh-token',
       });
-      (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(new Error('jwt-error'));
+      (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(
+        new Error('jwt-error'),
+      );
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(Error);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -611,7 +657,7 @@ describe('AuthorizationService', () => {
       err.name = 'TokenExpiredError';
       (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(err);
       mockAuth0Service.refreshToken.mockResolvedValueOnce({
-        id_token: 'id-token'
+        id_token: 'id-token',
       });
 
       const result = await service.getObject(targetId, mockReq, mockRes);
@@ -637,8 +683,9 @@ describe('AuthorizationService', () => {
       err.name = 'TokenExpiredError';
       (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(err);
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(Error);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -659,10 +706,13 @@ describe('AuthorizationService', () => {
       const err = new Error('token expired');
       err.name = 'TokenExpiredError';
       (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(err);
-      mockAuth0Service.refreshToken.mockRejectedValueOnce(new Error('refresh error'));
+      mockAuth0Service.refreshToken.mockRejectedValueOnce(
+        new Error('refresh error'),
+      );
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(Error);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -685,8 +735,9 @@ describe('AuthorizationService', () => {
       (CommonUtils.generateJwt as jest.Mock).mockRejectedValueOnce(err);
       mockAuth0Service.refreshToken.mockResolvedValueOnce({});
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(Error);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(Error);
 
       expect(mockAuthDataStore.put).not.toHaveBeenCalled();
       expect(mockRes.cookie).not.toHaveBeenCalled();
@@ -706,7 +757,7 @@ describe('AuthorizationService', () => {
       });
       (CommonUtils.parseJWTClaims as jest.Mock).mockImplementation(() => {
         return {
-          iss: 'https://another-test.com'
+          iss: 'https://another-test.com',
         };
       });
 
@@ -730,13 +781,20 @@ describe('AuthorizationService', () => {
         refreshToken: 'refresh-token',
       });
       (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValueOnce({
-        iss: 'https://another-test.com'
+        iss: 'https://another-test.com',
       });
 
-      const result = await service.getObject(targetId, mockReq, mockRes, fields);
+      const result = await service.getObject(
+        targetId,
+        mockReq,
+        mockRes,
+        fields,
+      );
 
       expect(result).toBeDefined();
-      const allKeysValid = Object.keys(result).every(key => ['token', 'target'].includes(key));
+      const allKeysValid = Object.keys(result).every((key) =>
+        ['token', 'target'].includes(key),
+      );
       expect(allKeysValid).toBeTruthy();
       expect(mockAuthDataStore.put).toHaveBeenCalled();
       expect(mockRes.cookie).toHaveBeenCalled();
@@ -753,8 +811,9 @@ describe('AuthorizationService', () => {
 
       mockAuthDataStore.get.mockResolvedValue(null);
 
-      await expect(service.getObject(targetId, mockReq, mockRes))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.getObject(targetId, mockReq, mockRes),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -783,8 +842,9 @@ describe('AuthorizationService', () => {
 
       mockPrismaAuth.client.findUnique.mockResolvedValue(null);
 
-      await expect(service.validateClient(dto))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.validateClient(dto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException if no redirect uri is configured', async () => {
@@ -798,8 +858,9 @@ describe('AuthorizationService', () => {
         redirectUri: null,
       });
 
-      await expect(service.validateClient(dto))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.validateClient(dto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException for unregistered URI', async () => {
@@ -813,8 +874,9 @@ describe('AuthorizationService', () => {
         redirectUri: 'https://valid.com',
       });
 
-      await expect(service.validateClient(dto))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.validateClient(dto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

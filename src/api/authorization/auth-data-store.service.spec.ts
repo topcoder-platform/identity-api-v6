@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthDataStore, InMemoryDataStore, RedisDataStore } from './auth-data-store.service';
+import {
+  AuthDataStore,
+  InMemoryDataStore,
+  RedisDataStore,
+} from './auth-data-store.service';
 import { ConfigurationService } from '../../config/configuration.service';
 import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
 
@@ -19,9 +23,9 @@ import Redis from 'ioredis';
 
 jest.mock('../../shared/util/common.utils', () => ({
   CommonUtils: {
-    parseJWTClaims: jest.fn().mockImplementation((token) => {
+    parseJWTClaims: jest.fn().mockImplementation(() => {
       // Your mock implementation
-      return {'userId': 123456};
+      return { userId: 123456 };
     }),
   },
 }));
@@ -32,19 +36,19 @@ describe('AuthDataStore', () => {
 
   const mockAuthResponse: AuthorizationResponse = {
     token: 'test-token',
-    target: 'test-target'
+    target: 'test-target',
   };
 
   describe('with InMemoryDataStore', () => {
     beforeEach(async () => {
       mockConfigService = {
-        getAuthStore: jest.fn().mockReturnValue({ type: 'memory' })
+        getAuthStore: jest.fn().mockReturnValue({ type: 'memory' }),
       };
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthDataStore,
-          { provide: ConfigurationService, useValue: mockConfigService }
+          { provide: ConfigurationService, useValue: mockConfigService },
         ],
       }).compile();
 
@@ -57,14 +61,20 @@ describe('AuthDataStore', () => {
 
     it('should store and retrieve authorization data', async () => {
       await service.put(mockAuthResponse);
-      const result = await service.get(mockAuthResponse.token, mockAuthResponse.target);
+      const result = await service.get(
+        mockAuthResponse.token,
+        mockAuthResponse.target,
+      );
       expect(result).toEqual(mockAuthResponse);
     });
 
     it('should delete authorization data', async () => {
       await service.put(mockAuthResponse);
       await service.delete(mockAuthResponse.token, mockAuthResponse.target);
-      const result = await service.get(mockAuthResponse.token, mockAuthResponse.target);
+      const result = await service.get(
+        mockAuthResponse.token,
+        mockAuthResponse.target,
+      );
       expect(result).toBeUndefined();
     });
 
@@ -90,7 +100,7 @@ describe('AuthDataStore', () => {
         ping: jest.fn().mockResolvedValue('PONG'),
         setex: jest.fn().mockResolvedValue('OK'),
         get: jest.fn().mockResolvedValue(JSON.stringify(mockAuthResponse)),
-        del: jest.fn().mockResolvedValue(1)
+        del: jest.fn().mockResolvedValue(1),
       };
       (Redis as unknown as jest.Mock).mockImplementation(() => mockRedisClient);
 
@@ -100,15 +110,15 @@ describe('AuthDataStore', () => {
           spec: {
             host: 'localhost',
             port: 6379,
-            expirySeconds: 3600
-          }
-        })
+            expirySeconds: 3600,
+          },
+        }),
       };
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthDataStore,
-          { provide: ConfigurationService, useValue: mockConfigService }
+          { provide: ConfigurationService, useValue: mockConfigService },
         ],
       }).compile();
 
@@ -121,7 +131,10 @@ describe('AuthDataStore', () => {
 
     it('should store and retrieve authorization data', async () => {
       await service.put(mockAuthResponse);
-      const result = await service.get(mockAuthResponse.token, mockAuthResponse.target);
+      const result = await service.get(
+        mockAuthResponse.token,
+        mockAuthResponse.target,
+      );
       expect(result).toEqual(mockAuthResponse);
       expect(mockRedisClient.setex).toHaveBeenCalled();
       expect(mockRedisClient.get).toHaveBeenCalled();
@@ -134,8 +147,10 @@ describe('AuthDataStore', () => {
 
     it('should handle connection errors', async () => {
       // Simulate connection failure
-      (mockRedisClient.ping as jest.Mock).mockRejectedValue(new Error('Connection failed'));
-      
+      (mockRedisClient.ping as jest.Mock).mockRejectedValue(
+        new Error('Connection failed'),
+      );
+
       // Need to create new instance since connection is established in constructor
       const failingConfigService = {
         getAuthStore: jest.fn().mockReturnValue({
@@ -143,20 +158,20 @@ describe('AuthDataStore', () => {
           spec: {
             host: 'localhost',
             port: 6379,
-            expirySeconds: 3600
-          }
-        })
+            expirySeconds: 3600,
+          },
+        }),
       };
 
       const failingModule: TestingModule = await Test.createTestingModule({
         providers: [
           AuthDataStore,
-          { provide: ConfigurationService, useValue: failingConfigService }
+          { provide: ConfigurationService, useValue: failingConfigService },
         ],
       }).compile();
 
       const failingService = failingModule.get<AuthDataStore>(AuthDataStore);
-      
+
       // Verify that operations fail with connection error
       await expect(failingService.put(mockAuthResponse)).rejects.toThrow();
       await expect(failingService.get('token', 'target')).rejects.toThrow();
@@ -184,13 +199,13 @@ describe('AuthDataStore', () => {
     it('should dynamically switch between store implementations based on config', async () => {
       // First test with memory store
       mockConfigService = {
-        getAuthStore: jest.fn().mockReturnValue({ type: 'memory' })
+        getAuthStore: jest.fn().mockReturnValue({ type: 'memory' }),
       };
 
       const memoryModule: TestingModule = await Test.createTestingModule({
         providers: [
           AuthDataStore,
-          { provide: ConfigurationService, useValue: mockConfigService }
+          { provide: ConfigurationService, useValue: mockConfigService },
         ],
       }).compile();
 
@@ -203,14 +218,14 @@ describe('AuthDataStore', () => {
         spec: {
           host: 'localhost',
           port: 6379,
-          expirySeconds: 3600
-        }
+          expirySeconds: 3600,
+        },
       });
 
       const redisModule: TestingModule = await Test.createTestingModule({
         providers: [
           AuthDataStore,
-          { provide: ConfigurationService, useValue: mockConfigService }
+          { provide: ConfigurationService, useValue: mockConfigService },
         ],
       }).compile();
 

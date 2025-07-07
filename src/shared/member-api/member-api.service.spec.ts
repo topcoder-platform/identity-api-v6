@@ -30,21 +30,24 @@ describe('MemberApiService', () => {
   const mockClientId = 'test-client-id';
   const mockClientSecret = 'test-client-secret';
 
-  beforeEach(async () => {
-    const mockHttpService = {
-      get: jest.fn(),
-    };
-
-    const mockConfigService = {
-      get: jest.fn().mockImplementation((key: string, defaultValue?: any) => {
+  const mockConfigService = {
+    get: jest
+      .fn()
+      .mockImplementation(<T = any>(key: string, defaultValue?: T): T => {
         const config = {
           MEMBER_API_URL: mockApiUrl,
           AUTH0_CLIENT_ID: mockClientId,
           AUTH0_CLIENT_SECRET: mockClientSecret,
-          TOKEN_CACHE_TIME: 23 * 60 * 60, // 23 hours
+          TOKEN_CACHE_TIME: 23 * 60 * 60,
         };
-        return config[key] || defaultValue;
+
+        return (config[key as keyof typeof config] || defaultValue) as T;
       }),
+  };
+
+  beforeEach(async () => {
+    const mockHttpService = {
+      get: jest.fn(),
     };
 
     const mockCacheManager = {
@@ -112,7 +115,7 @@ describe('MemberApiService', () => {
   describe('Constructor', () => {
     it('should initialize successfully with valid configuration', () => {
       expect(service).toBeDefined();
-      expect(configService.get).toHaveBeenCalledWith('MEMBER_API_URL');
+      expect(mockConfigService.get).toHaveBeenCalledWith('MEMBER_API_URL');
     });
   });
 
@@ -253,15 +256,17 @@ describe('MemberApiService', () => {
     });
 
     it('should return empty array for empty input', async () => {
+      const getSpy = jest.spyOn(httpService, 'get');
       const result = await service.getUserInfoList([]);
       expect(result).toEqual([]);
-      expect(httpService.get).not.toHaveBeenCalled();
+      expect(getSpy).not.toHaveBeenCalled();
     });
 
     it('should return empty array for null input', async () => {
+      const getSpy = jest.spyOn(httpService, 'get');
       const result = await service.getUserInfoList(null as any);
       expect(result).toEqual([]);
-      expect(httpService.get).not.toHaveBeenCalled();
+      expect(getSpy).not.toHaveBeenCalled();
     });
 
     it('should throw HttpException when M2M token cannot be obtained', async () => {
@@ -286,20 +291,19 @@ describe('MemberApiService', () => {
         config: {} as any,
       };
 
-      jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse));
+      const getSpy = jest
+        .spyOn(httpService, 'get')
+        .mockReturnValue(of(mockResponse));
 
       const result = await service.getUserInfoList(userIds);
 
       expect(result).toEqual(mockMemberInfo);
-      expect(httpService.get).toHaveBeenCalledWith(
-        `${mockApiUrl}?userIds=1&userIds=2`,
-        {
-          headers: {
-            Authorization: `Bearer ${mockToken}`,
-            'Content-Type': 'application/json',
-          },
+      expect(getSpy).toHaveBeenCalledWith(`${mockApiUrl}?userIds=1&userIds=2`, {
+        headers: {
+          Authorization: `Bearer ${mockToken}`,
+          'Content-Type': 'application/json',
         },
-      );
+      });
     });
 
     it('should handle large lists by batching requests', async () => {
@@ -344,7 +348,7 @@ describe('MemberApiService', () => {
         config: {} as any,
       };
 
-      jest
+      const getSpy = jest
         .spyOn(httpService, 'get')
         .mockReturnValueOnce(of(mockResponse1))
         .mockReturnValueOnce(of(mockResponse2))
@@ -352,7 +356,7 @@ describe('MemberApiService', () => {
 
       const result = await service.getUserInfoList(userIds);
 
-      expect(httpService.get).toHaveBeenCalledTimes(3); // 3 batches (50, 50, 20)
+      expect(getSpy).toHaveBeenCalledTimes(3); // 3 batches (50, 50, 20)
       expect(result).toHaveLength(120); // All responses combined
     });
 
@@ -366,12 +370,14 @@ describe('MemberApiService', () => {
         config: {} as any,
       };
 
-      jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse));
+      const getSpy = jest
+        .spyOn(httpService, 'get')
+        .mockReturnValue(of(mockResponse));
 
       await service.getUserInfoList(userIds);
 
       // Should only call with unique IDs: 1, 2, 3
-      expect(httpService.get).toHaveBeenCalledWith(
+      expect(getSpy).toHaveBeenCalledWith(
         `${mockApiUrl}?userIds=1&userIds=2&userIds=3`,
         expect.any(Object),
       );
@@ -434,14 +440,16 @@ describe('MemberApiService', () => {
       const userIds = Array.from({ length: 120 }, (_, i) => i + 1); // 120 users, 3 batches
       const error = new Error('First batch failed');
 
-      jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => error));
+      const getSpy = jest
+        .spyOn(httpService, 'get')
+        .mockReturnValue(throwError(() => error));
 
       await expect(service.getUserInfoList(userIds)).rejects.toThrow(
         HttpException,
       );
 
       // Should only call once (first batch), then stop
-      expect(httpService.get).toHaveBeenCalledTimes(1);
+      expect(getSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should properly encode user IDs in query string', async () => {
@@ -454,11 +462,13 @@ describe('MemberApiService', () => {
         config: {} as any,
       };
 
-      jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse));
+      const getSpy = jest
+        .spyOn(httpService, 'get')
+        .mockReturnValue(of(mockResponse));
 
       await service.getUserInfoList(userIds);
 
-      expect(httpService.get).toHaveBeenCalledWith(
+      expect(getSpy).toHaveBeenCalledWith(
         `${mockApiUrl}?userIds=123&userIds=456`,
         expect.any(Object),
       );

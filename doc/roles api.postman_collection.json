@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "f90a5cc2-ba3d-4262-9cf0-945e99a78e18",
+		"_postman_id": "246071db-0bfb-4a5e-870a-524051e4c1c1",
 		"name": "roles api",
-		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
-		"_exporter_id": "2487006"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28573934"
 	},
 	"item": [
 		{
@@ -40,7 +40,16 @@
 					"mode": "raw",
 					"raw": "{\n    \"param\": {\n        \"roleName\": \"TestRole_{{$randomWord}}\"\n    }\n}"
 				},
-				"url": "{{baseUrl}}/v3/roles"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles"
+					]
+				}
 			},
 			"response": []
 		},
@@ -65,7 +74,16 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles"
+					]
+				}
 			},
 			"response": []
 		},
@@ -90,7 +108,17 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles/1"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"1"
+					]
+				}
 			},
 			"response": []
 		},
@@ -123,7 +151,17 @@
 					"mode": "raw",
 					"raw": "{\n    \"param\": {\n        \"roleName\": \"role {{$randomWord}}\"\n    }\n}"
 				},
-				"url": "{{baseUrl}}/v3/roles/{{createdRoleId}}"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/{{createdRoleId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"{{createdRoleId}}"
+					]
+				}
 			},
 			"response": []
 		},
@@ -152,7 +190,17 @@
 					"mode": "raw",
 					"raw": ""
 				},
-				"url": "{{baseUrl}}/v3/roles/{{createdRoleId}}"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/{{createdRoleId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"{{createdRoleId}}"
+					]
+				}
 			},
 			"response": []
 		},
@@ -185,7 +233,24 @@
 					"mode": "raw",
 					"raw": ""
 				},
-				"url": "{{baseUrl}}/v3/roles/40/assign?filter=subjectID=100"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/40/assign?filter=subjectID=100",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"40",
+						"assign"
+					],
+					"query": [
+						{
+							"key": "filter",
+							"value": "subjectID=100"
+						}
+					]
+				}
 			},
 			"response": []
 		},
@@ -213,7 +278,24 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles/40/hasrole?filter=subjectID=100"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/40/hasrole?filter=subjectID=100",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"40",
+						"hasrole"
+					],
+					"query": [
+						{
+							"key": "filter",
+							"value": "subjectID=100"
+						}
+					]
+				}
 			},
 			"response": []
 		},
@@ -238,7 +320,24 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles/40/deassign?filter=subjectID=100"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/40/deassign?filter=subjectID=100",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"40",
+						"deassign"
+					],
+					"query": [
+						{
+							"key": "filter",
+							"value": "subjectID=100"
+						}
+					]
+				}
 			},
 			"response": []
 		},
@@ -263,7 +362,23 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles/105?fields=subjects"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles/105?fields=subjects",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles",
+						"105"
+					],
+					"query": [
+						{
+							"key": "fields",
+							"value": "subjects"
+						}
+					]
+				}
 			},
 			"response": []
 		},
@@ -288,9 +403,56 @@
 						"value": "Bearer {{accessToken}}"
 					}
 				],
-				"url": "{{baseUrl}}/v3/roles?filter=subjectID=100"
+				"url": {
+					"raw": "{{baseUrl}}/v3/roles?filter=subjectID=100",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"v3",
+						"roles"
+					],
+					"query": [
+						{
+							"key": "filter",
+							"value": "subjectID=100"
+						}
+					]
+				}
 			},
 			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUxNTY2NDc0fQ.6vBfNA02NRU70TtIdymzaUNnrAaU3xJW5R112AzYR_E",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
 		}
 	]
 }

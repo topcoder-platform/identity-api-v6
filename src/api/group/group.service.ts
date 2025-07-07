@@ -60,7 +60,7 @@ export class GroupService {
     private readonly prismaAuth: PrismaClientAuthorization,
     @Inject(PRISMA_CLIENT_COMMON_OLTP)
     private readonly prismaCommonClient: PrismaCommonClient,
-  ) { }
+  ) {}
 
   // --- UTILITY METHODS ---
   private checkAccessPermissions(
@@ -115,7 +115,7 @@ export class GroupService {
 
   private mapDomainGroupToResponseDtoRecursive(group: Group): GroupResponseDto {
     const dto: GroupResponseDto = {
-      ...this.mapToGroupResponseDto(group)!,
+      ...this.mapToGroupResponseDto(group),
       subGroups:
         group.subGroups?.map((sg) =>
           this.mapDomainGroupToResponseDtoRecursive(sg),
@@ -125,7 +125,7 @@ export class GroupService {
   }
 
   private mapMembershipToDto(
-    membership: GroupMembership & { group?: { name: string } }
+    membership: GroupMembership & { group?: { name: string } },
   ): GroupMembershipResponseDto {
     const baseDto = {
       id: membership.id,
@@ -194,7 +194,7 @@ export class GroupService {
 
     try {
       const group = await this.prismaAuth.group.create({ data: dataToCreate });
-      return this.mapToGroupResponseDto(group)!;
+      return this.mapToGroupResponseDto(group);
     } catch (error) {
       this.logger.error(`Error creating group: ${error.message}`, error.stack);
       throw new InternalServerErrorException(
@@ -315,7 +315,7 @@ export class GroupService {
         where: { id: groupId },
         data: dataToUpdate,
       });
-      return this.mapToGroupResponseDto(updatedGroup)!;
+      return this.mapToGroupResponseDto(updatedGroup);
     } catch (error) {
       this.logger.error(
         `Error updating group ID ${groupId}: ${error.message}`,
@@ -375,7 +375,7 @@ export class GroupService {
     // if (!group) {
     //   throw new NotFoundException(`Group with ID ${groupId} not found.`);
     // }
-    const group = await this.getGroupOrThrow(groupId);
+    await this.getGroupOrThrow(groupId);
 
     try {
       const membership = await this.prismaAuth.groupMembership.findFirst({
@@ -509,7 +509,7 @@ export class GroupService {
       groupId,
       memberId: memberData.memberId,
       membershipType: MembershipTypeHelper.getByKey(
-        memberData.membershipType.toLocaleString().toLowerCase(),
+        (memberData.membershipType as string).toLowerCase(),
       ),
       createdBy: authUser.isMachine ? null : Number(authUser.userId),
       createdAt: now,
@@ -610,7 +610,7 @@ export class GroupService {
       this.readScopes,
       this.adminRoles,
     );
-    return this.mapToGroupResponseDto(group)!;
+    return this.mapToGroupResponseDto(group);
   }
 
   async validateAdminRoleOrPrivateGroupMembership(
@@ -650,9 +650,7 @@ export class GroupService {
     }
 
     const numericUserId = Number(user.userId);
-    if (
-      await this.isMemberOfGroup(numericUserId!, group.id, membershipTypeId)
-    ) {
+    if (await this.isMemberOfGroup(numericUserId, group.id, membershipTypeId)) {
       this.logger.debug(
         `Access granted for user ${user.userId} to private group ${group.id} as member.`,
       );
@@ -707,7 +705,10 @@ export class GroupService {
 
     try {
       const membershipRecords = await this.prismaAuth.groupMembership.findMany({
-        where: { groupId: parent.id, membershipType: Constants.subGroupMembershipType },
+        where: {
+          groupId: parent.id,
+          membershipType: Constants.subGroupMembershipType,
+        },
         select: { memberId: true },
       });
 
@@ -797,7 +798,12 @@ export class GroupService {
     try {
       const subGroups = await this.prismaAuth.group.findMany({
         where: {
-          memberships: { some: { groupId: parent.id, membershipType: MembershipTypeHelper.getByKey('Group')} }, // Group = 2
+          memberships: {
+            some: {
+              groupId: parent.id,
+              membershipType: MembershipTypeHelper.getByKey('Group'),
+            },
+          }, // Group = 2
         },
         orderBy: { id: 'asc' },
       });
@@ -896,7 +902,9 @@ export class GroupService {
 
     const membershipTypeInt = MembershipTypeHelper.getByKey(membershipType);
     if (!membershipTypeInt) {
-      throw new BadRequestException(`Unsupported MembershipType: ${membershipType}`);
+      throw new BadRequestException(
+        `Unsupported MembershipType: ${membershipType}`,
+      );
     }
 
     return this.findGroupsByMember(memberId, membershipTypeInt);
@@ -950,18 +958,19 @@ export class GroupService {
   }
 
   private validateMembership(request: GroupMemberDto) {
-
     if (request.memberId == null) {
-      throw new InternalServerErrorException("Mandatory field missing: memberId");
+      throw new BadRequestException('Mandatory field missing: memberId');
     }
 
     if (request.membershipType == null) {
-      throw new InternalServerErrorException("Mandatory field missing: membershipType");
+      throw new BadRequestException('Mandatory field missing: membershipType');
     }
 
-    const allTypes = [Constants.memberGroupMembershipName, Constants.subGroupMembershipName];
-    if (!allTypes.includes(request.membershipType as string)) {
-      throw new InternalServerErrorException("Mandatory field missing: membershipType");
+    const type = MembershipTypeHelper.getByKey(
+      request.membershipType as string,
+    );
+    if (type == null) {
+      throw new BadRequestException('Mandatory field missing: membershipType');
     }
   }
 }

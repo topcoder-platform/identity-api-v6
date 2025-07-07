@@ -4,7 +4,6 @@ import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { Cache } from 'cache-manager'; // Import Cache type
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { UserService } from './user.service';
 import { EventService } from '../../shared/event/event.service';
@@ -91,7 +90,7 @@ export class AuthFlowService {
       );
     }
 
-    let decodedJwtPayload: jwt.JwtPayload | string;
+    let decodedJwtPayload: jwt.JwtPayload;
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
@@ -180,7 +179,7 @@ export class AuthFlowService {
             data: { status_id: 1, modify_date: new Date() }, // Prisma handles number to Decimal for DTOs
           });
           this.logger.log(
-            `Primary email (ID: ${primaryEmailRecord.email_id}, Address: ${primaryEmailRecord.address}) status_id updated to verified for user ${userId}.`,
+            `Primary email (ID: ${primaryEmailRecord.email_id.toNumber()}, Address: ${primaryEmailRecord.address}) status_id updated to verified for user ${userId}.`,
           );
         } else {
           this.logger.warn(
@@ -266,7 +265,7 @@ export class AuthFlowService {
       throw new BadRequestException('User ID and resend token are required.');
     }
 
-    let decodedJwtPayload: jwt.JwtPayload | string;
+    let decodedJwtPayload: jwt.JwtPayload;
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
@@ -480,7 +479,7 @@ export class AuthFlowService {
     this.logger.log(
       `Generated one-time token (JTI: ${jti}) for user ${userId}`,
     );
-    return token;
+    return token as string;
   }
 
   async updateEmailWithOneTimeToken(
@@ -601,7 +600,7 @@ export class AuthFlowService {
       });
 
       this.logger.log(
-        `Updated existing primary email record ${currentPrimaryEmail.email_id} from ${oldEmail} to ${newEmailLower} for user ${userId} (verified via token)`,
+        `Updated existing primary email record ${currentPrimaryEmail.email_id.toNumber()} from ${oldEmail} to ${newEmailLower} for user ${userId} (verified via token)`,
       );
 
       // Update the user record
@@ -638,36 +637,6 @@ export class AuthFlowService {
         `Failed to publish user.updated event for email change, user ${userId}: ${eventError.message}`,
       );
     }
-  }
-
-  // --- Helper methods ---
-  private async generateAndCacheToken(
-    purpose: string,
-    userId: number,
-    expirySeconds: number,
-  ): Promise<string> {
-    const token = require('crypto').randomBytes(32).toString('hex');
-    const key = `identity:${purpose}:${token}`;
-    await this.cacheManager.set(key, userId.toString(), expirySeconds * 1000);
-    this.logger.log(`Generated ${purpose} token for user ${userId}`);
-    return token;
-  }
-
-  private async validateAndConsumeToken(
-    purpose: string,
-    token: string,
-  ): Promise<number | null> {
-    const key = `identity:${purpose}:${token}`;
-    const userIdString = await this.cacheManager.get<string>(key);
-    if (!userIdString) {
-      this.logger.warn(`${purpose} token not found or expired: ${token}`);
-      return null;
-    }
-    await this.cacheManager.del(key);
-    this.logger.log(
-      `Validated and consumed ${purpose} token for user ${userIdString}`,
-    );
-    return parseInt(userIdString, 10);
   }
 
   private generateAlphanumericToken(length: number): string {
@@ -717,19 +686,19 @@ export class AuthFlowService {
     // Assuming user model from userService.findUserByEmailOrHandle includes sso_logins
     if (user.user_sso_login && user.user_sso_login.length > 0) {
       this.logger.warn(
-        `User ${user.user_id} is an SSO user. Password reset via this flow is not allowed.`,
+        `User ${user.user_id.toNumber()} is an SSO user. Password reset via this flow is not allowed.`,
       );
       throw new ForbiddenException(
         'Password reset is not allowed for SSO-linked accounts.',
       );
     }
 
-    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id}`;
+    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id.toNumber()}`;
     const existingCachedToken =
       await this.cacheManager.get<string>(resetTokenCacheKey);
     if (existingCachedToken) {
       this.logger.warn(
-        `Password reset token already issued for user ${user.user_id}.`,
+        `Password reset token already issued for user ${user.user_id.toNumber()}.`,
       );
       // Java logic threw an error here. Adhering to that.
       throw new ConflictException(
@@ -747,7 +716,7 @@ export class AuthFlowService {
       expirySeconds * 1000,
     );
     this.logger.log(
-      `Password reset token ${resetToken} generated and cached for user ${user.user_id}`,
+      `Password reset token ${resetToken} generated and cached for user ${user.user_id.toNumber()}`,
     );
 
     const finalResetUrlPrefix =
@@ -759,7 +728,7 @@ export class AuthFlowService {
     const primaryEmailAddress = user.primaryEmail?.address;
     if (!primaryEmailAddress) {
       this.logger.error(
-        `Password reset initiated for user ${user.user_id} (${user.handle}), but no primary email address is associated. Cannot send email.`,
+        `Password reset initiated for user ${user.user_id.toNumber()} (${user.handle}), but no primary email address is associated. Cannot send email.`,
       );
       // Do not throw an error to prevent user enumeration, but log that email cannot be sent.
       return;
@@ -809,11 +778,11 @@ export class AuthFlowService {
         eventAttributes,
       );
       this.logger.log(
-        `Password reset notification ('userpasswordreset') published for user ${user.user_id}`,
+        `Password reset notification ('userpasswordreset') published for user ${user.user_id.toNumber()}`,
       );
     } catch (eventError) {
       this.logger.error(
-        `Failed to publish password reset event (to event.notification.send) for user ${user.user_id}: ${eventError.message}`,
+        `Failed to publish password reset event (to event.notification.send) for user ${user.user_id.toNumber()}: ${eventError.message}`,
         eventError.stack,
       );
       // Depending on business requirements, you might want to re-throw or handle this error differently.

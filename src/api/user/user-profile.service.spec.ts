@@ -8,10 +8,8 @@ import {
   ConflictException,
   InternalServerErrorException,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
   user_sso_login as UserSsoLoginModel,
   sso_login_provider as SsoLoginProviderModel,
   user_social_login as UserSocialLoginModel,
@@ -53,7 +51,7 @@ const mockPrismaOltp = {
   },
 };
 
-const mockEventService = {
+const mockEventService: jest.Mocked<Partial<EventService>> = {
   postEnvelopedNotification: jest.fn(),
 };
 
@@ -136,15 +134,9 @@ describe('UserProfileService', () => {
   let service: UserProfileService;
   let prismaOltp: typeof mockPrismaOltp;
   let eventService: jest.Mocked<EventService>;
-  let loggerErrorSpy: jest.SpyInstance;
-
-  const operatorId = 'operator-1';
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    loggerErrorSpy = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation(() => {});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -299,11 +291,7 @@ describe('UserProfileService', () => {
       );
       prismaOltp.user_sso_login.create.mockResolvedValue(mockCreatedSsoLogin);
 
-      const result = await service.createSSOUserLogin(
-        userId,
-        profileDto,
-        operatorId,
-      );
+      const result = await service.createSSOUserLogin(userId, profileDto);
 
       expect(prismaOltp.sso_login_provider.findFirst).toHaveBeenCalledWith({
         where: { name: profileDto.provider },
@@ -324,25 +312,23 @@ describe('UserProfileService', () => {
 
     it('should throw BadRequestException if provider name or sso user ID is missing', async () => {
       await expect(
-        service.createSSOUserLogin(
-          userId,
-          { ...profileDto, provider: undefined } as any,
-          operatorId,
-        ),
+        service.createSSOUserLogin(userId, {
+          ...profileDto,
+          provider: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.createSSOUserLogin(
-          userId,
-          { ...profileDto, userId: undefined } as any,
-          operatorId,
-        ),
+        service.createSSOUserLogin(userId, {
+          ...profileDto,
+          userId: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if SSO provider not found', async () => {
       prismaOltp.sso_login_provider.findFirst.mockResolvedValue(null);
       await expect(
-        service.createSSOUserLogin(userId, profileDto, operatorId),
+        service.createSSOUserLogin(userId, profileDto),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -358,7 +344,7 @@ describe('UserProfileService', () => {
         }),
       );
       await expect(
-        service.createSSOUserLogin(userId, profileDto, operatorId),
+        service.createSSOUserLogin(userId, profileDto),
       ).rejects.toThrow(ConflictException);
     });
     it('should throw InternalServerErrorException for other Prisma errors', async () => {
@@ -369,7 +355,7 @@ describe('UserProfileService', () => {
         new Error('Some other DB error'),
       );
       await expect(
-        service.createSSOUserLogin(userId, profileDto, operatorId),
+        service.createSSOUserLogin(userId, profileDto),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });
@@ -402,11 +388,7 @@ describe('UserProfileService', () => {
       );
       prismaOltp.user_sso_login.update.mockResolvedValue(mockUpdatedSsoLogin);
 
-      const result = await service.updateSSOUserLogin(
-        userId,
-        profileDto,
-        operatorId,
-      );
+      const result = await service.updateSSOUserLogin(userId, profileDto);
       expect(prismaOltp.sso_login_provider.findFirst).toHaveBeenCalledWith({
         where: { name: profileDto.provider },
       });
@@ -429,25 +411,23 @@ describe('UserProfileService', () => {
 
     it('should throw BadRequestException if provider name or sso user ID is missing for update context', async () => {
       await expect(
-        service.updateSSOUserLogin(
-          userId,
-          { ...profileDto, provider: undefined } as any,
-          operatorId,
-        ),
+        service.updateSSOUserLogin(userId, {
+          ...profileDto,
+          provider: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.updateSSOUserLogin(
-          userId,
-          { ...profileDto, userId: undefined } as any,
-          operatorId,
-        ),
+        service.updateSSOUserLogin(userId, {
+          ...profileDto,
+          userId: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if SSO provider not found for update', async () => {
       prismaOltp.sso_login_provider.findFirst.mockResolvedValue(null);
       await expect(
-        service.updateSSOUserLogin(userId, profileDto, operatorId),
+        service.updateSSOUserLogin(userId, profileDto),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -463,7 +443,7 @@ describe('UserProfileService', () => {
         }),
       );
       await expect(
-        service.updateSSOUserLogin(userId, profileDto, operatorId),
+        service.updateSSOUserLogin(userId, profileDto),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -486,12 +466,7 @@ describe('UserProfileService', () => {
       ); // delete returns the deleted record
       eventService.postEnvelopedNotification.mockResolvedValue(undefined);
 
-      await service.deleteSSOUserLogin(
-        userId,
-        providerName,
-        ssoUserIdForEvent,
-        operatorId,
-      );
+      await service.deleteSSOUserLogin(userId, providerName, ssoUserIdForEvent);
 
       expect(prismaOltp.sso_login_provider.findFirst).toHaveBeenCalledWith({
         where: { name: providerName },
@@ -505,7 +480,7 @@ describe('UserProfileService', () => {
           },
         },
       });
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'user.sso.unlinked',
         {
           userId: userId.toString(),
@@ -518,12 +493,7 @@ describe('UserProfileService', () => {
     it('should throw NotFoundException if SSO provider not found for delete', async () => {
       prismaOltp.sso_login_provider.findFirst.mockResolvedValue(null);
       await expect(
-        service.deleteSSOUserLogin(
-          userId,
-          providerName,
-          ssoUserIdForEvent,
-          operatorId,
-        ),
+        service.deleteSSOUserLogin(userId, providerName, ssoUserIdForEvent),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -539,12 +509,7 @@ describe('UserProfileService', () => {
         }),
       );
       await expect(
-        service.deleteSSOUserLogin(
-          userId,
-          providerName,
-          ssoUserIdForEvent,
-          operatorId,
-        ),
+        service.deleteSSOUserLogin(userId, providerName, ssoUserIdForEvent),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -560,12 +525,7 @@ describe('UserProfileService', () => {
       );
 
       await expect(
-        service.deleteSSOUserLogin(
-          userId,
-          providerName,
-          ssoUserIdForEvent,
-          operatorId,
-        ),
+        service.deleteSSOUserLogin(userId, providerName, ssoUserIdForEvent),
       ).resolves.toBeUndefined();
     });
   });
@@ -599,11 +559,7 @@ describe('UserProfileService', () => {
         mockCreatedSocialLogin,
       );
 
-      const result = await service.addExternalProfile(
-        userId,
-        profileDto,
-        operatorId,
-      );
+      const result = await service.addExternalProfile(userId, profileDto);
 
       expect(prismaOltp.social_login_provider.findFirst).toHaveBeenCalledWith({
         where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
@@ -625,35 +581,32 @@ describe('UserProfileService', () => {
 
     it('should throw BadRequestException if attempting to add SSO profile via this method', async () => {
       await expect(
-        service.addExternalProfile(
-          userId,
-          { ...profileDto, providerType: 'sso' },
-          operatorId,
-        ),
+        service.addExternalProfile(userId, {
+          ...profileDto,
+          providerType: 'sso',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if provider name or social user ID is missing', async () => {
       await expect(
-        service.addExternalProfile(
-          userId,
-          { ...profileDto, provider: undefined } as any,
-          operatorId,
-        ),
+        service.addExternalProfile(userId, {
+          ...profileDto,
+          provider: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.addExternalProfile(
-          userId,
-          { ...profileDto, userId: undefined } as any,
-          operatorId,
-        ),
+        service.addExternalProfile(userId, {
+          ...profileDto,
+          userId: undefined,
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if social provider not found', async () => {
       prismaOltp.social_login_provider.findFirst.mockResolvedValue(null);
       await expect(
-        service.addExternalProfile(userId, profileDto, operatorId),
+        service.addExternalProfile(userId, profileDto),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -669,7 +622,7 @@ describe('UserProfileService', () => {
         }),
       );
       await expect(
-        service.addExternalProfile(userId, profileDto, operatorId),
+        service.addExternalProfile(userId, profileDto),
       ).rejects.toThrow(
         new ConflictException(
           'This social identity is already linked to another Topcoder account.',
@@ -688,7 +641,7 @@ describe('UserProfileService', () => {
         }),
       );
       await expect(
-        service.addExternalProfile(userId, profileDto, operatorId),
+        service.addExternalProfile(userId, profileDto),
       ).rejects.toThrow(
         new ConflictException(
           `This account is already linked with the social provider '${profileDto.provider}'.`,

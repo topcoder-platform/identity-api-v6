@@ -4,10 +4,7 @@ import { Auth0Service } from './auth0.service';
 import { ConfigurationModule } from 'src/config/configuration.module';
 
 @Module({
-  imports: [
-    ConfigurationModule,
-    HttpModule,
-  ],
+  imports: [ConfigurationModule, HttpModule],
   providers: [Auth0Service],
   exports: [Auth0Service],
 })

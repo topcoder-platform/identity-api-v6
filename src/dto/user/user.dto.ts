@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsString,
@@ -13,12 +14,10 @@ import {
   Matches,
   IsArray,
   IsDefined,
-  IsEnum,
   IsUrl,
   Length,
   IsInt,
   Min,
-  IsDateString,
 } from 'class-validator';
 
 // --- Base & Nested DTOs ---
@@ -86,7 +85,7 @@ class UserParamBaseDto {
   @IsString()
   @IsOptional()
   @MaxLength(64)
-  @Matches(/^[a-zA-Z0-9\-\[\]\\_\.`{}]{3,}$/, {
+  @Matches(/^[a-zA-Z0-9\-[\]\\_.`{}]{3,}$/, {
     // Basic handle validation
     message: 'Handle contains invalid characters or is too short.',
   })
@@ -451,20 +450,40 @@ export class OneTimeTokenResponseDto {
 export class UserSearchQueryDto {
   @IsString()
   @IsOptional()
+  @ApiPropertyOptional({
+    name: 'handle',
+    type: String,
+    description: 'member handle',
+  })
   handle?: string;
 
   @IsEmail()
   @IsOptional()
+  @ApiPropertyOptional({
+    name: 'email',
+    type: String,
+    description: 'member email',
+  })
   email?: string;
 
   @IsInt()
   @Min(1)
   @IsOptional()
+  @ApiPropertyOptional({
+    name: 'limit',
+    type: Number,
+    description: 'Default 20',
+  })
   limit?: number;
 
   @IsInt()
   @Min(0)
   @IsOptional()
+  @ApiPropertyOptional({
+    name: 'offset',
+    type: Number,
+    description: 'Default 0',
+  })
   offset?: number;
 
   // Add other potential search fields: status, role, etc.

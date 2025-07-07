@@ -24,7 +24,7 @@ export class ValidationExceptionFilter implements ExceptionFilter {
 
     // Handle class-validator ValidationPipe errors specifically
     if (
-      status === HttpStatus.BAD_REQUEST &&
+      status === (HttpStatus.BAD_REQUEST as number) &&
       typeof exceptionResponse === 'object' &&
       exceptionResponse !== null &&
       'message' in exceptionResponse

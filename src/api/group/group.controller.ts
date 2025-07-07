@@ -10,12 +10,12 @@ import {
   Req,
   ParseIntPipe,
   NotFoundException,
-  BadRequestException,
   Put,
   HttpCode,
   HttpStatus,
   Logger,
   ParseBoolPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { GroupService } from './group.service';
@@ -40,12 +40,23 @@ import {
   GroupMemberBodyDto,
   GroupMembershipResponseDto,
 } from '../../dto/group/group-membership.dto';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import {
   BaseResponse,
   createBaseResponse,
 } from '../../shared/util/responseBuilder';
 import { Constants } from '../../core/constant/constants';
+
+/**
+ * Check if request body and param are present. Throw 400 Bad Request if not.
+ * @param reqBody Request body containing the parameter to check
+ */
+function checkParamExists(
+  reqBody: GroupBodyDto | SecurityBodyDto | GroupMemberBodyDto,
+) {
+  if (!reqBody || !reqBody.param) {
+    throw new BadRequestException('Request param is required');
+  }
+}
 
 @ApiTags('groups')
 @Controller('groups')
@@ -54,9 +65,14 @@ import { Constants } from '../../core/constant/constants';
 export class GroupController {
   private readonly logger = new Logger(GroupController.name);
 
-  constructor(private readonly groupService: GroupService) { }
+  constructor(private readonly groupService: GroupService) {}
 
-  //create group
+  /**
+   * Create a new group.
+   * @param groupDataParam Group data containing the group details
+   * @param req Request object to get user information
+   * @returns Created group details with appropriate HTTP status
+   */
   @Post()
   @ApiOperation({ summary: 'Create a new group' })
   @ApiResponse({
@@ -65,17 +81,21 @@ export class GroupController {
     type: GroupResponseDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized.' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized.',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   async createGroup(
     @Body() groupDataParam: GroupBodyDto,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    if (!groupDataParam || !groupDataParam.param) {
-      throw new BadRequestException('Group data is required.');
-    }
+    checkParamExists(groupDataParam);
     const groupData = groupDataParam.param;
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(`User ${user.userId} creating group: ${groupData.name}`);
 
     const dataToSubmit = { ...groupData };
@@ -87,7 +107,12 @@ export class GroupController {
     return createBaseResponse(response, HttpStatus.CREATED);
   }
 
-  //create security group
+  /**
+   * Create a new security group.
+   * @param securityDataParam Security group data containing the group details
+   * @param req Request object to get user information
+   * @returns Created security group details with appropriate HTTP status
+   */
   @Post('securityGroups')
   @ApiOperation({ summary: 'Create a new security group' })
   @ApiResponse({
@@ -96,15 +121,22 @@ export class GroupController {
     type: GroupResponseDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized.' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized.',
+  })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   async createSecurityGroup(
     @Body() securityDataParam: SecurityBodyDto,
     @Req() req: Request,
   ): Promise<BaseResponse<SecurityGroupsResponseDto>> {
+    checkParamExists(securityDataParam);
     const securityData = securityDataParam.param;
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} creating security group: ${securityData.name}`,
     );
@@ -116,7 +148,13 @@ export class GroupController {
     return createBaseResponse(response);
   }
 
-  //get single group member
+  /**
+   * Get a single member from a group.
+   * @param groupId ID of the group
+   * @param memberId ID of the member
+   * @param req Request object to get user information
+   * @returns Member details if found, otherwise throws an error
+   */
   @Get(':groupId/singleMember/:memberId')
   @ApiOperation({ summary: 'Get a single member from a group' })
   @ApiResponse({
@@ -125,15 +163,24 @@ export class GroupController {
     type: GroupMembershipResponseDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Group or member not found.' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Group or member not found.',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   async getSingleMember(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Param('memberId', ParseIntPipe) memberId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupMembershipResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} getting member ${memberId} from group ${groupId}`,
     );
@@ -150,7 +197,13 @@ export class GroupController {
     return createBaseResponse(membership);
   }
 
-  // get members count
+  /**
+   * Get the count of members in a group.
+   * @param req Request object to get user information
+   * @param groupId ID of the group
+   * @param includeSubGroups Whether to include members from subgroups
+   * @returns Member count for the group
+   */
   @Get(':groupId/membersCount')
   @ApiOperation({ summary: 'Get the count of members in a group' })
   @ApiResponse({
@@ -159,15 +212,21 @@ export class GroupController {
     type: Number,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Group not found.' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Group not found.',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   async getMembersCount(
     @Req() req: Request,
     @Param('groupId', ParseIntPipe) groupId: number,
     @Query('includeSubGroups', new ParseBoolPipe({ optional: true }))
     includeSubGroups?: boolean,
   ): Promise<BaseResponse<{ count: number }>> {
-    const user = req.user as AuthenticatedUser; 
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} getting member count for group ${groupId}`,
     );
@@ -179,7 +238,13 @@ export class GroupController {
     return createBaseResponse({ count });
   }
 
-  //update group
+  /**
+   * Update an existing group.
+   * @param groupId ID of the group to update
+   * @param groupDataParam Updated group data
+   * @param req Request object to get user information
+   * @returns Updated group details with appropriate HTTP status
+   */
   @Put(':groupId')
   @ApiOperation({ summary: 'Update an existing group' })
   @ApiBody({
@@ -192,25 +257,31 @@ export class GroupController {
     type: GroupResponseDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized.' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized.',
+  })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Group not found.' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Group not found.',
+  })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
     description: 'Conflict (e.g., name already exists).',
   })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   async updateGroup(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Body() groupDataParam: GroupBodyDto,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    // Extract the actual group data from the DTO
-    if (!groupDataParam || !groupDataParam.param) {
-      throw new BadRequestException('Group data is required for update.');
-    }
+    checkParamExists(groupDataParam);
     const groupData = groupDataParam.param;
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.log(`User ${user.userId} updating group ID: ${groupId}`);
 
     const dataToSubmit = { ...groupData };
@@ -223,7 +294,12 @@ export class GroupController {
     return createBaseResponse(response);
   }
 
-  //delete group
+  /**
+   * Delete a group.
+   * @param groupId ID of the group to delete
+   * @param req Request object to get user information
+   * @returns Deleted group details with appropriate HTTP status
+   */
   @Delete(':groupId')
   @ApiOperation({ summary: 'Delete a group' })
   @ApiParam({
@@ -236,19 +312,28 @@ export class GroupController {
     description: 'The group has been successfully deleted.',
     type: GroupResponseDto,
   })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized.' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized.',
+  })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
     description: 'Forbidden. Insufficient permissions.',
   })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Group not found.' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error.' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Group not found.',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
   @HttpCode(HttpStatus.OK)
   async deleteGroup(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(`User ${user.userId} deleting group ID: ${groupId}`);
 
     const group = await this.groupService.deleteGroupAndMemberships(
@@ -258,7 +343,13 @@ export class GroupController {
     return createBaseResponse(group);
   }
 
-  //get group by id
+  /**
+   * Get a specific group by its ID.
+   * @param groupId ID of the group to retrieve
+   * @param req Request object to get user information
+   * @param fields Optional fields to include in the response
+   * @returns Group details if found, otherwise throws an error
+   */
   @Get(':groupId')
   @ApiOperation({ summary: 'Get a specific group by its ID' })
   @ApiParam({
@@ -297,7 +388,7 @@ export class GroupController {
     @Req() req: Request,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(`User ${user.userId} retrieving group ID: ${groupId}`);
     const response = await this.groupService.getGroupByGroupId(groupId, user);
     this.logger.debug(`Group retrieved: ${JSON.stringify(response)}`);
@@ -306,7 +397,13 @@ export class GroupController {
     return createBaseResponse(response, HttpStatus.OK, fields);
   }
 
-  //add member to group
+  /**
+   * Add a member to a group.
+   * @param groupId ID of the group to add the member to
+   * @param addMemberDtoParam Member data containing the member details
+   * @param req Request object to get user information
+   * @returns Added membership details with appropriate HTTP status
+   */
   @Post(':groupId/members')
   @ApiOperation({ summary: 'Add a member to a group' })
   @ApiParam({
@@ -349,12 +446,13 @@ export class GroupController {
     @Body() addMemberDtoParam: GroupMemberBodyDto,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupMembershipResponseDto>> {
+    checkParamExists(addMemberDtoParam);
     if (!addMemberDtoParam || !addMemberDtoParam.param) {
       throw new BadRequestException('Member data is required.');
     }
     const addMemberDto = addMemberDtoParam.param;
 
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} adding member ${addMemberDto.memberId} to group ${groupId}`,
     );
@@ -368,7 +466,13 @@ export class GroupController {
     return createBaseResponse(response);
   }
 
-  //remove member from group
+  /**
+   * Remove a member from a group using the membership ID.
+   * @param groupId ID of the group (for context and permission checks)
+   * @param membershipId ID of the membership record to remove
+   * @param req Request object to get user information
+   * @returns Removed membership details with appropriate HTTP status
+   */
   @Delete(':groupId/members/:membershipId')
   @ApiOperation({
     summary: 'Remove a member from a group using the membership ID',
@@ -414,7 +518,7 @@ export class GroupController {
     @Param('membershipId', ParseIntPipe) membershipId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupMembershipResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} removing membership ${membershipId} from group ${groupId}`,
     );
@@ -426,9 +530,15 @@ export class GroupController {
     );
     return createBaseResponse(response);
   }
-
-
-  // Get subgroups
+  /**
+   * Retrieve a group along with its subgroups.
+   * @param req - The request object containing user information.
+   * @param groupId - The ID of the parent group to retrieve.
+   * @param includeSubGroups - Flag indicating whether to include subgroups (default: false).
+   * @param oneLevel - Flag indicating whether to fetch only one level of subgroups (default: false).
+   * @param fields - Optional fields to include in the response.
+   * @returns A response containing the group and its subgroups.
+   */
   @Get(':groupId/getSubGroups')
   @ApiOperation({ summary: 'Get a group and its subgroups' })
   @ApiParam({
@@ -485,7 +595,7 @@ export class GroupController {
     oneLevel?: boolean,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     this.logger.debug(
       `User ${user.userId} requesting subgroups for group ${groupId}`,
     );
@@ -503,8 +613,14 @@ export class GroupController {
     return createBaseResponse(response, HttpStatus.OK, fields);
   }
 
-
-  // Get Parent Group
+  /**
+   * Retrieve the primary parent or ultimate ancestor of a group.
+   * @param req - The request object containing user information.
+   * @param groupId - The ID of the group whose parent is to be retrieved.
+   * @param oneLevel - Flag indicating whether to fetch only the direct primary parent (default: true).
+   * @param fields - Optional fields to include in the response.
+   * @returns A response containing the parent group.
+   */
   @Get(':groupId/getParentGroup')
   @ApiOperation({
     summary: "Get a group's primary parent or ultimate ancestor",
@@ -550,7 +666,7 @@ export class GroupController {
     oneLevel?: boolean,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     const effectiveOneLevel = oneLevel === undefined ? true : oneLevel;
     this.logger.debug(
       `User ${user.userId} requesting parent for group ${groupId}, oneLevel: ${effectiveOneLevel}`,
@@ -564,15 +680,21 @@ export class GroupController {
     return createBaseResponse(parentGroupDto, HttpStatus.OK, fields);
   }
 
+  /**
+   * Retrieve members of a specific group.
+   * @param req - The request object containing user information.
+   * @param groupId - The ID of the group to retrieve members from.
+   * @returns A response containing the list of group members.
+   */
   @Get(':groupId/members')
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Parent group retrieved successfully.',
-    type: GroupResponseDto,
+    description: 'Group members retrieved successfully.',
+    type: GroupMembershipResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Group or its parent not found.',
+    description: 'Group not found.',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -592,21 +714,27 @@ export class GroupController {
     @Param('groupId', ParseIntPipe) groupId: number,
   ): Promise<BaseResponse<GroupMembershipResponseDto[]>> {
     this.logger.debug(`getMembers : ` + groupId);
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
     const response = await this.groupService.getMembers(user, groupId);
     return createBaseResponse(response);
   }
 
-  // Get Group by Member
+  /**
+   * Retrieve groups associated with a specific member and membership type.
+   * @param req - The request object containing user information.
+   * @param memberId - The ID of the member.
+   * @param membershipType - The type of membership to filter by.
+   * @returns A response containing the list of groups associated with the member.
+   */
   @Get()
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Parent group retrieved successfully.',
+    description: 'Groups retrieved successfully by member.',
     type: GroupResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Group or its parent not found.',
+    description: 'No groups found for the member.',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -627,7 +755,7 @@ export class GroupController {
     @Query('membershipType') membershipType: string,
   ): Promise<BaseResponse<GroupResponseDto[]>> {
     this.logger.debug(`getGroupByMember : ` + memberId);
-    const user = req.user as AuthenticatedUser;
+    const user = req.user;
 
     const response = await this.groupService.getGroupByMember(
       user,

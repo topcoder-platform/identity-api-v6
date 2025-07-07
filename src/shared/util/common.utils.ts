@@ -1,8 +1,7 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import * as tokenValidator from 'tc-core-library-js';
 import _ from 'lodash';
-
 
 export class CommonUtils {
   private constructor() {}
@@ -25,7 +24,7 @@ export class CommonUtils {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return hash;
@@ -48,7 +47,7 @@ export class CommonUtils {
   }
 
   static generateJwt(payload, secret, opts): string {
-    return jwt.sign(payload, secret, opts);
+    return jwt.sign(payload, secret, opts) as string;
   }
 
   static createIssuerFor(authDomain: string): string {
@@ -59,15 +58,15 @@ export class CommonUtils {
   }
 
   static async verifyJwtToken(
-    token: string, 
-    validIssuers: string[], 
-    secret: string
+    token: string,
+    validIssuers: string[],
+    secret: string,
   ): Promise<Record<string, any>> {
     const validator = tokenValidator(validIssuers);
     return new Promise((resolve, reject) => {
       validator.validateToken(token, secret, (err, decoded) => {
         if (err) {
-          return reject(err);
+          return reject(new Error(err));
         }
         resolve(decoded);
       });
@@ -78,4 +77,3 @@ export class CommonUtils {
     return _.pick(obj, keys);
   }
 }
-

@@ -10,18 +10,13 @@ import {
   InternalServerErrorException,
   ForbiddenException,
   BadRequestException,
-  HttpException,
   Logger,
 } from '@nestjs/common';
-import {
-  Prisma as PrismaAuthorization,
-  GroupMembership,
-} from '@prisma/client-authorization';
+import { GroupMembership } from '@prisma/client-authorization';
 import {
   GroupResponseDto,
   GroupDto,
   SecurityGroups,
-  SecurityGroupsResponseDto,
 } from 'src/dto/group/group.dto';
 import {
   GroupMemberDto,
@@ -52,7 +47,9 @@ const mockPrismaAuth = {
   },
   $transaction: jest
     .fn()
-    .mockImplementation(async (callback) => callback(mockPrismaAuth)),
+    .mockImplementation(async (callback) =>
+      Promise.resolve(callback(mockPrismaAuth)),
+    ),
 };
 
 const mockPrismaCommonClient = {
@@ -134,10 +131,10 @@ describe('GroupService', () => {
 
   beforeEach(async () => {
     // Mock the Logger constructor
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => { });
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => { });
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => { });
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
     jest.clearAllMocks();
     (MembershipTypeHelper.getByKey as jest.Mock).mockImplementation(
@@ -624,8 +621,6 @@ describe('GroupService', () => {
 
       const count = await service.getMemberCount(groupId, true, 1);
       expect(count).toEqual(10);
-
-      const expectedGroupIds = [groupId, subGroupId]; // Removed Set since we know the exact expected values
     });
 
     it('should throw NotFoundException if group not found', async () => {
@@ -737,7 +732,10 @@ describe('GroupService', () => {
     });
 
     it('should throw ForbiddenException if non-admin tries to add another member to non-selfRegister group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue({ ...sampleGroupDb, selfRegister: false });
+      mockPrismaAuth.group.findUnique.mockResolvedValue({
+        ...sampleGroupDb,
+        selfRegister: false,
+      });
       mockPrismaAuth.groupMembership.count.mockResolvedValue(0);
       await expect(
         service.addMemberToGroup(mockRegularUser, groupId, {
@@ -745,7 +743,7 @@ describe('GroupService', () => {
           groupId: groupId,
           createdBy: mockRegularUser.userId,
           createdAt: new Date(),
-        })
+        }),
       ).rejects.toThrow(Error);
     });
 
@@ -887,8 +885,6 @@ describe('GroupService', () => {
         service.removeMembershipById(mockAdminUser, groupId, membershipId),
       ).rejects.toThrow(InternalServerErrorException);
     });
-
-
   });
 
   describe('getGroupByGroupId', () => {
@@ -988,8 +984,8 @@ describe('GroupService', () => {
       ); // includeSubGroups = true, oneLevel = true
       expect(result.id).toBe(groupId);
       expect(result.subGroups).toHaveLength(1);
-      expect(result.subGroups![0].id).toBe(subGroupId);
-      expect(result.subGroups![0].subGroups).toEqual([]); // Max depth reached for subGroup
+      expect(result.subGroups[0].id).toBe(subGroupId);
+      expect(result.subGroups[0].subGroups).toEqual([]); // Max depth reached for subGroup
     });
 
     it('should throw NotFoundException if group not found', async () => {
@@ -1025,8 +1021,8 @@ describe('GroupService', () => {
         true,
       ); // oneLevel = true
       expect(result).not.toBeNull();
-      expect(result!.id).toBe(parentGroupId);
-      expect(result!.parentGroup).toBeUndefined(); // Parent of parent not fetched
+      expect(result.id).toBe(parentGroupId);
+      expect(result.parentGroup).toBeUndefined(); // Parent of parent not fetched
     });
 
     it('should get parent group with all its parents recursively', async () => {
@@ -1049,7 +1045,7 @@ describe('GroupService', () => {
         false,
       ); // oneLevel = false
       expect(result).not.toBeNull();
-      expect(result!.id).toBe(2); // Direct parent
+      expect(result.id).toBe(2); // Direct parent
     });
 
     it('should return null if no parent group found', async () => {
@@ -1182,16 +1178,16 @@ describe('GroupService', () => {
 
       expect(parentGroup.subGroups).toBeDefined();
       expect(parentGroup.subGroups).toHaveLength(1);
-      expect(parentGroup.subGroups![0].id).toBe(subGroupL1.id);
-      expect(parentGroup.subGroups![0].name).toBe(subGroupL1.name);
+      expect(parentGroup.subGroups[0].id).toBe(subGroupL1.id);
+      expect(parentGroup.subGroups[0].name).toBe(subGroupL1.name);
 
-      const foundSubGroupL1 = parentGroup.subGroups![0];
+      const foundSubGroupL1 = parentGroup.subGroups[0];
       expect(foundSubGroupL1.subGroups).toBeDefined();
       expect(foundSubGroupL1.subGroups).toHaveLength(1);
-      expect(foundSubGroupL1.subGroups![0].id).toBe(subGroupL2.id);
-      expect(foundSubGroupL1.subGroups![0].name).toBe(subGroupL2.name);
+      expect(foundSubGroupL1.subGroups[0].id).toBe(subGroupL2.id);
+      expect(foundSubGroupL1.subGroups[0].name).toBe(subGroupL2.name);
 
-      const foundSubGroupL2 = foundSubGroupL1.subGroups![0];
+      const foundSubGroupL2 = foundSubGroupL1.subGroups[0];
       expect(foundSubGroupL2.subGroups).toBeDefined();
       expect(foundSubGroupL2.subGroups).toHaveLength(0);
     });
@@ -1324,7 +1320,9 @@ describe('GroupService', () => {
       ]);
 
       // Mock the service methods that are called internally
-      jest.spyOn(service, 'findGroupById').mockResolvedValue(publicGroup);
+      const mockFind = jest
+        .spyOn(service, 'findGroupById')
+        .mockResolvedValue(publicGroup);
 
       const mapSpy = jest.spyOn(service as any, 'mapMembershipListToDto');
       if (mapSpy) {
@@ -1334,11 +1332,10 @@ describe('GroupService', () => {
       const result = await service.getMembers(mockAdminUser, groupId);
 
       expect(result).toHaveLength(1);
-      expect(service.findGroupById).toHaveBeenCalledWith(groupId);
+      expect(mockFind).toHaveBeenCalledWith(groupId);
     });
 
     it('should throw BadRequestException if groupId is not provided', async () => {
-      // @ts-ignore to test invalid input
       await expect(service.getMembers(mockAdminUser, null)).rejects.toThrow(
         BadRequestException,
       );
@@ -1381,11 +1378,17 @@ describe('GroupService', () => {
       const result = await service.getGroupByMember(mockRegularUser, null, ''); // memberId and type ignored for non-admin
       expect(result).toHaveLength(1);
       expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
-        where: { memberships: { some: { memberId: Number(mockRegularUser.userId), membershipType: 1 } } },
+        where: {
+          memberships: {
+            some: {
+              memberId: Number(mockRegularUser.userId),
+              membershipType: 1,
+            },
+          },
+        },
         orderBy: { id: 'asc' },
       });
     });
-
 
     it('should throw ForbiddenException for machine user without read scopes', async () => {
       await expect(

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport'; // <-- Restore import
 import { JwtStrategy } from './jwt.strategy';
 import { ConfigModule } from '@nestjs/config'; // Import ConfigModule if strategy uses ConfigService
-import { PrismaModule } from '../../shared/prisma/prisma.module'; // Import PrismaModule for guard
 
 @Module({
   imports: [

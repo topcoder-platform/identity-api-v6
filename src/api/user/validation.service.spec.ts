@@ -3,19 +3,15 @@ import { ValidationService } from './validation.service';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
   user as UserModel,
   email as EmailModel,
   country as CountryModel,
   user_social_login as UserSocialLoginModel,
-  user_sso_login as UserSsoLoginModel,
 } from '@prisma/client-common-oltp';
 import * as DTOs from '../../dto/user/user.dto';
 import {
-  getProviderDetails,
   ProviderId,
   ProviderTypes,
-  ProviderDetails,
 } from '../../core/constant/provider-type.enum';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -154,19 +150,6 @@ const createMockUserSocialLoginModel = (
     social_email_verified: input.social_email_verified || null,
     create_date: input.create_date || new Date(),
     modify_date: input.modify_date || null,
-    ...input,
-  };
-};
-
-const createMockUserSsoLoginModel = (
-  input: Partial<UserSsoLoginModel>,
-): UserSsoLoginModel => {
-  return {
-    user_id: input.user_id || new Decimal(1),
-    provider_id: input.provider_id || new Decimal(ProviderId.SAMLP),
-    sso_user_id: input.sso_user_id || 'samlp-user-123',
-    sso_user_name: input.sso_user_name || 'SAML User',
-    email: input.email || 'samlp.user@example.com',
     ...input,
   };
 };
@@ -746,17 +729,14 @@ describe('ValidationService', () => {
 
     // --- SSO Profile Validation (Non-LDAP Enterprise) ---
     it('should validate a new SSO (non-LDAP enterprise) profile successfully', async () => {
-      jest
+      const mockFind = jest
         .spyOn(service, 'findInternalUserIdBySsoProfile')
         .mockResolvedValue(null);
       await expect(
         service.validateProfile(ssoProfile, internalUserId),
       ).resolves.toBeUndefined();
       expect(ssoProfile.providerType).toBe('enterprise');
-      expect(service.findInternalUserIdBySsoProfile).toHaveBeenCalledWith(
-        ssoProfile,
-        ProviderTypes['samlp'],
-      );
+      expect(mockFind).toHaveBeenCalledWith(ssoProfile, ProviderTypes['samlp']);
     });
 
     it('should throw ConflictException if SSO (non-LDAP enterprise) profile in use', async () => {
@@ -977,22 +957,21 @@ describe('ValidationService', () => {
           'unknown-provider',
         ),
       ).rejects.toThrow(
-        new BadRequestException(MSG_UNSUPPORTED_PROVIDER('unknown-provider')),
+        new BadRequestException(MSG_UNSUPPORTED_PROVIDER('"unknown-provider"')),
       );
     });
 
     it('should throw BadRequestException for unsupported provider object if it leads to getProviderDetails returning undefined', async () => {
       const unknownProviderDetailsAsString = '[object Object]'; // How a generic object might stringify
       // This test relies on the actual getProviderDetails returning undefined for such a string
+      const errorMsg = JSON.stringify(unknownProviderDetailsAsString);
       await expect(
         service.findInternalUserIdBySsoProfile(
           ssoProfileWithEmail,
           unknownProviderDetailsAsString as any,
         ),
       ).rejects.toThrow(
-        new BadRequestException(
-          MSG_UNSUPPORTED_PROVIDER(unknownProviderDetailsAsString),
-        ),
+        new BadRequestException(MSG_UNSUPPORTED_PROVIDER(errorMsg)),
       );
     });
 

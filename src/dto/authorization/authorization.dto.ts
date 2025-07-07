@@ -1,13 +1,16 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform, Type } from "class-transformer";
-import { IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
-import { isString } from "lodash";
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export class GetTokenQueryDto {
-
   @ApiProperty({
     name: 'code',
-    description: 'authorization code'
+    description: 'authorization code',
   })
   @IsOptional()
   @IsString()
@@ -15,7 +18,7 @@ export class GetTokenQueryDto {
 
   @ApiProperty({
     name: 'redirectUrl',
-    description: 'Redirect Url'
+    description: 'Redirect Url',
   })
   @IsOptional()
   @IsString()
@@ -23,7 +26,7 @@ export class GetTokenQueryDto {
 
   @ApiProperty({
     name: 'state',
-    description: 'state string generated in login request'
+    description: 'state string generated in login request',
   })
   @IsOptional()
   @IsString()
@@ -31,7 +34,7 @@ export class GetTokenQueryDto {
 
   @ApiPropertyOptional({
     name: 'error',
-    description: 'error message from auth0 if any'
+    description: 'error message from auth0 if any',
   })
   @IsOptional()
   @IsString()
@@ -53,36 +56,36 @@ export class AuthorizationCreateDto {
   id?: string;
 
   @ApiProperty({
-    description: 'token'
+    description: 'token',
   })
   @IsOptional()
   @IsString()
   token?: string;
 
   @ApiProperty({
-    description: 'refresh token'
+    description: 'refresh token',
   })
   @IsOptional()
   @IsString()
   refreshToken?: string;
 
   @ApiProperty({
-    description: 'target'
+    description: 'target',
   })
   @IsOptional()
   @IsString()
   target?: string;
 
   @ApiProperty({
-    description: 'external token'
+    description: 'external token',
   })
   @IsOptional()
   @IsString()
   externalToken?: string;
-  
+
   @ApiPropertyOptional({
     name: 'zendesk jwt',
-    description: 'jwt to access zendesk'
+    description: 'jwt to access zendesk',
   })
   @IsOptional()
   @IsString()
@@ -91,7 +94,7 @@ export class AuthorizationCreateDto {
 
 export class AuthorizationCreateRequest {
   @ApiProperty({
-    description: 'request parameter'
+    description: 'request parameter',
   })
   @IsOptional()
   @ValidateNested()
@@ -101,25 +104,27 @@ export class AuthorizationCreateRequest {
 
 export class AuthorizationForm {
   @ApiProperty({
-    description: 'client id'
+    description: 'client id',
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({value}) => {value.trim()})
+  @Transform(({ value }) => {
+    value.trim();
+  })
   clientId: string;
 
   @ApiProperty({
-    description: 'client secret'
+    description: 'client secret',
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({value}) => {value.trim()})
+  @Transform(({ value }) => {
+    value.trim();
+  })
   secret: string;
 }
 
-
 export class AuthorizationResponse extends AuthorizationCreateDto {
-
   @ApiProperty({ description: 'authorization modifiedBy' })
   modifiedBy?: string;
   @ApiProperty({ description: 'authorization modifiedAt' })
@@ -130,13 +135,11 @@ export class AuthorizationResponse extends AuthorizationCreateDto {
   createdAt?: Date;
 }
 
-
 export class ValidateClientQueryDto {
-
   @ApiProperty({
     name: 'clientId',
     description: 'client id',
-    required: true
+    required: true,
   })
   @IsString()
   @IsNotEmpty()
@@ -145,7 +148,7 @@ export class ValidateClientQueryDto {
   @ApiProperty({
     name: 'redirectUrl',
     description: 'Redirect Url',
-    required: true
+    required: true,
   })
   @IsString()
   @IsNotEmpty()
@@ -153,7 +156,7 @@ export class ValidateClientQueryDto {
 
   @ApiPropertyOptional({
     name: 'scope',
-    description: 'This parameter is not used for now'
+    description: 'This parameter is not used for now',
   })
   @IsOptional()
   @IsString()

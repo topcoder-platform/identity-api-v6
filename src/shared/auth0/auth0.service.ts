@@ -1,15 +1,19 @@
-import { HttpService } from "@nestjs/axios";
+import { HttpService } from '@nestjs/axios';
 import * as jwt from 'jsonwebtoken';
-import { HttpStatus, Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
-import { firstValueFrom } from "rxjs";
-import { Auth0Credential } from "src/dto/authorization/authorization.dto";
-import { CommonUtils } from "../util/common.utils";
-import { ConfigurationService } from "../../config/configuration.service";
-
+import {
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
+import { Auth0Credential } from 'src/dto/authorization/authorization.dto';
+import { CommonUtils } from '../util/common.utils';
+import { ConfigurationService } from '../../config/configuration.service';
+import { Constants } from '../../core/constant/constants';
 
 @Injectable()
 export class Auth0Service {
-
   private readonly logger: Logger = new Logger(Auth0Service.name);
 
   readonly clientId: string;
@@ -41,7 +45,7 @@ export class Auth0Service {
       redirect_uri: redirectUrl,
       code,
       grant_type: 'authorization_code',
-      scope: 'openid offline_access'
+      scope: 'openid offline_access',
     });
   }
 
@@ -56,7 +60,7 @@ export class Auth0Service {
       client_id: this.clientId,
       client_secret: this.clientSecret,
       refresh_token: refreshToken,
-      grant_type: 'refresh_token'
+      grant_type: 'refresh_token',
     });
   }
 
@@ -66,17 +70,17 @@ export class Auth0Service {
    * @returns decoded payload
    */
   async verifyToken(auth0Token: string): Promise<Record<string, any>> {
-    try {  
+    try {
       const secretBuffer = Buffer.from(this.clientSecret, 'base64');
 
       const decoded = jwt.verify(auth0Token, secretBuffer, {
-        algorithms: ['HS256']
+        algorithms: [Constants.jwtHs256Algorithm],
       });
-      return decoded as Record<string, any>;
+      return Promise.resolve(decoded as Record<string, any>);
     } catch (error) {
       // will never catch the exp here as the token is deem valid at the step
       this.logger.warn('Error parsing auth0 token', error);
-      return null;
+      return Promise.resolve({});
     }
   }
 
@@ -87,16 +91,18 @@ export class Auth0Service {
    */
   async revokeRefreshToken(token: string, refreshToken: string) {
     const userId = this.getUserIdFromToken(token);
-    const url = `https://${this.domain}/api/users/${userId}/refresh_tokens/${refreshToken}`
+    const url = `https://${this.domain}/api/users/${userId}/refresh_tokens/${refreshToken}`;
     const response = await firstValueFrom(
       this.httpService.delete(url, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
+          Authorization: `Bearer ${token}`,
+        },
+      }),
     );
-    if (response.status !== HttpStatus.OK) {
-      throw new Error(`Got unexpected response from remote service. ${response.status}`);
+    if (response.status !== (HttpStatus.OK as number)) {
+      throw new Error(
+        `Got unexpected response from remote service. ${response.status}`,
+      );
     }
   }
 
@@ -106,20 +112,25 @@ export class Auth0Service {
    * @param params parameters
    * @returns auth0 credential with tokens
    */
-  private async postAuth0Request(url: string, params): Promise<Auth0Credential> {
+  private async postAuth0Request(
+    url: string,
+    params,
+  ): Promise<Auth0Credential> {
     try {
       this.logger.debug(`Sending Auth0 request with url: ${url}`);
-      const response = await firstValueFrom(
-        this.httpService.post(url, params)
-      );
-      if (!response.data || response.status !== HttpStatus.OK) {
-        throw new Error(`Got unexpected response from remote service. ${response.status}`);
+      const response = await firstValueFrom(this.httpService.post(url, params));
+      if (!response.data || response.status !== (HttpStatus.OK as number)) {
+        throw new Error(
+          `Got unexpected response from remote service. ${response.status}`,
+        );
       }
       this.logger.debug(`Got Auth0 response content: ${response.data}`);
       return response.data as Auth0Credential;
     } catch (error) {
       this.logger.warn(error);
-      throw new InternalServerErrorException('Got unexpected response from remote service.');
+      throw new InternalServerErrorException(
+        'Got unexpected response from remote service.',
+      );
     }
   }
 
@@ -137,4 +148,3 @@ export class Auth0Service {
     return String(userId);
   }
 }
-

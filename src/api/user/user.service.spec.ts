@@ -4,7 +4,6 @@ import {
   Auth0UserProfile,
   ACTIVATION_OTP_CACHE_PREFIX_KEY,
   ACTIVATION_OTP_EXPIRY_SECONDS,
-  ACTIVATION_OTP_LENGTH,
 } from './user.service';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -20,7 +19,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
   user as UserModel,
   Prisma,
   email as EmailModel,
@@ -35,8 +33,6 @@ import {
   UpdateUserBodyDto,
   UserSearchQueryDto,
   AchievementDto,
-  CountryDto,
-  UserProfileDto,
 } from '../../dto/user/user.dto';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -44,6 +40,7 @@ import * as CryptoJS from 'crypto-js';
 import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
+import { Cache } from 'cache-manager';
 
 // Null logger to suppress NestJS application logs during tests
 const nullLogger = {
@@ -102,9 +99,12 @@ const mockPrismaOltp = {
     findUnique: jest.fn(), // Added for potential use
   },
   // Mock transaction: it takes a callback and executes it with the prisma mock itself
-  $transaction: jest.fn().mockImplementation(async (callback) => {
-    return callback(mockPrismaOltp);
-  }),
+  $transaction: jest
+    .fn()
+    .mockImplementation(async <T>(callback): Promise<T> => {
+      const result = callback(mockPrismaOltp);
+      return result instanceof Promise ? result : Promise.resolve(result);
+    }),
   $queryRaw: jest.fn(),
 };
 
@@ -119,39 +119,44 @@ const mockValidationService = {
   // Add other methods if they are called by UserService
 };
 
-const mockRoleService = {
+const mockRoleService: jest.Mocked<Partial<RoleService>> = {
   assignRoleByName: jest.fn(),
   deassignRoleByName: jest.fn(),
   // Add other methods if they are called by UserService
 };
 
-const mockCacheManager = {
+const mockCacheManager: jest.Mocked<Partial<Cache>> = {
   get: jest.fn(),
   set: jest.fn(),
   del: jest.fn(),
 };
 
-const mockEventService = {
+const mockEventService: jest.Mocked<Partial<EventService>> = {
   postEnvelopedNotification: jest.fn(),
   postDirectBusMessage: jest.fn(),
 };
 
 const mockConfigService = {
-  get: jest.fn((key: string, defaultValue?: any) => {
-    const configValues = {
-      LEGACY_BLOWFISH_KEY: 'dGVzdEJhc2U2NEtleQ==', // "testBase64Key"
-      ACTIVATION_OTP_EXPIRY_SECONDS: ACTIVATION_OTP_EXPIRY_SECONDS,
-      SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID:
-        'd-resendActivationTemplate',
-      SENDGRID_WELCOME_EMAIL_TEMPLATE_ID: 'd-welcomeTemplate',
-      APP_DOMAIN: 'testapp.com',
-      SSO_TOKEN_SALT: 'mock-sso-salt',
-      JWT_SECRET: 'mock-jwt-secret',
-      ACTIVATION_RESEND_JWT_EXPIRY: '1h',
-      // Add other config keys as needed
-    };
-    return configValues[key] !== undefined ? configValues[key] : defaultValue;
-  }),
+  get: jest.fn(
+    (
+      key: string,
+      defaultValue?: string | number,
+    ): string | number | undefined => {
+      const configValues = {
+        LEGACY_BLOWFISH_KEY: 'dGVzdEJhc2U2NEtleQ==', // "testBase64Key"
+        ACTIVATION_OTP_EXPIRY_SECONDS: ACTIVATION_OTP_EXPIRY_SECONDS,
+        SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID:
+          'd-resendActivationTemplate',
+        SENDGRID_WELCOME_EMAIL_TEMPLATE_ID: 'd-welcomeTemplate',
+        APP_DOMAIN: 'testapp.com',
+        SSO_TOKEN_SALT: 'mock-sso-salt',
+        JWT_SECRET: 'mock-jwt-secret',
+        ACTIVATION_RESEND_JWT_EXPIRY: '1h',
+        // Add other config keys as needed
+      };
+      return configValues[key] !== undefined ? configValues[key] : defaultValue;
+    },
+  ),
 };
 
 // Mock CryptoJS
@@ -372,12 +377,15 @@ describe('UserService', () => {
     configService = module.get(ConfigService);
 
     // Mock implementations for external libraries
-    (CryptoJS.enc.Base64.parse as jest.Mock).mockImplementation((val) =>
-      jest.requireActual('crypto-js').enc.Base64.parse(val),
+    const actualParse = jest.requireActual('crypto-js').enc.Base64.parse;
+    (CryptoJS.enc.Base64.parse as jest.Mock).mockImplementation(
+      (val: string): ReturnType<typeof actualParse> => {
+        return actualParse(val);
+      },
     );
-    (CryptoJS.Blowfish.encrypt as jest.Mock).mockImplementation(
-      (msg, key, opts) => ({ toString: () => 'encryptedPassword' }),
-    );
+    (CryptoJS.Blowfish.encrypt as jest.Mock).mockImplementation(() => ({
+      toString: () => 'encryptedPassword',
+    }));
     (jwt.sign as jest.Mock).mockReturnValue('mock.jwt.token');
     (uuidv4 as jest.Mock).mockReturnValue('mock-uuid-v4');
     mockDigest.mockReturnValue('hashedValue');
@@ -633,15 +641,17 @@ describe('UserService', () => {
 
   describe('encodePasswordLegacy', () => {
     it('should correctly encode a password', () => {
-      (CryptoJS.enc.Base64.parse as jest.Mock).mockReturnValue('parsedKey');
-      (CryptoJS.Blowfish.encrypt as jest.Mock).mockReturnValue({
+      const mockParse = (
+        CryptoJS.enc.Base64.parse as jest.Mock
+      ).mockReturnValue('parsedKey');
+      const mockEncrypt = (
+        CryptoJS.Blowfish.encrypt as jest.Mock
+      ).mockReturnValue({
         toString: () => 'encryptedLegacyPassword',
       });
       const result = service.encodePasswordLegacy('password123');
-      expect(CryptoJS.enc.Base64.parse).toHaveBeenCalledWith(
-        'dGVzdEJhc2U2NEtleQ==',
-      );
-      expect(CryptoJS.Blowfish.encrypt).toHaveBeenCalledWith(
+      expect(mockParse).toHaveBeenCalledWith('dGVzdEJhc2U2NEtleQ==');
+      expect(mockEncrypt).toHaveBeenCalledWith(
         'password123',
         'parsedKey',
         expect.any(Object),
@@ -671,7 +681,7 @@ describe('UserService', () => {
       const plainPassword = 'password123';
       const storedEncodedPassword = 'encryptedLegacyPassword';
       // Mock encodePasswordLegacy to return the stored one when called with plainPassword
-      jest
+      const mockEncode = jest
         .spyOn(service, 'encodePasswordLegacy')
         .mockReturnValue(storedEncodedPassword);
 
@@ -679,7 +689,7 @@ describe('UserService', () => {
         plainPassword,
         storedEncodedPassword,
       );
-      expect(service.encodePasswordLegacy).toHaveBeenCalledWith(plainPassword);
+      expect(mockEncode).toHaveBeenCalledWith(plainPassword);
       expect(result).toBe(true);
     });
 
@@ -731,9 +741,10 @@ describe('UserService', () => {
       status: 'A',
     });
 
+    let mockFindUser;
     beforeEach(() => {
       // Mock findUserById to return the user with password
-      jest
+      mockFindUser = jest
         .spyOn(service, 'findUserById')
         .mockResolvedValue(mockUserWithPassword);
 
@@ -753,7 +764,7 @@ describe('UserService', () => {
     it('should generate an SSO token', async () => {
       const token = await service.generateSSOToken(userId);
 
-      expect(service.findUserById).toHaveBeenCalledWith(userId);
+      expect(mockFindUser).toHaveBeenCalledWith(userId);
       expect(
         (service as any).generateSSOTokenWithCredentials,
       ).toHaveBeenCalledWith(
@@ -768,14 +779,14 @@ describe('UserService', () => {
       await expect(service.generateSSOToken(null as any)).rejects.toThrow(
         BadRequestException,
       );
-      expect(service.generateSSOToken(null as any)).rejects.toThrow(
+      await expect(service.generateSSOToken(null as any)).rejects.toThrow(
         'userId must be specified.',
       );
 
       await expect(service.generateSSOToken(undefined as any)).rejects.toThrow(
         BadRequestException,
       );
-      expect(service.generateSSOToken(undefined as any)).rejects.toThrow(
+      await expect(service.generateSSOToken(undefined as any)).rejects.toThrow(
         'userId must be specified.',
       );
     });
@@ -786,7 +797,7 @@ describe('UserService', () => {
       await expect(service.generateSSOToken(999)).rejects.toThrow(
         BadRequestException,
       );
-      expect(service.generateSSOToken(999)).rejects.toThrow(
+      await expect(service.generateSSOToken(999)).rejects.toThrow(
         "userId doesn't exist.",
       );
     });
@@ -897,6 +908,7 @@ describe('UserService', () => {
     });
     const mockEncodedLegacyPassword = 'legacyEncodedPassword';
 
+    let mockEncode;
     beforeEach(() => {
       validationService.validateHandle.mockResolvedValue({ valid: true });
       validationService.validateEmail.mockResolvedValue({ valid: true });
@@ -912,7 +924,7 @@ describe('UserService', () => {
           return [{ nextval: BigInt(mockNextUserId) }];
         if (sqlString.includes('sequence_email_seq'))
           return [{ nextval: BigInt(mockNextEmailId) }];
-        return [];
+        return Promise.resolve([]);
       });
 
       prismaOltp.user.create.mockResolvedValue(mockCreatedUser);
@@ -925,7 +937,7 @@ describe('UserService', () => {
       cacheManager.set.mockResolvedValue(undefined);
       eventService.postEnvelopedNotification.mockResolvedValue(undefined);
       eventService.postDirectBusMessage.mockResolvedValue(undefined);
-      jest
+      mockEncode = jest
         .spyOn(service, 'encodePasswordLegacy')
         .mockReturnValue(mockEncodedLegacyPassword);
       (uuidv4 as jest.Mock).mockReturnValue('random-otp-or-activation-code'); // For activation_code
@@ -934,14 +946,18 @@ describe('UserService', () => {
     it('should successfully register a new user', async () => {
       const result = await service.registerUser(createUserDto);
 
-      expect(validationService.validateHandle).toHaveBeenCalledWith('newuser');
-      expect(validationService.validateEmail).toHaveBeenCalledWith(
+      expect(mockValidationService.validateHandle).toHaveBeenCalledWith(
+        'newuser',
+      );
+      expect(mockValidationService.validateEmail).toHaveBeenCalledWith(
         'newuser@example.com',
       );
-      expect(validationService.validateCountryAndMutate).toHaveBeenCalledWith({
+      expect(
+        mockValidationService.validateCountryAndMutate,
+      ).toHaveBeenCalledWith({
         code: 'US',
       });
-      expect(validationService.validateProfile).toHaveBeenCalledWith(
+      expect(mockValidationService.validateProfile).toHaveBeenCalledWith(
         createUserDto.param.profile,
       );
 
@@ -956,7 +972,7 @@ describe('UserService', () => {
           activation_code: expect.any(String), // OTP
         }),
       });
-      expect(service.encodePasswordLegacy).toHaveBeenCalledWith('Password123!');
+      expect(mockEncode).toHaveBeenCalledWith('Password123!');
       expect(prismaOltp.security_user.create).toHaveBeenCalledWith({
         data: {
           login_id: new Decimal(mockNextUserId),
@@ -974,12 +990,12 @@ describe('UserService', () => {
           email_type_id: 1,
         }),
       });
-      expect(roleService.assignRoleByName).toHaveBeenCalledWith(
+      expect(mockRoleService.assignRoleByName).toHaveBeenCalledWith(
         'Topcoder User',
         mockNextUserId,
         mockNextUserId,
       );
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'event.user.created',
         service.toCamelCase(mockCreatedUser),
       );
@@ -1032,7 +1048,7 @@ describe('UserService', () => {
           : (query as Prisma.Sql)?.strings?.[0] || '';
         if (sqlString.includes('sequence_user_seq'))
           throw new Error('Sequence fail');
-        return [];
+        return Promise.resolve([]);
       });
       await expect(service.registerUser(createUserDto)).rejects.toThrow(
         InternalServerErrorException,
@@ -1047,7 +1063,7 @@ describe('UserService', () => {
           return [{ nextval: BigInt(mockNextUserId) }];
         if (sqlString.includes('sequence_email_seq'))
           throw new Error('Sequence fail');
-        return [];
+        return Promise.resolve([]);
       });
       await expect(service.registerUser(createUserDto)).rejects.toThrow(
         InternalServerErrorException,
@@ -1055,7 +1071,7 @@ describe('UserService', () => {
     });
 
     it('should throw ConflictException on Prisma P2002 for handle', async () => {
-      prismaOltp.$transaction.mockImplementation(async (callback) => {
+      prismaOltp.$transaction.mockImplementation(async () => {
         const error = new Prisma.PrismaClientKnownRequestError(
           'Unique constraint failed',
           {
@@ -1064,14 +1080,14 @@ describe('UserService', () => {
             meta: { target: ['handle_lower'] },
           },
         );
-        throw error;
+        return Promise.reject(error);
       });
       await expect(service.registerUser(createUserDto)).rejects.toThrow(
         new ConflictException("Handle 'newuser' already exists."),
       );
     });
     it('should throw ConflictException on Prisma P2002 for email (address)', async () => {
-      prismaOltp.$transaction.mockImplementation(async (callback) => {
+      prismaOltp.$transaction.mockImplementation(async () => {
         const error = new Prisma.PrismaClientKnownRequestError(
           'Unique constraint failed',
           {
@@ -1080,7 +1096,7 @@ describe('UserService', () => {
             meta: { target: ['address'] }, // Assuming email table unique constraint is on 'address'
           },
         );
-        throw error;
+        return Promise.reject(error);
       });
       await expect(service.registerUser(createUserDto)).rejects.toThrow(
         new ConflictException("Email 'newuser@example.com' already exists."),
@@ -1119,11 +1135,7 @@ describe('UserService', () => {
       };
       prismaOltp.user.update.mockResolvedValue(mockUpdatedUser);
 
-      const result = await service.updateBasicInfo(
-        userIdString,
-        updateUserDto,
-        mockUser,
-      );
+      const result = await service.updateBasicInfo(userIdString, updateUserDto);
       expect(prismaOltp.user.update).toHaveBeenCalledWith({
         where: { user_id: userId },
         data: {
@@ -1137,7 +1149,7 @@ describe('UserService', () => {
 
     it('should throw BadRequestException for invalid user ID format', async () => {
       await expect(
-        service.updateBasicInfo('abc', updateUserDto, mockUser),
+        service.updateBasicInfo('abc', updateUserDto),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -1145,11 +1157,7 @@ describe('UserService', () => {
       prismaOltp.user.findUnique.mockResolvedValue(mockExistingUser); // findUserById is called internally
       prismaOltp.email.findFirst.mockResolvedValue(null); // for findUserById
 
-      const result = await service.updateBasicInfo(
-        userIdString,
-        { param: {} },
-        mockUser,
-      );
+      const result = await service.updateBasicInfo(userIdString, { param: {} });
       expect(prismaOltp.user.update).not.toHaveBeenCalled();
       expect(result).toEqual(mockExistingUser);
     });
@@ -1162,14 +1170,14 @@ describe('UserService', () => {
         }),
       );
       await expect(
-        service.updateBasicInfo(userIdString, updateUserDto, mockUser),
+        service.updateBasicInfo(userIdString, updateUserDto),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException for other update errors', async () => {
       prismaOltp.user.update.mockRejectedValue(new Error('DB Error'));
       await expect(
-        service.updateBasicInfo(userIdString, updateUserDto, mockUser),
+        service.updateBasicInfo(userIdString, updateUserDto),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });
@@ -1223,9 +1231,10 @@ describe('UserService', () => {
         user_id: newHandle,
         password: 'pwd',
       });
-      prismaOltp.$transaction.mockImplementation(async (callback) =>
-        callback(prismaOltp),
-      );
+      prismaOltp.$transaction.mockImplementation(<T>(callback): Promise<T> => {
+        const result = callback(prismaOltp);
+        return result instanceof Promise ? result : Promise.resolve(result);
+      });
       prismaOltp.user.update.mockResolvedValue({
         ...mockExistingUser,
         handle: newHandle,
@@ -1241,7 +1250,9 @@ describe('UserService', () => {
         mockUser,
       );
 
-      expect(validationService.validateHandle).toHaveBeenCalledWith(newHandle);
+      expect(mockValidationService.validateHandle).toHaveBeenCalledWith(
+        newHandle,
+      );
       expect(prismaOltp.user.findUnique).toHaveBeenCalledWith({
         where: { user_id: userId },
       });
@@ -1253,7 +1264,7 @@ describe('UserService', () => {
         where: { user_id: oldHandle },
         data: { user_id: newHandle },
       });
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'event.user.updated',
         expect.any(Object),
       );
@@ -1295,22 +1306,23 @@ describe('UserService', () => {
       expect(prismaOltp.security_user.update).not.toHaveBeenCalled();
     });
     it('should throw ConflictException if new handle already exists in security_user (P2002)', async () => {
-      prismaOltp.$transaction.mockImplementation(async (callback) => {
+      prismaOltp.$transaction.mockImplementation(<T>(callback): Promise<T> => {
         // Simulate user.update succeeds
-        (prismaOltp.user.update as jest.Mock).mockResolvedValueOnce({
+        prismaOltp.user.update.mockResolvedValueOnce({
           ...mockExistingUser,
           handle: newHandle,
           handle_lower: newHandle.toLowerCase(),
         });
         // Simulate security_user.update fails with P2002
-        (prismaOltp.security_user.update as jest.Mock).mockRejectedValueOnce(
+        prismaOltp.security_user.update.mockRejectedValueOnce(
           new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
             code: 'P2002',
             clientVersion: 'test',
             meta: { modelName: 'security_user', target: ['user_id'] }, // user_id in security_user is the handle
           }),
         );
-        return callback(prismaOltp);
+        const result = callback(prismaOltp);
+        return result instanceof Promise ? result : Promise.resolve(result);
       });
 
       await expect(
@@ -1358,11 +1370,12 @@ describe('UserService', () => {
       payload: {},
     };
 
+    let mockCheckEmail;
     beforeEach(() => {
       jest.clearAllMocks();
 
       // Mock checkEmailAvailabilityForUser
-      jest
+      mockCheckEmail = jest
         .spyOn(service, 'checkEmailAvailabilityForUser')
         .mockResolvedValue(undefined);
 
@@ -1377,14 +1390,16 @@ describe('UserService', () => {
         .mockReturnValue({ userId: 1, handle: 'testuser' });
 
       // Mock config values
-      mockConfigService.get.mockImplementation((key, defaultValue) => {
-        const configValues = {
-          ACTIVATION_OTP_EXPIRY_SECONDS: 300,
-          ACTIVATION_RESEND_JWT_EXPIRY: '1h',
-          JWT_SECRET: 'mock-jwt-secret',
-        };
-        return configValues[key] || defaultValue;
-      });
+      mockConfigService.get.mockImplementation(
+        <T = string | number>(key: string, defaultValue?: T): T => {
+          const configValues: Record<string, string | number> = {
+            ACTIVATION_OTP_EXPIRY_SECONDS: 300,
+            ACTIVATION_RESEND_JWT_EXPIRY: '1h',
+            JWT_SECRET: 'mock-jwt-secret',
+          };
+          return (configValues[key] ?? defaultValue) as T;
+        },
+      );
 
       // Mock JWT sign
       (jwt.sign as jest.Mock).mockReturnValue('mock.resend.token');
@@ -1395,22 +1410,25 @@ describe('UserService', () => {
 
     it('should successfully update primary email', async () => {
       // Set up specific transaction mock for this test
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest
-              .fn()
-              .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
-              .mockResolvedValueOnce(null), // No existing email conflict
-            update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+          update: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
+            .mockResolvedValueOnce(null), // No existing email conflict
+          update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       // Mock finding updated email record after transaction
       mockPrismaOltp.email.findFirst.mockResolvedValue(mockUpdatedEmailRecord);
@@ -1421,13 +1439,10 @@ describe('UserService', () => {
         mockAuthUser,
       );
 
-      expect(service.checkEmailAvailabilityForUser).toHaveBeenCalledWith(
-        newEmail,
-        userId,
-      );
+      expect(mockCheckEmail).toHaveBeenCalledWith(newEmail, userId);
       expect(mockPrismaOltp.$transaction).toHaveBeenCalled();
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${mockUpdatedEmailRecord.email_id}`,
+        `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${mockUpdatedEmailRecord.email_id.toNumber()}`,
         '123456',
         300000,
       );
@@ -1480,14 +1495,17 @@ describe('UserService', () => {
     });
 
     it('should throw NotFoundException when user not found', async () => {
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(null),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       await expect(
         service.updatePrimaryEmail(userIdString, newEmail, mockAuthUser),
@@ -1498,17 +1516,20 @@ describe('UserService', () => {
     });
 
     it('should throw NotFoundException when no primary email found', async () => {
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest.fn().mockResolvedValue(null),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       await expect(
         service.updatePrimaryEmail(userIdString, newEmail, mockAuthUser),
@@ -1538,7 +1559,8 @@ describe('UserService', () => {
               .mockResolvedValueOnce(existingEmailRecord), // Existing email check
           },
         };
-        return callback(txMock as any);
+        const result = callback(txMock as any);
+        return result instanceof Promise ? result : Promise.resolve(result);
       });
 
       await expect(
@@ -1564,22 +1586,25 @@ describe('UserService', () => {
 
     it('should handle email verification event failure gracefully', async () => {
       // Set up transaction mock
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest
-              .fn()
-              .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
-              .mockResolvedValueOnce(null), // No existing email conflict
-            update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+          update: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
+            .mockResolvedValueOnce(null), // No existing email conflict
+          update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       // Mock finding updated email record after transaction
       mockPrismaOltp.email.findFirst.mockResolvedValue(mockUpdatedEmailRecord);
@@ -1610,22 +1635,25 @@ describe('UserService', () => {
 
     it('should handle user updated event failure gracefully', async () => {
       // Set up transaction mock
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest
-              .fn()
-              .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
-              .mockResolvedValueOnce(null), // No existing email conflict
-            update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+          update: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
+            .mockResolvedValueOnce(null), // No existing email conflict
+          update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       // Mock finding updated email record after transaction
       mockPrismaOltp.email.findFirst.mockResolvedValue(mockUpdatedEmailRecord);
@@ -1649,22 +1677,25 @@ describe('UserService', () => {
 
     it('should handle case when updated email record is not found after transaction', async () => {
       // Set up transaction mock
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest
-              .fn()
-              .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
-              .mockResolvedValueOnce(null), // No existing email conflict
-            update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
-          },
-        };
-        return callback(txMock as any);
-      });
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+          update: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary email
+            .mockResolvedValueOnce(null), // No existing email conflict
+          update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
 
       // Mock that the email record is not found after transaction
       mockPrismaOltp.email.findFirst.mockResolvedValue(null);
@@ -1684,56 +1715,55 @@ describe('UserService', () => {
     });
 
     it('should properly format transaction operations', async () => {
-      let transactionCallback: any;
+      mockPrismaOltp.$transaction.mockImplementation(
+        async <T>(callback): Promise<T> => {
+          const txMock = {
+            user: {
+              findUnique: jest.fn().mockResolvedValue(mockUser),
+              update: jest.fn().mockResolvedValue(mockUser),
+            },
+            email: {
+              findFirst: jest
+                .fn()
+                .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary
+                .mockResolvedValueOnce(null), // No existing email conflict
+              update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+            },
+          };
 
-      mockPrismaOltp.$transaction.mockImplementation(async (callback) => {
-        transactionCallback = callback;
-        const txMock = {
-          user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockResolvedValue(mockUser),
-          },
-          email: {
-            findFirst: jest
-              .fn()
-              .mockResolvedValueOnce(mockCurrentEmailRecord) // Current primary
-              .mockResolvedValueOnce(null), // No existing email conflict
-            update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
-          },
-        };
+          const result = await callback(txMock as any);
 
-        const result = await callback(txMock as any);
+          expect(txMock.user.findUnique).toHaveBeenCalledWith({
+            where: { user_id: userId },
+          });
+          expect(txMock.email.findFirst).toHaveBeenCalledWith({
+            where: { user_id: userId, primary_ind: 1 },
+          });
+          expect(txMock.email.findFirst).toHaveBeenCalledWith({
+            where: {
+              address: newEmail.toLowerCase(),
+              user_id: { not: userId },
+              primary_ind: 1,
+            },
+          });
+          expect(txMock.email.update).toHaveBeenCalledWith({
+            where: { email_id: mockCurrentEmailRecord.email_id },
+            data: {
+              address: newEmail.toLowerCase(),
+              status_id: new Decimal(2),
+              modify_date: expect.any(Date),
+            },
+          });
+          expect(txMock.user.update).toHaveBeenCalledWith({
+            where: { user_id: userId },
+            data: {
+              modify_date: expect.any(Date),
+            },
+          });
 
-        expect(txMock.user.findUnique).toHaveBeenCalledWith({
-          where: { user_id: userId },
-        });
-        expect(txMock.email.findFirst).toHaveBeenCalledWith({
-          where: { user_id: userId, primary_ind: 1 },
-        });
-        expect(txMock.email.findFirst).toHaveBeenCalledWith({
-          where: {
-            address: newEmail.toLowerCase(),
-            user_id: { not: userId },
-            primary_ind: 1,
-          },
-        });
-        expect(txMock.email.update).toHaveBeenCalledWith({
-          where: { email_id: mockCurrentEmailRecord.email_id },
-          data: {
-            address: newEmail.toLowerCase(),
-            status_id: new Decimal(2),
-            modify_date: expect.any(Date),
-          },
-        });
-        expect(txMock.user.update).toHaveBeenCalledWith({
-          where: { user_id: userId },
-          data: {
-            modify_date: expect.any(Date),
-          },
-        });
-
-        return result;
-      });
+          return result;
+        },
+      );
 
       // Mock finding updated email record after transaction
       mockPrismaOltp.email.findFirst.mockResolvedValue(mockUpdatedEmailRecord);
@@ -1780,11 +1810,11 @@ describe('UserService', () => {
         where: { user_id: userId },
         data: { status: newStatus, modify_date: expect.any(Date) },
       });
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'event.user.activated',
         service.toCamelCase(mockUpdatedUser),
       );
-      expect(roleService.assignRoleByName).toHaveBeenCalledWith(
+      expect(mockRoleService.assignRoleByName).toHaveBeenCalledWith(
         'Topcoder User',
         userId,
         Number(mockUser.userId),
@@ -1806,12 +1836,12 @@ describe('UserService', () => {
       prismaOltp.user.update.mockResolvedValue(toInactiveUser);
 
       await service.updateStatus(userIdString, 'I', mockUser);
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'event.user.deactivated',
         service.toCamelCase(toInactiveUser),
       );
-      expect(roleService.assignRoleByName).not.toHaveBeenCalled(); // No role assignment for deactivation
-      expect(eventService.postDirectBusMessage).not.toHaveBeenCalledWith(
+      expect(mockRoleService.assignRoleByName).not.toHaveBeenCalled(); // No role assignment for deactivation
+      expect(mockEventService.postDirectBusMessage).not.toHaveBeenCalledWith(
         'external.action.email',
         expect.objectContaining({ sendgrid_template_id: 'd-welcomeTemplate' }),
       );
@@ -1928,9 +1958,10 @@ describe('UserService', () => {
       prismaOltp.user.findFirst.mockResolvedValue(null); // Default: no existing user by handle
       prismaOltp.user_sso_login.create.mockResolvedValue({} as any);
       prismaOltp.user.update.mockResolvedValue({} as any); // For updateLastLoginDate
-      prismaOltp.$transaction.mockImplementation(async (callback) =>
-        callback(prismaOltp),
-      ); // For new user creation
+      prismaOltp.$transaction.mockImplementation(<T>(callback): Promise<T> => {
+        const result = callback(prismaOltp);
+        return result instanceof Promise ? result : Promise.resolve(result);
+      });
       eventService.postEnvelopedNotification.mockResolvedValue(undefined);
     });
 
@@ -1998,7 +2029,7 @@ describe('UserService', () => {
           provider_id: mockAuth0Provider.sso_login_provider_id,
         },
       });
-      expect(eventService.postEnvelopedNotification).toHaveBeenCalledWith(
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'user.created',
         expect.any(Object),
       );
@@ -2107,10 +2138,13 @@ describe('UserService', () => {
       user_id: new Decimal(userId),
     });
 
+    let mockAssign;
+    let mockDeassign;
     beforeEach(() => {
       prismaOltp.user.findUnique.mockResolvedValue(mockUserRecord);
-      roleService.deassignRoleByName.mockResolvedValue(undefined);
-      roleService.assignRoleByName.mockResolvedValue(undefined);
+      mockDeassign =
+        roleService.deassignRoleByName.mockResolvedValue(undefined);
+      mockAssign = roleService.assignRoleByName.mockResolvedValue(undefined);
     });
 
     it('should update primary role, deassigning other valid primary roles', async () => {
@@ -2124,11 +2158,8 @@ describe('UserService', () => {
         where: { user_id: userId },
       });
       // It should try to deassign 'Topcoder Customer' if 'Topcoder Talent' is the new one
-      expect(roleService.deassignRoleByName).toHaveBeenCalledWith(
-        'Topcoder Customer',
-        userId,
-      );
-      expect(roleService.assignRoleByName).toHaveBeenCalledWith(
+      expect(mockDeassign).toHaveBeenCalledWith('Topcoder Customer', userId);
+      expect(mockAssign).toHaveBeenCalledWith(
         newPrimaryRole,
         userId,
         operatorId,
@@ -2152,7 +2183,8 @@ describe('UserService', () => {
     it('should log warning if deassigning a role fails but continue', async () => {
       roleService.deassignRoleByName.mockImplementation(async (roleName) => {
         if (roleName === 'Topcoder Customer')
-          throw new Error('Deassign failed');
+          return Promise.reject(new Error('Deassign failed'));
+        return Promise.resolve();
       });
       await service.updatePrimaryRole(userId, newPrimaryRole, operatorId);
       // expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining("Could not de-assign role 'Topcoder Customer'"));

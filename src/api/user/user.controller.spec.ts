@@ -9,12 +9,10 @@ import { RoleService } from '../role/role.service';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ForbiddenException,
-  NotFoundException,
   BadRequestException,
   UnauthorizedException,
   InternalServerErrorException,
-  HttpException,
-  HttpStatus,
+  NotImplementedException,
 } from '@nestjs/common';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as DTOs from '../../dto/user/user.dto';
@@ -137,8 +135,12 @@ const createMockRequest = (
     body: body || {},
     query: query || {},
     params: params || {},
-    get: jest.fn((name: string) => _headers[name.toLowerCase()]),
-    header: jest.fn((name: string) => _headers[name.toLowerCase()]),
+    get: jest.fn(
+      (name: string): string | undefined => _headers[name.toLowerCase()],
+    ),
+    header: jest.fn(
+      (name: string): string | undefined => _headers[name.toLowerCase()],
+    ),
     // Minimal http.IncomingMessage properties often expected
     httpVersion: '1.1',
     method: 'GET',
@@ -151,11 +153,13 @@ const createMockRequest = (
     acceptsEncodings: jest.fn(),
     acceptsLanguages: jest.fn(),
     range: jest.fn(),
-    param: jest.fn((nameParam, defaultValue) => {
+    param: jest.fn((nameParam: string, defaultValue: string) => {
       // A simple mock for req.param, might need adjustment based on actual usage
-      if (req.params && req.params[nameParam]) return req.params[nameParam];
-      if (req.body && req.body[nameParam]) return req.body[nameParam];
-      if (req.query && req.query[nameParam]) return req.query[nameParam];
+      if (req.params && req.params[nameParam])
+        return req.params[nameParam] as string;
+      if (req.body && req.body[nameParam]) return req.body[nameParam] as string;
+      if (req.query && req.query[nameParam])
+        return req.query[nameParam] as string;
       return defaultValue;
     }),
     is: jest.fn(),
@@ -462,19 +466,18 @@ describe('UserController', () => {
       expect(mockUserService.updateBasicInfo).toHaveBeenCalledWith(
         userIdToUpdate,
         updateUserDto,
-        mockRegularUser,
       );
       expect(result.firstName).toBe('UpdatedFirst');
     });
   });
 
   describe('deleteUser', () => {
-    it('should throw HttpException with 501 for admin user', async () => {
+    it('should throw NotImplementedException with 501 for admin user', async () => {
       const mockReq = createMockRequest(mockAdminUser, {
         authorization: 'Bearer admin-token',
       });
       await expect(controller.deleteUser('5', mockReq)).rejects.toThrow(
-        new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED),
+        NotImplementedException,
       );
     });
   });
@@ -507,7 +510,6 @@ describe('UserController', () => {
       expect(mockUserProfileService.createSSOUserLogin).toHaveBeenCalledWith(
         userId,
         createSSODto.param,
-        mockAdminUser.userId,
       );
       expect(result).toEqual(mockProfileResponse);
     });
@@ -557,7 +559,6 @@ describe('UserController', () => {
       expect(mockUserProfileService.updateSSOUserLogin).toHaveBeenCalledWith(
         userId,
         updateSSODto.param,
-        mockRegularUser.userId.toString(),
       );
       expect(result).toEqual(mockProfileResponse);
     });
@@ -603,7 +604,6 @@ describe('UserController', () => {
         userId,
         'myProvider',
         ssoUserId,
-        mockRegularUser.userId.toString(),
       );
     });
 
@@ -635,7 +635,6 @@ describe('UserController', () => {
         userId,
         'resolvedProvider',
         ssoUserId,
-        mockAdminUser.userId.toString(),
       );
     });
 
@@ -691,7 +690,6 @@ describe('UserController', () => {
       expect(mockUserProfileService.addExternalProfile).toHaveBeenCalledWith(
         userId,
         createProfileDto.param,
-        mockAdminUser.userId,
       );
       expect(result).toEqual(mockProfileResponse);
     });
@@ -909,7 +907,7 @@ describe('UserController', () => {
         authorization: 'Bearer admin-token',
       });
       mockUserService.updatePrimaryEmail.mockResolvedValue(mockUpdatedRawUser);
-      const result = await controller.updatePrimaryEmail(
+      await controller.updatePrimaryEmail(
         userIdToUpdate,
         updateEmailDto,
         mockReq,
@@ -1109,7 +1107,7 @@ describe('UserController', () => {
       mockTwoFactorAuthService.sendOtpFor2fa.mockResolvedValue(mockOtpResponse);
       const result = await controller.sendOtp(sendOtpDto);
       expect(mockTwoFactorAuthService.sendOtpFor2fa).toHaveBeenCalledWith(
-        sendOtpDto.param.userId!.toString(),
+        sendOtpDto.param.userId.toString(),
       );
       expect(result).toEqual(mockOtpResponse);
     });
@@ -1154,7 +1152,7 @@ describe('UserController', () => {
       expect(
         mockTwoFactorAuthService.checkOtpAndCompleteLogin,
       ).toHaveBeenCalledWith(
-        checkOtpDto.param.userId!.toString(),
+        checkOtpDto.param.userId.toString(),
         checkOtpDto.param.otp,
       );
       expect(result).toEqual(mockLoginCompletion);

@@ -49,9 +49,10 @@ const createMockPrismaAuth = () => ({
     deleteMany: jest.fn(),
     count: jest.fn(),
   },
-  $transaction: jest
-    .fn()
-    .mockImplementation(async (callback) => callback(mockPrismaAuth)),
+  $transaction: jest.fn().mockImplementation(<T>(callback): Promise<T> => {
+    const result = callback(mockPrismaAuth);
+    return result instanceof Promise ? result : Promise.resolve(result);
+  }),
 });
 
 const createMockMemberApiService = () => ({
@@ -72,7 +73,6 @@ const mockLogger = createMockLogger();
 
 describe('RoleService', () => {
   let service: RoleService;
-  let memberApiService: MemberApiService;
 
   beforeEach(async () => {
     // Reset all mocks
@@ -81,8 +81,11 @@ describe('RoleService', () => {
     Object.values(mockPrismaAuth.roleAssignment).forEach((mock) =>
       mock.mockReset(),
     );
-    mockPrismaAuth.$transaction.mockImplementation(async (callback) =>
-      callback(mockPrismaAuth),
+    mockPrismaAuth.$transaction.mockImplementation(
+      <T>(callback): Promise<T> => {
+        const result = callback(mockPrismaAuth);
+        return result instanceof Promise ? result : Promise.resolve(result);
+      },
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -95,7 +98,6 @@ describe('RoleService', () => {
     }).compile();
 
     service = module.get<RoleService>(RoleService);
-    memberApiService = module.get<MemberApiService>(MemberApiService);
 
     // Replace logger instance to ensure consistent mocking
     (service as any).logger = mockLogger;
@@ -138,10 +140,10 @@ describe('RoleService', () => {
     it('should not include enriched subjects even when fields=subjects', async () => {
       mockPrismaAuth.role.findMany.mockResolvedValue(mockRoles);
 
-      const result = await service.findAll(undefined, 'subjects');
+      const result = await service.findAll(undefined);
 
       expect(result[0].subjects).toBeUndefined();
-      expect(memberApiService.getUserInfoList).not.toHaveBeenCalled();
+      expect(mockMemberApiService.getUserInfoList).not.toHaveBeenCalled();
     });
   });
 
@@ -184,7 +186,10 @@ describe('RoleService', () => {
         mockPrismaAuth.role.findUnique.mockResolvedValue(
           mockRoleWithAssignments,
         );
-        mockMemberApiService.getUserInfoList.mockResolvedValue(mockMemberInfo);
+        const mockFunc =
+          mockMemberApiService.getUserInfoList.mockResolvedValue(
+            mockMemberInfo,
+          );
 
         const result = await service.findOne(roleId, 'subjects');
 
@@ -197,9 +202,7 @@ describe('RoleService', () => {
             },
           },
         });
-        expect(memberApiService.getUserInfoList).toHaveBeenCalledWith([
-          subjectId,
-        ]);
+        expect(mockFunc).toHaveBeenCalledWith([subjectId]);
         expect(result?.subjects).toEqual(mockMemberInfo);
       });
 
@@ -472,14 +475,16 @@ describe('RoleService', () => {
     describe('assignRoleByName', () => {
       it('should assign role successfully when role exists', async () => {
         (service.findRoleByName as jest.Mock).mockResolvedValue(mockRole);
-        jest.spyOn(service, 'assignRoleToSubject').mockResolvedValue(undefined);
+        const mockFunc = jest
+          .spyOn(service, 'assignRoleToSubject')
+          .mockResolvedValue(undefined);
 
         await service.assignRoleByName(roleName, subjectId, operatorId);
 
         expect(mockLogger.debug).toHaveBeenCalledWith(
           `Assigning role '${roleName}' to subject ${subjectId} by operator ${operatorId}`,
         );
-        expect(service.assignRoleToSubject).toHaveBeenCalledWith(
+        expect(mockFunc).toHaveBeenCalledWith(
           mockRole.id,
           subjectId,
           operatorId,
@@ -501,7 +506,7 @@ describe('RoleService', () => {
     describe('deassignRoleByName', () => {
       it('should deassign role successfully when role exists', async () => {
         (service.findRoleByName as jest.Mock).mockResolvedValue(mockRole);
-        jest
+        const mockFunc = jest
           .spyOn(service, 'deassignRoleFromSubject')
           .mockResolvedValue(undefined);
 
@@ -510,10 +515,7 @@ describe('RoleService', () => {
         expect(mockLogger.debug).toHaveBeenCalledWith(
           `Deassigning role by name '${roleName}' from subject ${subjectId}`,
         );
-        expect(service.deassignRoleFromSubject).toHaveBeenCalledWith(
-          mockRole.id,
-          subjectId,
-        );
+        expect(mockFunc).toHaveBeenCalledWith(mockRole.id, subjectId);
       });
 
       it('should throw NotFoundException when role does not exist', async () => {

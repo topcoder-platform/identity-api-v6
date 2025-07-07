@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import {
   PrismaClient as PrismaClientCommonOltp,
-  Prisma,
   country,
 } from '@prisma/client-common-oltp';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
@@ -21,7 +20,7 @@ import {
 // Basic email regex, can be refined
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Basic handle regex: 3-64 chars, alphanumeric, and specific special characters _ . - ` [ ] { }
-const HANDLE_REGEX = /^[a-zA-Z0-9\-\[\]_\.`\{\}]{3,64}$/;
+const HANDLE_REGEX = /^[a-zA-Z0-9\-[\]_.`{}]{3,64}$/;
 // TODO: Add list of reserved handles if necessary
 const RESERVED_HANDLES = ['admin', 'support', 'root', 'administrator']; // Example
 
@@ -101,7 +100,7 @@ export class ValidationService {
     // If a record for this email address exists AND it has a user_id, it means the email is in use.
     if (existingEmailRecord && existingEmailRecord.user_id !== null) {
       this.logger.warn(
-        `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingEmailRecord.user_id}.`,
+        `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingEmailRecord.user_id.toNumber()}.`,
       );
       throw new ConflictException(`Email '${email}' is already in use.`);
     }
@@ -446,7 +445,7 @@ export class ValidationService {
         Number(socialProfileInUse.user_id) !== internalUserId
       ) {
         this.logger.warn(
-          `Social profile for provider ${providerDetails.key} and external ID ${profile.userId} is already in use by user ${socialProfileInUse.user_id}.`,
+          `Social profile for provider ${providerDetails.key} and external ID ${profile.userId} is already in use by user ${socialProfileInUse.user_id.toNumber()}.`,
         );
         throw new ConflictException(MSG_SOCIAL_PROFILE_IN_USE);
       }
@@ -520,10 +519,10 @@ export class ValidationService {
 
     if (!providerDetails) {
       this.logger.warn(
-        `findInternalUserIdBySsoProfile called with unknown provider input: ${providerInput}`,
+        `findInternalUserIdBySsoProfile called with unknown provider input: ${JSON.stringify(providerInput)}`,
       );
       throw new BadRequestException(
-        MSG_UNSUPPORTED_PROVIDER(String(providerInput)),
+        MSG_UNSUPPORTED_PROVIDER(JSON.stringify(providerInput)),
       );
     }
 

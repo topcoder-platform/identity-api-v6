@@ -3,9 +3,7 @@ import { UserProfileHelper } from './user-profile.helper';
 import { UserProfileDto } from '../../dto/user/user.dto';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { Logger } from '@nestjs/common';
-import {
-  Prisma,
-} from '@prisma/client-common-oltp';
+import { Prisma } from '@prisma/client-common-oltp';
 import { ProviderId } from '../../core/constant/provider-type.enum';
 
 const userIdValue = new Prisma.Decimal(123);
@@ -141,23 +139,29 @@ describe('UserProfileHelper', () => {
 
   describe('getUserIdByProfile', () => {
     it('should throw error when profile is null', async () => {
-      await expect(service.getUserIdByProfile(null)).rejects.toThrow('profile must be specified.');
+      await expect(service.getUserIdByProfile(null)).rejects.toThrow(
+        'profile must be specified.',
+      );
     });
 
     it('should throw error for unsupported provider type', async () => {
       const profile = new UserProfileDto();
       profile.providerType = 'unknown';
 
-      await expect(service.getUserIdByProfile(profile)).rejects.toThrow('Unsupported provider type: unknown');
+      await expect(service.getUserIdByProfile(profile)).rejects.toThrow(
+        'Unsupported provider type: unknown',
+      );
     });
 
     it('should handle LDAP provider type', async () => {
       const profile = new UserProfileDto();
       profile.providerType = 'ad';
       profile.userId = '123';
-      
+
       // Mock the internal call that would happen for LDAP
-      mockPrismaClient.user_social_login.findFirst.mockResolvedValue({ user_id: userIdValue });
+      mockPrismaClient.user_social_login.findFirst.mockResolvedValue({
+        user_id: userIdValue,
+      });
 
       const result = await service.getUserIdByProfile(profile);
       expect(result).toBe(123);
@@ -169,7 +173,9 @@ describe('UserProfileHelper', () => {
       profile.userId = '123';
       profile.email = 'test@example.com';
 
-      mockPrismaClient.user_social_login.findFirst.mockResolvedValue({ user_id: userIdValue });
+      mockPrismaClient.user_social_login.findFirst.mockResolvedValue({
+        user_id: userIdValue,
+      });
 
       const result = await service.getUserIdByProfile(profile);
       expect(result).toBe(123);
@@ -182,8 +188,12 @@ describe('UserProfileHelper', () => {
       profile.userId = '123';
       profile.email = 'test@example.com';
 
-      mockPrismaClient.sso_login_provider.findFirst.mockResolvedValue({ sso_login_provider_id: 1 });
-      mockPrismaClient.user_sso_login.findFirst.mockResolvedValue({ user_id: userIdValue });
+      mockPrismaClient.sso_login_provider.findFirst.mockResolvedValue({
+        sso_login_provider_id: 1,
+      });
+      mockPrismaClient.user_sso_login.findFirst.mockResolvedValue({
+        user_id: userIdValue,
+      });
 
       const result = await service.getUserIdByProfile(profile);
       expect(result).toEqual(123);
@@ -207,7 +217,9 @@ describe('UserProfileHelper', () => {
       profile.userId = null;
       profile.email = 'test@example.com';
 
-      await expect(service.getUserIdByProfile(profile)).rejects.toThrow('profile must have userId');
+      await expect(service.getUserIdByProfile(profile)).rejects.toThrow(
+        'profile must have userId',
+      );
     });
 
     it('should ignore error if user not found by social user id', async () => {
@@ -216,24 +228,32 @@ describe('UserProfileHelper', () => {
       profile.userId = '123';
       profile.email = 'test@example.com';
 
-      mockPrismaClient.user_social_login.findFirst.mockRejectedValueOnce(new Error('query-fail-with-userId'));
-      mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({ user_id: userIdValue });
+      mockPrismaClient.user_social_login.findFirst.mockRejectedValueOnce(
+        new Error('query-fail-with-userId'),
+      );
+      mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({
+        user_id: userIdValue,
+      });
 
       const result = await service.getUserIdByProfile(profile);
       expect(result).toBe(123);
-      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith({
-        where: {
-          social_user_id: '123',
-          social_login_provider_id: ProviderId.GOOGLE
-        }
-      });
-      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith({
-        where: {
-          social_email: profile.email,
-          social_email_verified: false,
-          social_login_provider_id: ProviderId.GOOGLE
-        }
-      });
+      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            social_user_id: '123',
+            social_login_provider_id: ProviderId.GOOGLE,
+          },
+        },
+      );
+      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            social_email: profile.email,
+            social_email_verified: false,
+            social_login_provider_id: ProviderId.GOOGLE,
+          },
+        },
+      );
     });
 
     it('should get user by profile name if email is not provided', async () => {
@@ -246,22 +266,28 @@ describe('UserProfileHelper', () => {
       // first call
       mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({});
       // second call
-      mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({ user_id: userIdValue });
+      mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({
+        user_id: userIdValue,
+      });
 
       const result = await service.getUserIdByProfile(profile);
       expect(result).toBe(123);
-      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith({
-        where: {
-          social_user_id: '123',
-          social_login_provider_id: ProviderId.GOOGLE
-        }
-      });
-      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith({
-        where: {
-          social_user_name: profile.name,
-          social_login_provider_id: ProviderId.GOOGLE
-        }
-      });
+      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            social_user_id: '123',
+            social_login_provider_id: ProviderId.GOOGLE,
+          },
+        },
+      );
+      expect(mockPrismaClient.user_social_login.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            social_user_name: profile.name,
+            social_login_provider_id: ProviderId.GOOGLE,
+          },
+        },
+      );
     });
 
     it('should throw error if no email or name provided', async () => {
@@ -273,7 +299,9 @@ describe('UserProfileHelper', () => {
       // first call
       mockPrismaClient.user_social_login.findFirst.mockResolvedValueOnce({});
 
-      await expect(service.getUserIdByProfile(profile)).rejects.toThrow('he social account should have at least one valid email or one valid username.');
+      await expect(service.getUserIdByProfile(profile)).rejects.toThrow(
+        'he social account should have at least one valid email or one valid username.',
+      );
     });
   });
 });

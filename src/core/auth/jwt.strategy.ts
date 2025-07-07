@@ -239,6 +239,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       // Create a cacheable version without the potentially large payload
       const { payload: _, ...cacheableUser } = authenticatedUser;
+      void _;
       await this.cacheManager.set(
         cacheKey,
         cacheableUser,

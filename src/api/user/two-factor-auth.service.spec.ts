@@ -16,13 +16,11 @@ import { AuthFlowService } from './auth-flow.service';
 import { RoleService } from '../role/role.service';
 import {
   BadRequestException,
-  ForbiddenException,
   InternalServerErrorException,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
   // Import specific Prisma models if needed for explicit typing, otherwise Prisma.ModelName suffices for mock shapes
   Prisma,
 } from '@prisma/client-common-oltp';
@@ -86,12 +84,12 @@ const mockCacheManager = {
 
 // --- Mock ConfigService ---
 const mockConfigService = {
-  get: jest.fn((key: string, defaultValue?: any) => {
+  get: jest.fn(<T = any>(key: string, defaultValue?: T): T => {
     const configValues: Record<string, string | undefined> = {
       JWT_SECRET: 'test-2fa-jwt-secret-for-service',
       DEV_DICEAUTH_OTP_DURATION: '10',
     };
-    return configValues[key] !== undefined ? configValues[key] : defaultValue;
+    return (configValues[key] ?? defaultValue) as T;
   }),
 };
 
@@ -130,8 +128,8 @@ const createMockAuthUser = (
 
 // --- Helper Functions to Create Mock Prisma Models (simplified for brevity, expand as needed) ---
 const createMockUserModel = (
-  input: Partial<Prisma.userGetPayload<{}>> = {},
-): Prisma.userGetPayload<{}> =>
+  input: Partial<Prisma.userGetPayload<unknown>> = {},
+): Prisma.userGetPayload<unknown> =>
   ({
     user_id: input.user_id ? new Decimal(input.user_id) : new Decimal(1),
     handle: input.handle || 'testuser',
@@ -145,11 +143,11 @@ const createMockUserModel = (
     password: input.password || 'secret',
     // Ensure all non-nullable fields have a default or are passed in 'input'
     ...input,
-  }) as Prisma.userGetPayload<{}>;
+  }) as Prisma.userGetPayload<unknown>;
 
 const createMockUser2faModel = (
-  input: Partial<Prisma.user_2faGetPayload<{}>> = {},
-): Prisma.user_2faGetPayload<{}> =>
+  input: Partial<Prisma.user_2faGetPayload<unknown>> = {},
+): Prisma.user_2faGetPayload<unknown> =>
   ({
     id: input.id || 1,
     user_id: input.user_id || new Decimal(1),
@@ -160,11 +158,11 @@ const createMockUser2faModel = (
     created_at: input.created_at || new Date(),
     modified_at: input.modified_at || new Date(),
     ...input,
-  }) as Prisma.user_2faGetPayload<{}>;
+  }) as Prisma.user_2faGetPayload<unknown>;
 
 const createMockEmailModel = (
-  input: Partial<Prisma.emailGetPayload<{}>> = {},
-): Prisma.emailGetPayload<{}> =>
+  input: Partial<Prisma.emailGetPayload<unknown>> = {},
+): Prisma.emailGetPayload<unknown> =>
   ({
     email_id: input.email_id || new Decimal(101),
     user_id: input.user_id ? new Decimal(input.user_id) : new Decimal(1),
@@ -181,24 +179,7 @@ const createMockEmailModel = (
     create_date: input.create_date || new Date(),
     modify_date: input.modify_date || new Date(),
     ...input,
-  }) as Prisma.emailGetPayload<{}>;
-
-const createMockDiceConnectionModel = (
-  input: Partial<
-    Prisma.dice_connectionGetPayload<{ include: { user: true } }>
-  > = {},
-): Prisma.dice_connectionGetPayload<{ include: { user: true } }> =>
-  ({
-    id: input.id || 1,
-    user_id: input.user_id || new Decimal(1),
-    connection: input.connection || 'dice-conn-123',
-    accepted: input.accepted === undefined ? false : input.accepted,
-    created_at: input.created_at || new Date(),
-    short_url: input.short_url || 'https://dice.short.url/123',
-    con_created_at: input.con_created_at || null,
-    user: input.user ? createMockUserModel(input.user) : undefined,
-    ...input,
-  }) as Prisma.dice_connectionGetPayload<{ include: { user: true } }>;
+  }) as Prisma.emailGetPayload<unknown>;
 
 describe('TwoFactorAuthService', () => {
   let service: TwoFactorAuthService;
@@ -394,7 +375,7 @@ describe('TwoFactorAuthService', () => {
         mockPrismaOltp.user_2fa.findUnique.mockResolvedValue(null);
         mockPrismaOltp.email.count.mockResolvedValue(1); // Default to 1 email
         mockPrismaOltp.user_2fa.create.mockImplementation((args) =>
-          Promise.resolve(createMockUser2faModel(args.data as any)),
+          Promise.resolve(createMockUser2faModel(args.data)),
         );
       });
 
@@ -480,7 +461,7 @@ describe('TwoFactorAuthService', () => {
       beforeEach(() => {
         mockPrismaOltp.user_2fa.findUnique.mockResolvedValue(existingUser2fa);
         mockPrismaOltp.user_2fa.update.mockImplementation((args) =>
-          Promise.resolve({ ...existingUser2fa, ...args.data } as any),
+          Promise.resolve({ ...existingUser2fa, ...args.data }),
         );
       });
 
@@ -577,7 +558,6 @@ describe('TwoFactorAuthService', () => {
       });
     });
   });
-
 
   describe('sendOtpFor2fa', () => {
     const userIdStr = '1';
@@ -838,10 +818,6 @@ describe('TwoFactorAuthService', () => {
   describe('checkOtpAndCompleteLogin', () => {
     const userIdStr = '1';
     const otp = '123456';
-    const userRecord = createMockUserModel({
-      user_id: new Decimal(1),
-      handle: 'checkOtpUser',
-    });
 
     it('should throw BadRequestException if OTP not in cache and log warning', async () => {
       mockCacheManager.get.mockResolvedValue(null);

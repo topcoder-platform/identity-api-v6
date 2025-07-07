@@ -48,7 +48,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'twitter',
     isSocial: true,
     isEnterprise: false,
-    nameKey: 'screen_name'
+    nameKey: 'screen_name',
   },
   github: {
     id: ProviderId.GITHUB,
@@ -67,21 +67,21 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'dribbble',
     isSocial: true,
     isEnterprise: false,
-    nameKey: 'username'
+    nameKey: 'username',
   },
   behance: {
     id: ProviderId.BEHANCE,
     key: 'behance',
     isSocial: true,
     isEnterprise: false,
-    nameKey: 'username'
+    nameKey: 'username',
   },
   stackoverflow: {
     id: ProviderId.STACKOVERFLOW,
     key: 'stackoverflow',
     isSocial: true,
     isEnterprise: false,
-    nameKey: 'username'
+    nameKey: 'username',
   },
   linkedin: {
     id: ProviderId.LINKEDIN,
@@ -94,7 +94,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'bitbucket',
     isSocial: true,
     isEnterprise: false,
-    nameKey: 'username'
+    nameKey: 'username',
   },
   ad: { id: ProviderId.LDAP, key: 'ad', isSocial: false, isEnterprise: true }, // LDAP
   samlp: {

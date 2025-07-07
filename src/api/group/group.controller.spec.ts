@@ -19,6 +19,8 @@ import {
 } from '../../dto/group/group-membership.dto';
 import { createBaseResponse } from '../../shared/util/responseBuilder';
 
+const fixedTime = new Date();
+
 const sampleGroupResponse: GroupResponseDto = {
   id: 1,
   name: 'Test Group From Service',
@@ -26,9 +28,9 @@ const sampleGroupResponse: GroupResponseDto = {
   privateGroup: true,
   selfRegister: false,
   createdBy: 1,
-  createdAt: new Date(),
+  createdAt: fixedTime,
   modifiedBy: 1,
-  modifiedAt: new Date(),
+  modifiedAt: fixedTime,
 };
 
 const sampleSecurityGroupsResponse: SecurityGroupsResponseDto = {
@@ -45,12 +47,12 @@ const sampleGroupMembershipResponse: GroupMembershipResponseDto = {
   memberId: 2,
   membershipType: 'user',
   createdBy: 1,
-  createdAt: new Date(),
+  createdAt: fixedTime,
   modifiedBy: 1,
-  modifiedAt: new Date(),
+  modifiedAt: fixedTime,
 };
 
-const mockGroupService = {
+const mockGroupService: jest.Mocked<Partial<GroupService>> = {
   create: jest
     .fn<Promise<GroupResponseDto>, [GroupDto, AuthenticatedUser]>()
     .mockResolvedValue(sampleGroupResponse),
@@ -72,9 +74,7 @@ const mockGroupService = {
       [number, Partial<GroupDto>, AuthenticatedUser]
     >()
     .mockResolvedValue(sampleGroupResponse),
-  deleteGroupAndMemberships: jest
-    .fn<Promise<GroupResponseDto>, [number, AuthenticatedUser]>()
-    .mockResolvedValue(sampleGroupResponse),
+  deleteGroupAndMemberships: jest.fn().mockResolvedValue(sampleGroupResponse),
   getGroupByGroupId: jest
     .fn<Promise<GroupResponseDto>, [number, AuthenticatedUser]>()
     .mockResolvedValue(sampleGroupResponse),
@@ -105,12 +105,7 @@ const mockGroupService = {
   getMembers: jest
     .fn<Promise<GroupMembershipResponseDto[]>, [AuthenticatedUser, number]>()
     .mockResolvedValue([sampleGroupMembershipResponse]),
-  getGroupByMember: jest
-    .fn<
-      Promise<GroupResponseDto[]>,
-      [AuthenticatedUser, number | null, string]
-    >()
-    .mockResolvedValue([sampleGroupResponse]),
+  getGroupByMember: jest.fn().mockResolvedValue([sampleGroupResponse]),
 };
 
 const mockAdminJwtPayload: JwtPayload = {
@@ -143,7 +138,6 @@ const mockRegularUser: AuthenticatedUser = {
 
 describe('GroupController', () => {
   let controller: GroupController;
-  let service: GroupService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -157,7 +151,6 @@ describe('GroupController', () => {
       .compile();
 
     controller = module.get<GroupController>(GroupController);
-    service = module.get<GroupService>(GroupService);
   });
 
   it('should be defined', () => {
@@ -179,7 +172,7 @@ describe('GroupController', () => {
     memberId: 3,
     membershipType: 1,
     groupId: 1,
-    createdAt: new Date(),
+    createdAt: fixedTime,
     createdBy: '1',
   };
 
@@ -192,11 +185,12 @@ describe('GroupController', () => {
         privateGroup: true,
         selfRegister: false,
       };
-      mockGroupService.create.mockResolvedValueOnce(sampleGroupResponse);
+      const mockCreate =
+        mockGroupService.create.mockResolvedValueOnce(sampleGroupResponse);
 
       const result = await controller.createGroup(groupBodyDto, req);
 
-      expect(service.create).toHaveBeenCalledWith(
+      expect(mockCreate).toHaveBeenCalledWith(
         expectedServiceData,
         mockAdminUser,
       );
@@ -220,12 +214,13 @@ describe('GroupController', () => {
       const securityBodyDto: SecurityBodyDto = {
         param: validSecurityGroupInput,
       };
-      mockGroupService.createSecurityGroup.mockResolvedValueOnce(
-        sampleSecurityGroupsResponse,
-      );
+      const mockCreate =
+        mockGroupService.createSecurityGroup.mockResolvedValueOnce(
+          sampleSecurityGroupsResponse,
+        );
 
       const result = await controller.createSecurityGroup(securityBodyDto, req);
-      expect(service.createSecurityGroup).toHaveBeenCalledWith(
+      expect(mockCreate).toHaveBeenCalledWith(
         validSecurityGroupInput,
         mockAdminUser,
       );
@@ -236,11 +231,12 @@ describe('GroupController', () => {
   describe('getSingleMember', () => {
     it('should return a member if found', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.findMembershipByGroupAndMember.mockResolvedValueOnce(
-        sampleGroupMembershipResponse,
-      );
+      const mockGet =
+        mockGroupService.findMembershipByGroupAndMember.mockResolvedValueOnce(
+          sampleGroupMembershipResponse,
+        );
       const result = await controller.getSingleMember(1, 2, req);
-      expect(service.findMembershipByGroupAndMember).toHaveBeenCalledWith(1, 2);
+      expect(mockGet).toHaveBeenCalledWith(1, 2);
       expect(result).toEqual(createBaseResponse(sampleGroupMembershipResponse));
     });
 
@@ -258,17 +254,17 @@ describe('GroupController', () => {
   describe('getMembersCount', () => {
     it('should get member count with specified includeSubGroups', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getMemberCount.mockResolvedValueOnce(10);
+      const mockGet = mockGroupService.getMemberCount.mockResolvedValueOnce(10);
       const result = await controller.getMembersCount(req, 1, true);
-      expect(service.getMemberCount).toHaveBeenCalledWith(1, true, 1);
+      expect(mockGet).toHaveBeenCalledWith(1, true, 1);
       expect(result).toEqual(createBaseResponse({ count: 10 }));
     });
 
     it('should get member count with default includeSubGroups (undefined)', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getMemberCount.mockResolvedValueOnce(5);
+      const mockGet = mockGroupService.getMemberCount.mockResolvedValueOnce(5);
       const result = await controller.getMembersCount(req, 1, undefined);
-      expect(service.getMemberCount).toHaveBeenCalledWith(1, undefined, 1);
+      expect(mockGet).toHaveBeenCalledWith(1, undefined, 1);
       expect(result).toEqual(createBaseResponse({ count: 5 }));
     });
   });
@@ -283,10 +279,11 @@ describe('GroupController', () => {
     it('should update a group', async () => {
       const req = createMockRequest(mockAdminUser);
 
-      mockGroupService.update.mockResolvedValueOnce(sampleGroupResponse);
+      const mockUpdate =
+        mockGroupService.update.mockResolvedValueOnce(sampleGroupResponse);
 
       const result = await controller.updateGroup(groupId, updateBodyDto, req);
-      expect(service.update).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
         groupId,
         updateBodyDto.param,
         mockAdminUser,
@@ -316,14 +313,20 @@ describe('GroupController', () => {
   describe('deleteGroup', () => {
     it('should delete a group', async () => {
       const req = createMockRequest(mockAdminUser);
-      mockGroupService.deleteGroupAndMemberships.mockResolvedValueOnce(
-        sampleGroupResponse,
-      );
+      const mockDelete =
+        mockGroupService.deleteGroupAndMemberships.mockResolvedValueOnce({
+          id: 1,
+          name: 'Test Group From Service',
+          description: 'A test group description from service',
+          privateGroup: true,
+          selfRegister: false,
+          createdBy: 1,
+          createdAt: fixedTime,
+          modifiedBy: 1,
+          modifiedAt: fixedTime,
+        });
       const result = await controller.deleteGroup(1, req);
-      expect(service.deleteGroupAndMemberships).toHaveBeenCalledWith(
-        1,
-        mockAdminUser,
-      );
+      expect(mockDelete).toHaveBeenCalledWith(1, mockAdminUser);
       expect(result).toEqual(createBaseResponse(sampleGroupResponse));
     });
   });
@@ -331,14 +334,12 @@ describe('GroupController', () => {
   describe('getGroupById', () => {
     it('should get a group by ID with fields', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getGroupByGroupId.mockResolvedValueOnce(
-        sampleGroupResponse,
-      );
+      const mockGet =
+        mockGroupService.getGroupByGroupId.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getGroupById(1, req, 'id');
-      expect(service.getGroupByGroupId).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser);
       expect(result).toEqual(
         createBaseResponse(sampleGroupResponse, 200, 'id'),
       );
@@ -346,14 +347,12 @@ describe('GroupController', () => {
 
     it('should get a group by ID without fields', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getGroupByGroupId.mockResolvedValueOnce(
-        sampleGroupResponse,
-      );
+      const mockGet =
+        mockGroupService.getGroupByGroupId.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getGroupById(1, req, undefined);
-      expect(service.getGroupByGroupId).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser);
       expect(result).toEqual(
         createBaseResponse(sampleGroupResponse, 200, undefined),
       );
@@ -364,16 +363,12 @@ describe('GroupController', () => {
     it('should add a member to a group', async () => {
       const req = createMockRequest(mockAdminUser);
       const memberBodyDto: GroupMemberBodyDto = { param: validMemberInput };
-      mockGroupService.addMemberToGroup.mockResolvedValueOnce(
+      const mockAdd = mockGroupService.addMemberToGroup.mockResolvedValueOnce(
         sampleGroupMembershipResponse,
       );
 
       const result = await controller.addMemberToGroup(1, memberBodyDto, req);
-      expect(service.addMemberToGroup).toHaveBeenCalledWith(
-        mockAdminUser,
-        1,
-        validMemberInput,
-      );
+      expect(mockAdd).toHaveBeenCalledWith(mockAdminUser, 1, validMemberInput);
       expect(result).toEqual(createBaseResponse(sampleGroupMembershipResponse));
     });
 
@@ -388,15 +383,12 @@ describe('GroupController', () => {
   describe('removeMemberFromGroup', () => {
     it('should remove a member from a group', async () => {
       const req = createMockRequest(mockAdminUser);
-      mockGroupService.removeMembershipById.mockResolvedValueOnce(
-        sampleGroupMembershipResponse,
-      );
+      const mockRemove =
+        mockGroupService.removeMembershipById.mockResolvedValueOnce(
+          sampleGroupMembershipResponse,
+        );
       const result = await controller.removeMemberFromGroup(1, 5, req);
-      expect(service.removeMembershipById).toHaveBeenCalledWith(
-        mockAdminUser,
-        1,
-        5,
-      );
+      expect(mockRemove).toHaveBeenCalledWith(mockAdminUser, 1, 5);
       expect(result).toEqual(createBaseResponse(sampleGroupMembershipResponse));
     });
   });
@@ -404,32 +396,28 @@ describe('GroupController', () => {
   describe('getGroupWithSubGroups', () => {
     it('should get group with default subGroup options', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getGroupById.mockResolvedValueOnce(sampleGroupResponse);
+      const mockGet =
+        mockGroupService.getGroupById.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getGroupWithSubGroups(
         req,
         1,
         undefined,
         undefined,
       );
-      expect(service.getGroupById).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-        false,
-        false,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser, false, false);
       expect(result).toEqual(createBaseResponse(sampleGroupResponse));
     });
 
     it('should get group with specified subGroup options', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getGroupById.mockResolvedValueOnce(sampleGroupResponse);
+      const mockGet =
+        mockGroupService.getGroupById.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getGroupWithSubGroups(req, 1, true, true);
-      expect(service.getGroupById).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-        true,
-        true,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser, true, true);
       expect(result).toEqual(createBaseResponse(sampleGroupResponse));
     });
   });
@@ -437,29 +425,23 @@ describe('GroupController', () => {
   describe('getParentGroupForChild', () => {
     it('should get parent group with default oneLevel', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getParentGroupByGroupId.mockResolvedValueOnce(
-        sampleGroupResponse,
-      );
+      const mockGet =
+        mockGroupService.getParentGroupByGroupId.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getParentGroupForChild(req, 1, undefined);
-      expect(service.getParentGroupByGroupId).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-        true,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser, true);
       expect(result).toEqual(createBaseResponse(sampleGroupResponse));
     });
 
     it('should get parent group with oneLevel false', async () => {
       const req = createMockRequest(mockRegularUser);
-      mockGroupService.getParentGroupByGroupId.mockResolvedValueOnce(
-        sampleGroupResponse,
-      );
+      const mockGet =
+        mockGroupService.getParentGroupByGroupId.mockResolvedValueOnce(
+          sampleGroupResponse,
+        );
       const result = await controller.getParentGroupForChild(req, 1, false);
-      expect(service.getParentGroupByGroupId).toHaveBeenCalledWith(
-        1,
-        mockRegularUser,
-        false,
-      );
+      expect(mockGet).toHaveBeenCalledWith(1, mockRegularUser, false);
       expect(result).toEqual(createBaseResponse(sampleGroupResponse));
     });
 
@@ -478,10 +460,11 @@ describe('GroupController', () => {
         sampleGroupMembershipResponse,
         { ...sampleGroupMembershipResponse, id: 2 },
       ];
-      mockGroupService.getMembers.mockResolvedValueOnce(membersList);
+      const mockGet =
+        mockGroupService.getMembers.mockResolvedValueOnce(membersList);
 
       const result = await controller.getMemebrs(req, 1);
-      expect(service.getMembers).toHaveBeenCalledWith(mockRegularUser, 1);
+      expect(mockGet).toHaveBeenCalledWith(mockRegularUser, 1);
       expect(result).toEqual(createBaseResponse(membersList));
     });
   });
@@ -489,15 +472,28 @@ describe('GroupController', () => {
   describe('getGroupByMember', () => {
     it('should get groups for a member', async () => {
       const req = createMockRequest(mockRegularUser);
-      const groupsList = [sampleGroupResponse];
-      mockGroupService.getGroupByMember.mockResolvedValueOnce(groupsList);
+      const groupsList = [
+        {
+          id: 1,
+          name: 'Test Group From Service',
+          description: 'A test group description from service',
+          privateGroup: true,
+          selfRegister: false,
+          createdBy: 1,
+          createdAt: fixedTime,
+          modifiedBy: 1,
+          modifiedAt: fixedTime,
+        },
+      ];
+      const mockGet =
+        mockGroupService.getGroupByMember.mockResolvedValueOnce(groupsList);
 
       const result = await controller.getGroupByMember(
         req,
         2,
         'membershipType' as string,
       );
-      expect(service.getGroupByMember).toHaveBeenCalledWith(
+      expect(mockGet).toHaveBeenCalledWith(
         mockRegularUser,
         2,
         'membershipType',

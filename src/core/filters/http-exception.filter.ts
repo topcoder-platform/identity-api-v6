@@ -39,7 +39,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           : {}),
       };
       this.logger.error(
-        `Unhandled exception: ${exception instanceof Error ? exception.message : exception}`,
+        `Unhandled exception: ${exception instanceof Error ? exception.message : JSON.stringify(exception)}`,
         exception instanceof Error ? exception.stack : undefined,
         `${request.method} ${request.url}`,
       );

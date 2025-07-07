@@ -24,8 +24,6 @@ model Client {
   modifiedBy  Int?
   modifiedAt  DateTime? @db.Timestamp(0)
 
-  clientUsers ClientUser[] // Relation field
-
   @@map("client") // Map model name to table name
 }
 
@@ -45,22 +43,6 @@ model Group {
   @@map("group") // Map model name to table name (needed because 'group' can be a reserved word)
 }
 
-model PermissionPolicy {
-  id          String   @id @map("id") @db.VarChar(100)
-  subjectId   String   @map("subjectId") @db.VarChar(100)
-  subjectType String   @map("subjectType") @db.VarChar(40)
-  resource    String   @db.VarChar(40)
-  createdBy   Int?
-  createdAt   DateTime? @db.Timestamp(0)
-  modifiedBy  Int?
-  modifiedAt  DateTime? @db.Timestamp(0)
-  policy      String   @db.Text // Using Text for mediumtext equivalent
-
-  @@unique([subjectId, subjectType, resource], map: "perm_policy_subject_resource_unique")
-  @@index([subjectId], map: "subject_key")
-  @@map("permission_policy")
-}
-
 model Role {
   id          Int      @id @default(autoincrement()) @map("id")
   name        String   @unique @db.VarChar(45)
@@ -72,24 +54,6 @@ model Role {
   roleAssignments RoleAssignment[] // Relation field
 
   @@map("role") // Map model name to table name
-}
-
-model ClientUser {
-  id         Int      @id @default(autoincrement()) @map("id")
-  clientId   Int      @map("client_id")
-  userId     Int      @map("user_id")
-  scope      String?  @db.VarChar(8192)
-  createdBy  Int?
-  createdAt  DateTime? @db.Timestamp(0)
-  modifiedBy Int?
-  modifiedAt DateTime? @db.Timestamp(0)
-
-  client Client @relation(fields: [clientId], references: [id], map: "client_id") // Relation field
-
-  @@unique([clientId, userId], map: "client_user_id")
-  @@index([clientId], map: "client_id_idx")
-  @@index([userId], map: "user_id_idx") // Assuming user_id might relate elsewhere, added index
-  @@map("client_user")
 }
 
 model GroupMembership {

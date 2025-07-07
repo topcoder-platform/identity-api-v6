@@ -17,8 +17,8 @@ describe('ZendeskAuthPlugin', () => {
     mockConfigService = {
       getZendesk: jest.fn().mockReturnValue({
         secret: 'test-secret',
-        idPrefix: 'dev'
-      })
+        idPrefix: 'dev',
+      }),
     };
 
     // Mock CommonUtils methods
@@ -28,7 +28,9 @@ describe('ZendeskAuthPlugin', () => {
       }
       return {};
     });
-    (CommonUtils.generateJwt as jest.Mock).mockReturnValue(mockJwt);
+    (CommonUtils.generateJwt as jest.Mock)
+      .mockReturnValue(mockJwt)
+      .bind(CommonUtils);
 
     // Mock uuid
     (uuidv4 as jest.Mock).mockReturnValue('mock-uuid');
@@ -58,7 +60,7 @@ describe('ZendeskAuthPlugin', () => {
 
       expect(result).toEqual({
         token: 'valid-token',
-        zendeskJwt: mockJwt
+        zendeskJwt: mockJwt,
       });
       expect(CommonUtils.generateJwt).toHaveBeenCalledWith(
         {
@@ -66,36 +68,36 @@ describe('ZendeskAuthPlugin', () => {
           name: 'testuser.dev',
           email: 'user@example.com.dev',
           jti: 'mock-uuid',
-          iat: Math.floor(Date.now() / 1000)
+          iat: Math.floor(Date.now() / 1000),
         },
         'test-secret',
-        { algorithm: 'HS256' }
+        { algorithm: 'HS256' },
       );
     });
 
     it('should use production format when idPrefix indicates production', async () => {
       mockConfigService.getZendesk.mockReturnValueOnce({
         secret: 'prod-secret',
-        idPrefix: 'prod'
+        idPrefix: 'prod',
       });
       const authResponse: AuthorizationResponse = { token: 'valid-token' };
 
       plugin = new ZendeskAuthPlugin(mockConfigService as ConfigurationService);
 
-      const result = await plugin.process(authResponse);
+      await plugin.process(authResponse);
 
       expect(CommonUtils.generateJwt).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'testuser',
-          email: 'user@example.com'
+          email: 'user@example.com',
         }),
         'prod-secret',
-        { algorithm: 'HS256' }
+        { algorithm: 'HS256' },
       );
     });
 
     it('should not modify original auth object properties', async () => {
-      const authResponse: AuthorizationResponse = { 
+      const authResponse: AuthorizationResponse = {
         token: 'valid-token',
         refreshToken: 'refresh-token',
       };

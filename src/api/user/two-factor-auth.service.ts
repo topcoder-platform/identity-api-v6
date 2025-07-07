@@ -5,15 +5,10 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import {
   PrismaClient as PrismaClientCommonOltp,
-  user as UserModel,
-  user_2fa as User2faModel,
   Prisma,
-  email as EmailModel,
-  dice_connection as DiceConnectionModel,
 } from '@prisma/client-common-oltp';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { ConfigService } from '@nestjs/config';
@@ -26,23 +21,13 @@ import * as DTOs from '../../dto/user/user.dto';
 import { SlackService } from '../../shared/slack/slack.service';
 import { AuthFlowService } from './auth-flow.service'; // For OTP completion
 import * as jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
 import { RoleService } from '../role/role.service';
-import { format } from 'date-fns';
 
 export const TFA_OTP_CACHE_PREFIX_KEY = 'USER_2FA_OTP';
 export const TFA_OTP_RESEND_TOKEN_CACHE_PREFIX_KEY = 'USER_2FA_RESEND_OTP';
 export const TFA_OTP_EXPIRY_SECONDS = 5 * 60; // 5 minutes
 export const TFA_RESEND_TOKEN_EXPIRY_SECONDS = 10 * 60; // 10 minutes
 export const TFA_OTP_MAX_ATTEMPTS = 5;
-
-// Interface for the expected decoded payload
-interface DecodedResendToken extends jwt.JwtPayload {
-  userId: string;
-  email: string;
-  type?: string;
-  aud?: string | string[]; // Explicitly add audience claim
-}
 
 @Injectable()
 export class TwoFactorAuthService {
@@ -201,9 +186,6 @@ export class TwoFactorAuthService {
     let user2fa = await this.prismaOltp.user_2fa.findUnique({
       where: { user_id: userId },
     });
-    const operatorId = parseInt(authUser.userId, 10);
-
-    const oldMfaStatus = user2fa?.mfa_enabled ?? false;
     const oldDiceStatus = user2fa?.dice_enabled ?? false;
     const userHandle =
       (
