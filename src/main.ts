@@ -7,11 +7,13 @@ import { ValidationExceptionFilter } from './core/filters/validation-exception.f
 import { RequestLoggerMiddleware } from './shared/middleware/request-logger.middleware'; // Import the logger middleware
 import { LoggingInterceptor } from './shared/interceptors/logging.interceptor'; // <-- Import the interceptor
 import { Request, Response, NextFunction } from 'express'; // Import express types
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  const logger = new Logger('Bootstrap');
 
   // Apply the request logger middleware FIRST (Correctly)
   const requestLogger = new RequestLoggerMiddleware();
@@ -43,11 +45,21 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter()); // Apply the validation filter
 
-  // TODO: Add Swagger setup if needed
+  const config = new DocumentBuilder()
+    .setTitle('TopCoder Identity Service')
+    .setDescription('validate username / password logins, lookup roles, etc')
+    .setVersion('v6')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document);
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
   logger.log(`Application listening on port ${port}`);
   logger.log(`API available at http://localhost:${port}/v3`);
 }
-bootstrap();
+
+bootstrap()
+  .then()
+  .catch((err) => logger.error(err));

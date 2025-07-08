@@ -10,18 +10,10 @@ This zip contains submission for challenge `Topcoder Identity Service: updating 
 Please use correct variables after copying `.env.example`
 
 ```
-AUTH_SECRET="test"
-AUTH0_CLIENT_SECRET="..."        # Client Secret of M2M App
-DICEAUTH_DICE_API_URL="https://console-api-uat.diceid.com/v1"
-DICEAUTH_DICE_API_KEY="..."
-DICEAUTH_ORG_ID="4f541723-f581-44de-b61c-5f83e8b8ef1e"
-DICEAUTH_USER_ID="a5e7e72a-fa5e-4acf-9eca-741d1443279b"
-DICEAUTH_TC_API_KEY="..."
-DICEAUTH_SCHEMA_NAME="Topcoder"
-DICEAUTH_SCHEMA_VERSION="1.4"
-DICEAUTH_OTP_DURATION="10"
-SLACK_BOT_KEY="..."
-SLACK_CHANNEL_ID="C04ENKCU4TZ"
+AUTH_SECRET=""
+AUTH0_CLIENT_SECRET=""        # Client Secret of M2M App
+SLACK_BOT_KEY=""
+SLACK_CHANNEL_ID=""
 JWT_SECRET="just-a-random-string"
 ```
 
@@ -35,7 +27,7 @@ LEGACY_BLOWFISH_KEY=!!!_REPLACE_WITH_BASE64_ENCODED_KEY_!!!
 Here is an example
 
 ```
-LEGACY_BLOWFISH_KEY=dGhpc2lzRGVmYXVmZlZhbHVl
+LEGACY_BLOWFISH_KEY=
 ```
 `.env.example has only sample values`.
 

@@ -14,7 +14,7 @@ const defaultUserId = '40141235'; // Admin role assigned to this user
 const defaultRoles = ['administrator', 'Topcoder User'];
 const defaultHandle = 'TonyJ';
 const defaultEmail = 'tjefths+fix@topcoder.com';
-const defaultScopes = ['read:dice', 'write:dice', 'read:users', 'write:users']; // Added default scopes
+const defaultScopes = ['read:users', 'write:users']; // Added default scopes
 const defaultExpiresIn = '8h'; // Default expiry
 
 // --- Get Args ---

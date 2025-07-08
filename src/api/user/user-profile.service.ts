@@ -90,7 +90,6 @@ export class UserProfileService {
   async createSSOUserLogin(
     userId: number,
     profileDto: UserProfileDto,
-    operatorId: string,
   ): Promise<UserProfileDto> {
     this.logger.log(
       `Creating SSO login for user ID: ${userId}, provider: ${profileDto.provider}, ssoUserId: ${profileDto.userId}`,
@@ -168,7 +167,6 @@ export class UserProfileService {
   async updateSSOUserLogin(
     userId: number,
     profileDto: UserProfileDto,
-    operatorId: string,
   ): Promise<UserProfileDto> {
     this.logger.log(
       `Updating SSO login for user ID: ${userId}, provider: ${profileDto.provider}, ssoUserId: ${profileDto.userId}`,
@@ -234,7 +232,6 @@ export class UserProfileService {
     userId: number,
     providerName: string,
     ssoUserIdForEvent: string,
-    operatorId: string,
   ): Promise<void> {
     // ssoUserIdForEvent is needed because if we delete by user_id and providerName only,
     // we might not know the exact sso_user_id if it wasn't passed in the request, but it is part of PK.
@@ -307,7 +304,6 @@ export class UserProfileService {
   async addExternalProfile(
     userId: number,
     profileDto: UserProfileDto,
-    operatorId: string,
   ): Promise<UserProfileDto> {
     this.logger.log(
       `Adding external social profile for user ID: ${userId}, provider: ${profileDto.provider}, providerUserId: ${profileDto.userId}`,

@@ -6,6 +6,8 @@ import { EventModule } from './shared/event/event.module';
 import { RoleModule } from './api/role/role.module';
 import { AuthModule } from './core/auth/auth.module';
 import { UserModule } from './api/user/user.module';
+import { GroupModule } from './api/group/group.module';
+import { AuthorizationModule } from './api/authorization/authorization.module';
 
 @Module({
   imports: [
@@ -16,7 +18,7 @@ import { UserModule } from './api/user/user.module';
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         store: redisStore,
         host: configService.get<string>('REDIS_HOST', '127.0.0.1'),
         port: configService.get<number>('REDIS_PORT', 6379),
@@ -34,6 +36,8 @@ import { UserModule } from './api/user/user.module';
     // UserModule,
     RoleModule,
     UserModule,
+    GroupModule,
+    AuthorizationModule,
   ],
   controllers: [], // No root controller
   providers: [], // No root service

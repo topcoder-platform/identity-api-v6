@@ -13,6 +13,7 @@ import {
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { MemberApiService } from '../../shared/member-api/member-api.service';
 import { MemberInfoResponseDto } from '../../dto/member/member.dto';
+import { Constants } from '../../core/constant/constants';
 
 interface InternalCreateRoleDto {
   roleName: string;
@@ -47,10 +48,7 @@ export class RoleService {
     return dto;
   }
 
-  async findAll(
-    subjectId?: number,
-    fields?: string,
-  ): Promise<RoleResponseDto[]> {
+  async findAll(subjectId?: number): Promise<RoleResponseDto[]> {
     this.logger.debug(`Finding all roles, subjectId: ${subjectId}`);
 
     const whereClause: any = subjectId
@@ -58,7 +56,7 @@ export class RoleService {
           roleAssignments: {
             some: {
               subjectId: subjectId,
-              subjectType: 1,
+              subjectType: Constants.memberSubjectType,
             },
           },
         }
@@ -83,7 +81,7 @@ export class RoleService {
       include: {
         roleAssignments: includeSubjects
           ? {
-              where: { subjectType: 1 },
+              where: { subjectType: Constants.memberSubjectType },
               select: { subjectId: true },
             }
           : false,
@@ -268,7 +266,7 @@ export class RoleService {
         data: {
           roleId: roleId,
           subjectId: subjectId,
-          subjectType: 1,
+          subjectType: Constants.memberSubjectType,
           createdBy: operatorId,
           modifiedBy: operatorId,
         },
@@ -300,7 +298,7 @@ export class RoleService {
       where: {
         roleId: roleId,
         subjectId: subjectId,
-        subjectType: 1,
+        subjectType: Constants.memberSubjectType,
       },
     });
 
@@ -321,7 +319,7 @@ export class RoleService {
         roleId_subjectId_subjectType: {
           roleId: roleId,
           subjectId: subjectId,
-          subjectType: 1,
+          subjectType: Constants.memberSubjectType,
         },
       },
       include: {

@@ -12,7 +12,9 @@ const commonOltpProvider: Provider = {
   useFactory: () => {
     const client = new PrismaClientCommonOltp();
     // Connect eagerly or handle connection errors if needed
-    // client.$connect().catch(e => console.error('Failed to connect to common_oltp DB', e));
+    client
+      .$connect()
+      .catch((e) => console.error('Failed to connect to common_oltp DB', e));
     return client;
   },
 };
@@ -22,7 +24,10 @@ const authorizationProvider: Provider = {
   useFactory: () => {
     const client = new PrismaClientAuthorization();
     // Connect eagerly or handle connection errors if needed
-    // client.$connect().catch(e => console.error('Failed to connect to authorization DB', e));
+    client
+      .$connect()
+      .catch((e) => console.error('Failed to connect to authorization DB', e));
+    console.log('Connected to authorization DB');
     return client;
   },
 };

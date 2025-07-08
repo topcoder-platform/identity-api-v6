@@ -4,7 +4,6 @@ import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { Cache } from 'cache-manager'; // Import Cache type
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { UserService } from './user.service';
 import { EventService } from '../../shared/event/event.service';
@@ -91,7 +90,7 @@ export class AuthFlowService {
       );
     }
 
-    let decodedJwtPayload: jwt.JwtPayload | string;
+    let decodedJwtPayload: jwt.JwtPayload;
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
@@ -180,7 +179,7 @@ export class AuthFlowService {
             data: { status_id: 1, modify_date: new Date() }, // Prisma handles number to Decimal for DTOs
           });
           this.logger.log(
-            `Primary email (ID: ${primaryEmailRecord.email_id}, Address: ${primaryEmailRecord.address}) status_id updated to verified for user ${userId}.`,
+            `Primary email (ID: ${primaryEmailRecord.email_id.toNumber()}, Address: ${primaryEmailRecord.address}) status_id updated to verified for user ${userId}.`,
           );
         } else {
           this.logger.warn(
@@ -266,7 +265,7 @@ export class AuthFlowService {
       throw new BadRequestException('User ID and resend token are required.');
     }
 
-    let decodedJwtPayload: jwt.JwtPayload | string;
+    let decodedJwtPayload: jwt.JwtPayload;
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
@@ -480,7 +479,7 @@ export class AuthFlowService {
     this.logger.log(
       `Generated one-time token (JTI: ${jti}) for user ${userId}`,
     );
-    return token;
+    return token as string;
   }
 
   async updateEmailWithOneTimeToken(
@@ -537,35 +536,21 @@ export class AuthFlowService {
       // Assuming EMAIL_REGEX is available or imported
       throw new BadRequestException('Invalid new email format.');
     }
-    // This validation should check if `newEmail` is used by *another* user as primary.
-    // The ValidationService.validateEmail might need adjustment or a new method for this specific check.
-    // For now, assuming validateEmail checks general conflicts.
-    try {
-      await this.userService.checkEmailAvailabilityForUser(newEmail, userId); // This method needs to be created in UserService
-    } catch (error) {
-      // Re-throw known exceptions, wrap others
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      } else {
-        this.logger.error(
-          `Unexpected error during email availability check: ${error.message}`,
-          error.stack,
-        );
-        throw new InternalServerErrorException(
-          'Error validating new email address.',
-        );
-      }
-    }
 
-    // 4. Prisma Transaction: Update email
+    // 4. Prisma Transaction: Update email - SIMPLIFIED TO JUST UPDATE THE EXISTING PRIMARY EMAIL
     await this.prismaOltp.$transaction(async (prisma) => {
       const newEmailLower = newEmail.toLowerCase();
 
-      // Step 1: Find the current primary email for the user
+      // Find the user first
+      const userInDB = await prisma.user.findUnique({
+        where: { user_id: userId },
+      });
+
+      if (!userInDB) {
+        throw new NotFoundException(`User ${userId} not found.`);
+      }
+
+      // Find the current primary email for the user
       const currentPrimaryEmail = await prisma.email.findFirst({
         where: {
           user_id: userId,
@@ -573,72 +558,59 @@ export class AuthFlowService {
         },
       });
 
-      // Step 2: If current primary email exists and is different from the new one,
-      // mark it as non-primary.
-      if (
-        currentPrimaryEmail &&
-        currentPrimaryEmail.address !== newEmailLower
-      ) {
-        await prisma.email.update({
-          where: { email_id: currentPrimaryEmail.email_id },
-          data: {
-            primary_ind: 0, // Mark as non-primary
-            modify_date: new Date(),
-          },
-        });
-        this.logger.log(
-          `Marked old primary email ${currentPrimaryEmail.address} (ID: ${currentPrimaryEmail.email_id}) as non-primary for user ${userId}.`,
+      if (!currentPrimaryEmail) {
+        throw new NotFoundException(
+          `No primary email found for user ${userId}.`,
         );
       }
 
-      // Step 3: Find or create the record for the new email address
-      let newEmailEntity = await prisma.email.findFirst({
-        where: { address: newEmailLower },
+      const oldEmail = currentPrimaryEmail.address;
+
+      // If the new email is the same as current, no need to update
+      if (oldEmail === newEmailLower) {
+        this.logger.log(
+          `Email ${newEmail} is already the primary email for user ${userId}. No changes needed.`,
+        );
+        return;
+      }
+
+      // Check if new email is already taken by another user as primary
+      const existingEmailRecord = await prisma.email.findFirst({
+        where: {
+          address: newEmailLower,
+          user_id: { not: userId },
+          primary_ind: 1,
+        },
       });
 
-      if (newEmailEntity) {
-        // Email address exists, update it to be the primary for this user
-        await prisma.email.update({
-          where: { email_id: newEmailEntity.email_id },
-          data: {
-            user_id: userId, // Associate/Re-associate with this user
-            primary_ind: 1, // Mark as primary
-            status_id: 1, // Mark as verified
-            modify_date: new Date(),
-          },
-        });
-        this.logger.log(
-          `Updated existing email ${newEmailLower} (ID: ${newEmailEntity.email_id}) to be primary and verified for user ${userId}.`,
-        );
-      } else {
-        // Email address does not exist, create a new one for this user as primary and verified
-
-        // Get nextval for email_id from sequence
-        const emailIdRecord = await prisma.$queryRaw<
-          [{ nextval: bigint }]
-        >`SELECT nextval('sequence_email_seq'::regclass)`;
-        const nextEmailId = emailIdRecord[0].nextval;
-        if (!nextEmailId) {
-          throw new InternalServerErrorException(
-            'Could not retrieve next email_id from sequence.',
-          );
-        }
-
-        newEmailEntity = await prisma.email.create({
-          data: {
-            email_id: new Decimal(nextEmailId.toString()), // Ensure correct type
-            address: newEmailLower,
-            user_id: userId,
-            primary_ind: 1,
-            status_id: 1, // Verified
-            create_date: new Date(),
-            modify_date: new Date(),
-          },
-        });
-        this.logger.log(
-          `Created new email ${newEmailLower} (ID: ${newEmailEntity.email_id}) as primary and verified for user ${userId}.`,
+      if (existingEmailRecord) {
+        throw new BadRequestException(
+          'Email address is already in use by another user.',
         );
       }
+
+      // Simply UPDATE the existing primary email record with the new email address
+      await prisma.email.update({
+        where: { email_id: currentPrimaryEmail.email_id },
+        data: {
+          address: newEmailLower,
+          status_id: new Decimal(1), // Set to verified status since token was validated
+          modify_date: new Date(),
+        },
+      });
+
+      this.logger.log(
+        `Updated existing primary email record ${currentPrimaryEmail.email_id.toNumber()} from ${oldEmail} to ${newEmailLower} for user ${userId} (verified via token)`,
+      );
+
+      // Update the user record
+      await prisma.user.update({
+        where: { user_id: userId },
+        data: {
+          modify_date: new Date(),
+        },
+      });
+
       this.logger.log(
         `Primary email updated to ${newEmail} for user ${userId}.`,
       );
@@ -665,36 +637,6 @@ export class AuthFlowService {
         `Failed to publish user.updated event for email change, user ${userId}: ${eventError.message}`,
       );
     }
-  }
-
-  // --- Helper methods ---
-  private async generateAndCacheToken(
-    purpose: string,
-    userId: number,
-    expirySeconds: number,
-  ): Promise<string> {
-    const token = require('crypto').randomBytes(32).toString('hex');
-    const key = `identity:${purpose}:${token}`;
-    await this.cacheManager.set(key, userId.toString(), expirySeconds * 1000);
-    this.logger.log(`Generated ${purpose} token for user ${userId}`);
-    return token;
-  }
-
-  private async validateAndConsumeToken(
-    purpose: string,
-    token: string,
-  ): Promise<number | null> {
-    const key = `identity:${purpose}:${token}`;
-    const userIdString = await this.cacheManager.get<string>(key);
-    if (!userIdString) {
-      this.logger.warn(`${purpose} token not found or expired: ${token}`);
-      return null;
-    }
-    await this.cacheManager.del(key);
-    this.logger.log(
-      `Validated and consumed ${purpose} token for user ${userIdString}`,
-    );
-    return parseInt(userIdString, 10);
   }
 
   private generateAlphanumericToken(length: number): string {
@@ -744,19 +686,19 @@ export class AuthFlowService {
     // Assuming user model from userService.findUserByEmailOrHandle includes sso_logins
     if (user.user_sso_login && user.user_sso_login.length > 0) {
       this.logger.warn(
-        `User ${user.user_id} is an SSO user. Password reset via this flow is not allowed.`,
+        `User ${user.user_id.toNumber()} is an SSO user. Password reset via this flow is not allowed.`,
       );
       throw new ForbiddenException(
         'Password reset is not allowed for SSO-linked accounts.',
       );
     }
 
-    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id}`;
+    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id.toNumber()}`;
     const existingCachedToken =
       await this.cacheManager.get<string>(resetTokenCacheKey);
     if (existingCachedToken) {
       this.logger.warn(
-        `Password reset token already issued for user ${user.user_id}.`,
+        `Password reset token already issued for user ${user.user_id.toNumber()}.`,
       );
       // Java logic threw an error here. Adhering to that.
       throw new ConflictException(
@@ -774,7 +716,7 @@ export class AuthFlowService {
       expirySeconds * 1000,
     );
     this.logger.log(
-      `Password reset token ${resetToken} generated and cached for user ${user.user_id}`,
+      `Password reset token ${resetToken} generated and cached for user ${user.user_id.toNumber()}`,
     );
 
     const finalResetUrlPrefix =
@@ -786,7 +728,7 @@ export class AuthFlowService {
     const primaryEmailAddress = user.primaryEmail?.address;
     if (!primaryEmailAddress) {
       this.logger.error(
-        `Password reset initiated for user ${user.user_id} (${user.handle}), but no primary email address is associated. Cannot send email.`,
+        `Password reset initiated for user ${user.user_id.toNumber()} (${user.handle}), but no primary email address is associated. Cannot send email.`,
       );
       // Do not throw an error to prevent user enumeration, but log that email cannot be sent.
       return;
@@ -836,11 +778,11 @@ export class AuthFlowService {
         eventAttributes,
       );
       this.logger.log(
-        `Password reset notification ('userpasswordreset') published for user ${user.user_id}`,
+        `Password reset notification ('userpasswordreset') published for user ${user.user_id.toNumber()}`,
       );
     } catch (eventError) {
       this.logger.error(
-        `Failed to publish password reset event (to event.notification.send) for user ${user.user_id}: ${eventError.message}`,
+        `Failed to publish password reset event (to event.notification.send) for user ${user.user_id.toNumber()}: ${eventError.message}`,
         eventError.stack,
       );
       // Depending on business requirements, you might want to re-throw or handle this error differently.
@@ -848,91 +790,91 @@ export class AuthFlowService {
     }
   }
 
-  async resetPassword(resetDto: {
-    handleOrEmail?: string;
-    resetToken: string;
-    newPassword?: string;
-  }): Promise<void> {
-    const { handleOrEmail, resetToken, newPassword } = resetDto;
-    this.logger.log(`Attempting to reset password with token.`);
+  // async resetPassword(resetDto: {
+  //   handleOrEmail?: string;
+  //   resetToken: string;
+  //   newPassword?: string;
+  // }): Promise<void> {
+  //   const { handleOrEmail, resetToken, newPassword } = resetDto;
+  //   this.logger.log(`Attempting to reset password with token.`);
 
-    if (!resetToken || !newPassword) {
-      throw new BadRequestException(
-        'Reset token and new password are required.',
-      );
-    }
-    if (newPassword.length < 8) {
-      throw new BadRequestException(
-        'New password must be at least 8 characters long.',
-      );
-    }
+  //   if (!resetToken || !newPassword) {
+  //     throw new BadRequestException(
+  //       'Reset token and new password are required.',
+  //     );
+  //   }
+  //   if (newPassword.length < 8) {
+  //     throw new BadRequestException(
+  //       'New password must be at least 8 characters long.',
+  //     );
+  //   }
 
-    // Find user by handleOrEmail - needed to construct cache key as per Java logic
-    if (!handleOrEmail) {
-      // Java logic: if handle/email not provided in DTO, it implies it might have been part of an earlier step
-      // or the token itself is globally unique. For now, require handleOrEmail for key construction.
-      throw new BadRequestException(
-        'Handle or email is required to identify the user for password reset.',
-      );
-    }
+  //   // Find user by handleOrEmail - needed to construct cache key as per Java logic
+  //   if (!handleOrEmail) {
+  //     // Java logic: if handle/email not provided in DTO, it implies it might have been part of an earlier step
+  //     // or the token itself is globally unique. For now, require handleOrEmail for key construction.
+  //     throw new BadRequestException(
+  //       'Handle or email is required to identify the user for password reset.',
+  //     );
+  //   }
 
-    let user: Awaited<
-      ReturnType<typeof this.userService.findUserByEmailOrHandle>
-    >;
-    try {
-      user = await this.userService.findUserByEmailOrHandle(handleOrEmail);
-    } catch (error) {
-      throw new NotFoundException(`User '${handleOrEmail}' not found.`); // Or BadRequest if user identity is solely from token
-    }
-    if (!user)
-      throw new NotFoundException(`User '${handleOrEmail}' not found.`);
+  //   let user: Awaited<
+  //     ReturnType<typeof this.userService.findUserByEmailOrHandle>
+  //   >;
+  //   try {
+  //     user = await this.userService.findUserByEmailOrHandle(handleOrEmail);
+  //   } catch (error) {
+  //     throw new NotFoundException(`User '${handleOrEmail}' not found.`); // Or BadRequest if user identity is solely from token
+  //   }
+  //   if (!user)
+  //     throw new NotFoundException(`User '${handleOrEmail}' not found.`);
 
-    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id}`;
-    const cachedToken = await this.cacheManager.get<string>(resetTokenCacheKey);
+  //   const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id}`;
+  //   const cachedToken = await this.cacheManager.get<string>(resetTokenCacheKey);
 
-    if (!cachedToken) {
-      this.logger.warn(
-        `Password reset token not found in cache for user ${user.user_id}. Key: ${resetTokenCacheKey}`,
-      );
-      throw new GoneException(
-        'Password reset token has expired or is invalid.',
-      );
-    }
+  //   if (!cachedToken) {
+  //     this.logger.warn(
+  //       `Password reset token not found in cache for user ${user.user_id}. Key: ${resetTokenCacheKey}`,
+  //     );
+  //     throw new GoneException(
+  //       'Password reset token has expired or is invalid.',
+  //     );
+  //   }
 
-    if (cachedToken !== resetToken) {
-      this.logger.warn(
-        `Invalid password reset token provided for user ${user.user_id}.`,
-      );
-      throw new BadRequestException('Invalid password reset token.');
-    }
+  //   if (cachedToken !== resetToken) {
+  //     this.logger.warn(
+  //       `Invalid password reset token provided for user ${user.user_id}.`,
+  //     );
+  //     throw new BadRequestException('Invalid password reset token.');
+  //   }
 
-    await this.cacheManager.del(resetTokenCacheKey);
-    this.logger.log(
-      `Password reset token validated and consumed for user ${user.user_id}`,
-    );
+  //   await this.cacheManager.del(resetTokenCacheKey);
+  //   this.logger.log(
+  //     `Password reset token validated and consumed for user ${user.user_id}`,
+  //   );
 
-    // Encrypt the new password using the legacy Blowfish method from UserService
-    const legacyEncodedPassword =
-      this.userService.encodePasswordLegacy(newPassword);
-    this.logger.debug(
-      `Password reset: New password encoded using legacy method for user ${user.handle}.`,
-    );
+  //   // Encrypt the new password using the legacy Blowfish method from UserService
+  //   const legacyEncodedPassword =
+  //     this.userService.encodePasswordLegacy(newPassword);
+  //   this.logger.debug(
+  //     `Password reset: New password encoded using legacy method for user ${user.handle}.`,
+  //   );
 
-    // Update the password in the security_user table using the user's handle
-    await this.prismaOltp.security_user.update({
-      where: { user_id: user.handle }, // security_user.user_id is the user handle
-      data: { password: legacyEncodedPassword },
-    });
+  //   // Update the password in the security_user table using the user's handle
+  //   await this.prismaOltp.security_user.update({
+  //     where: { user_id: user.handle }, // security_user.user_id is the user handle
+  //     data: { password: legacyEncodedPassword },
+  //   });
 
-    // Also update the modify_date on the main user record
-    await this.prismaOltp.user.update({
-      where: { user_id: user.user_id.toNumber() },
-      data: { modify_date: new Date() }, // Only update modify_date here
-    });
+  //   // Also update the modify_date on the main user record
+  //   await this.prismaOltp.user.update({
+  //     where: { user_id: user.user_id.toNumber() },
+  //     data: { modify_date: new Date() }, // Only update modify_date here
+  //   });
 
-    this.logger.log(`Password successfully reset for user ${user.user_id}`);
-    // Optionally publish user.password.updated event
-  }
+  //   this.logger.log(`Password successfully reset for user ${user.user_id}`);
+  //   // Optionally publish user.password.updated event
+  // }
 
   /**
    * Authenticates a user with handle/email and password, mimicking legacy Java logic.

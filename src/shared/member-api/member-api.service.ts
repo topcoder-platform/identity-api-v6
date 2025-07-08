@@ -2,7 +2,6 @@ import {
   Injectable,
   Inject,
   Logger,
-  NotFoundException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -139,7 +138,6 @@ export class MemberApiService {
     const uniqueUserIds = [...new Set(userIds)]; // Ensure unique IDs
     const batchSize = 50; // Reduced batch size to avoid 413/414 errors
     const allMemberInfo: MemberInfoDto[] = [];
-    let failedBatch = false;
     const totalBatches = Math.ceil(uniqueUserIds.length / batchSize);
 
     this.logger.log(
@@ -189,7 +187,6 @@ export class MemberApiService {
         );
         allMemberInfo.push(...response.data);
       } catch (error) {
-        failedBatch = true;
         this.logger.error(
           `Failed to fetch user info batch ${currentBatchNum}/${totalBatches} from Member API: ${error.message}`,
           error.response?.data, // Log response data if available

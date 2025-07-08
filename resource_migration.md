@@ -1,4 +1,4 @@
-# Identity Service Migration Analysis: Authorization, Group, and User Resources
+<!-- # Identity Service Migration Analysis: Authorization, Group, and User Resources
 
 This document outlines the functionalities of the existing Java `AuthorizationResource`, `GroupResource`, and `UserResource` and proposes a corresponding structure using TypeScript, Express (implied framework), and Prisma for the migration. The goal is to replicate the existing functionality while adhering to a controller-service pattern.
 
@@ -11,8 +11,7 @@ This migration relies on several external systems and core libraries. The necess
 *   **Event Bus:** The messaging backbone abstraction used for publishing asynchronous events (e.g., user creation, triggers for email notifications). Requires connection details/endpoint for the Event Bus API client and configured topic names (e.g., `EVENT_ORIGINATOR`). The `EventService` wrapping the `EventBusServiceClient` is set up to handle publishing. *Note: Email sending itself is triggered by publishing events (e.g., to `external.action.email`) which are consumed by a separate downstream service.* (Status: **Available**)
 *   **Auth0:** The primary Identity Provider (IdP) handling user login/signup via OAuth2/OIDC, M2M token validation, and user profile management. Requires Auth0 Domain, Client ID, Client Secret, M2M Client ID/Secret, and Audience configuration. (Status: **Integration Needed**)
 *   **Zendesk (SSO JWT Generation):** Configuration is required (shared secret, ID prefix) to generate a specific JWT for Zendesk Single Sign-On. This service *generates* the JWT, but does not directly call Zendesk APIs. The client uses the generated JWT. (Status: **Configuration Required**)
-*   **DICE:** Appears to be an external **SaaS platform or dedicated internal service** for digital identity/verifiable credentials. Interaction involves direct, authenticated API calls *from* this service (to initiate invitations) and receiving webhook callbacks *from* DICE (for status updates). Requires DICE API URL, API Key, Org ID, invoking User ID, and potentially specific schema/credential definition details. (Status: **Integration Needed**)
-*   **Slack:** Communication platform used for sending internal system notifications, primarily related to the DICE integration status. Integration involves **direct API calls** to the Slack `chat.postMessage` endpoint using a Bot Token. Requires a Slack Bot Token and Channel ID. (Status: **Integration Needed**)
+*   **Slack:** Communication platform used for sending internal system notifications, primarily related to the 2FA integration status. Integration involves **direct API calls** to the Slack `chat.postMessage` endpoint using a Bot Token. Requires a Slack Bot Token and Channel ID. (Status: **Integration Needed**)
 *   **`jsonwebtoken`:** A library needed for *generating* various JWTs (internal session tokens, reset tokens, activation resend tokens, one-time tokens). Must be added as a dependency. (Status: **Library Needed**)
 *   **`bcrypt`:** A library needed for securely hashing user passwords and comparing hashes during authentication. Must be added as a dependency. (Status: **Library Needed**)
 
@@ -505,8 +504,7 @@ This is a large resource covering user lifecycle, authentication aspects, profil
 *   Event publishing via Event Bus (`user.created`, `user.updated`, `user.activated`, email notifications).
 *   Email sending orchestration via events (using SendGrid templates).
 *   Auth0 integration (fetching IdP tokens).
-*   DICE integration (invitation flow, status webhooks).
-*   Slack notifications for DICE events.
+*   Slack notifications for 2FA events.
 *   M2M scope-based authorization (`UserProfilesFactory`).
 
 **Proposed TypeScript Structure:**
@@ -534,9 +532,8 @@ Given the complexity, splitting `UserService` is recommended.
     *   Interacts with `NotificationService` (for emails).
     *   Generates/validates various tokens (reset, resend, OTP, one-time).
 *   **Service:** `TwoFactorAuthService` (`src/services/twoFactorAuth.service.ts`)
-    *   Manages 2FA settings (`/2fa`), DICE connection (`/diceConnection`, `/dice-status`), OTP handling (`/sendOtp`, `/resendOtpEmail`, `/checkOtp`).
-    *   Interacts with Prisma Client (`User2fa`, `DiceConnection`, `UserOtp` tables).
-    *   Interacts with `DICEService`.
+    *   Manages 2FA settings (`/2fa`), OTP handling (`/sendOtp`, `/resendOtpEmail`, `/checkOtp`).
+    *   Interacts with Prisma Client (`User2fa`, `UserOtp` tables).
     *   Interacts with `NotificationService` (for OTP emails, Slack).
 *   **Service:** `RoleService` (`src/services/role.service.ts`) - *May already exist from RoleResource migration*
     *   Handles role lookup (`/roles`) and assignment (`/updatePrimaryRole`, default role assignment).
@@ -550,8 +547,6 @@ Given the complexity, splitting `UserService` is recommended.
     *   Sends Slack notifications.
 *   **Service:** `CacheService` (`src/services/cache.service.ts`) - *Likely shared*
     *   Wrapper around Redis client for get/put/delete operations with expiry.
-*   **Service:** `DICEService` (`src/services/dice.service.ts`)
-    *   Wrapper around DICE SDK/API client.
 *   **Service:** `Auth0Service` (`src/services/auth0.service.ts`) - *Likely shared with AuthService*
     *   Wrapper around Auth0 SDK/API client.
 
@@ -562,11 +557,10 @@ Given the complexity, splitting `UserService` is recommended.
 *   Event Bus client library (e.g., `kafkajs`)
 *   `jsonwebtoken` library
 *   Auth0 Node.js SDK
-*   DICE SDK/client library (if available, otherwise HTTP client)
 *   SendGrid client library
 *   Slack client library
 *   Auth module/middleware
-*   Configuration for DB, Redis, Event Bus, Auth0, DICE, SendGrid, Slack, JWT secrets.
+*   Configuration for DB, Redis, Event Bus, Auth0, SendGrid, Slack, JWT secrets.
 
 ## 4. General Considerations
 
@@ -579,7 +573,7 @@ Given the complexity, splitting `UserService` is recommended.
 
 This structure provides a modular approach to migrating the complex functionalities of these resources into a maintainable TypeScript codebase.
 
-*   **2FA/DICE:**
+*   **2FA:**
     *   `GET /{resourceId}/2fa`: Get 2FA status (`UserDAO`). Requires self or Admin.
         *   **Dependencies:** Prisma(common_oltp). (Requires auth middleware). (Status: Available)
         *   **Implementation Details:**
@@ -609,52 +603,6 @@ This structure provides a modular approach to migrating the complex functionalit
                 6.  Return success.
             *   `Validations`: Permission check (self or Admin).
             *   `External Calls`: None.
-            *   `Cache`: None.
-            *   `Cookies`: None.
-    *   `GET /{resourceId}/diceConnection`: Get/initiate DICE connection (`UserDAO`, `DICEAuth`, Slack). Requires self. **Makes direct API call to DICE** via `sendDiceInvitation` under certain conditions.
-        *   **Dependencies:** Prisma(common_oltp), DICE (API Call), Slack. (Requires auth middleware). (Status: Prisma Available; DICE, Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `UserService`, `NotificationService`.
-            *   `Prisma Models`: `common_oltp.user` (Read, Update), `common_oltp.credential` (Read).
-            *   `Core Logic`:
-                1.  Extract `resourceId` from path.
-                2.  Check permissions: Requires self (`AuthUser.userId == resourceId`).
-                3.  Find user by `resourceId`. If not found, throw 404.
-                4.  Find user's credential record to get `verified` status (related to DICE).
-                5.  If `credential.verified == true`, return existing DICE connection details (e.g., { verified: true }).
-                6.  If not verified, call `DiceIntegrationService.sendDiceInvitation(user)`:
-                    *   Construct DICE API payload (org ID, user ID, schema ID, etc. from config/user).
-                    *   Make POST request to DICE API endpoint (`diceApiUrl/invitation`) with payload and Auth header (API Key). (DICE API Call).
-                    *   Handle response from DICE.
-                    *   If successful, call `NotificationService.sendSlackNotification` with invitation details. (Slack API Call).
-                    *   Update `user` or `credential` record with DICE connection status (e.g., 'pending').
-                7.  Return current DICE connection status (e.g., { verified: false, status: 'pending' }).
-            *   `Validations`: Permission check (self).
-            *   `External Calls`: DICE API (`/invitation`), Slack API (`chat.postMessage`).
-            *   `Cache`: None.
-            *   `Cookies`: None.
-    *   `POST /dice-invitation`: Internal helper endpoint, not a direct HTTP endpoint. **Makes direct API call to DICE.** Called by `GET /{resourceId}/diceConnection`.
-        *   **Dependencies:** DICE (API Call), Slack. (Status: DICE, Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `NotificationService`.
-            *   `Core Logic`: (See step 6 within `GET /{resourceId}/diceConnection` logic).
-    *   `POST /dice-status`: DICE webhook callback endpoint. **Receives calls from DICE.** Updates local DB and notifies Slack.
-        *   **Dependencies:** Prisma(common_oltp), Slack. (Requires DICE API Key validation). (Status: Prisma Available; Slack Integration Needed)
-        *   **Implementation Details:**
-            *   `Service(s)`: `DiceIntegrationService`, `UserService`, `NotificationService`.
-            *   `Prisma Models`: `common_oltp.user` (Read), `common_oltp.credential` (Read, Update).
-            *   `Core Logic`:
-                1.  Receive webhook payload from DICE (contains status, user identifier).
-                2.  Validate the incoming request (e.g., check a signature or API key provided by DICE if applicable). *Requires understanding DICE webhook security.*
-                3.  Extract user identifier from payload.
-                4.  Find the corresponding user in `user` table.
-                5.  Find the user's credential record.
-                6.  Parse the status from the DICE payload (e.g., 'verified', 'rejected').
-                7.  Update the `credential.verified` status based on the payload.
-                8.  Call `NotificationService.sendSlackNotification` with the status update.
-                9.  Return success response (e.g., 200 OK) to DICE.
-            *   `Validations`: Incoming webhook validation (API Key/Signature).
-            *   `External Calls`: Slack API (`chat.postMessage`).
             *   `Cache`: None.
             *   `Cookies`: None.
     *   `POST /sendOtp`: Send 2FA OTP (`UserDAO`, Email event via Event Bus). Generates resend token.
@@ -751,4 +699,211 @@ This structure provides a modular approach to migrating the complex functionalit
             *   `Validations`: User existence, User status, Password verification.
             *   `External Calls`: None.
             *   `Cache`: Write one-time token to Redis.
-            *   `Cookies`: None.
+            *   `Cookies`: None. -->
+
+# Identity Service Migration Guide
+
+## Java to TypeScript/Express/Prisma
+
+This document outlines how to migrate the existing Java identity service to TypeScript using Express and Prisma.
+
+## Required Dependencies
+
+### Available (Already Set Up)
+
+- **Prisma**: Database access to `common_oltp` and `authorization` schemas
+- **Redis**: Caching for tokens, OTPs, sessions
+- **Event Bus**: For publishing events (user creation, email triggers)
+
+### Need Integration
+
+- **Auth0**: User authentication and management
+- **Slack**: System notifications
+
+### Need Libraries
+
+- `jsonwebtoken`: JWT token generation
+- `bcrypt`: Password hashing
+
+## User Management (`/users`)
+
+### Core User Operations
+
+#### List Users - `GET /users`
+
+- **Purpose**: Search and list users
+- **Auth**: Admin or `read` scope required
+- **Database**: Read from `user` table
+- **Logic**: Filter by handle/email/status, paginate results
+
+#### Get User Details - `GET /users/{id}`
+
+- **Purpose**: Get single user with profile data
+- **Auth**: Self access or Admin/`read` scope
+- **Database**: Read `user`, `email`, `social_user_profile`, roles
+- **Logic**: Combine user data with related profiles and permissions
+
+#### Create User - `POST /users`
+
+- **Purpose**: Register new user account
+- **Auth**: Public endpoint
+- **Database**: Create `user`, `credential`, `email` records
+- **Logic**:
+  1. Validate input (handle, email, password)
+  2. Check for duplicates
+  3. Hash password with bcrypt
+  4. Create user records
+  5. Generate activation OTP
+  6. Store OTP in Redis
+  7. Assign default role
+  8. Send activation email via Event Bus
+
+#### Update User - `PATCH /users/{id}`
+
+- **Purpose**: Update user information
+- **Auth**: Self or Admin/`update` scope
+- **Database**: Update `user` and `credential` tables
+- **Logic**:
+  1. Verify permissions
+  2. If changing password, verify current password
+  3. Hash new password if provided
+  4. Update user record
+  5. Publish update event
+
+### Authentication Flow
+
+#### Login - `POST /users/login`
+
+- **Purpose**: Authenticate user credentials
+- **Auth**: Public (used by Auth0)
+- **Database**: Read `user`, `credential`, `email`, roles
+- **Logic**:
+  1. Find user by handle or email
+  2. Verify password with bcrypt
+  3. Check user status is active
+  4. Return user details and roles
+
+#### Password Reset
+
+- **Request Reset** - `GET /users/resetToken`
+  - Generate reset token, store in Redis
+  - Send reset email via Event Bus
+- **Complete Reset** - `PUT /users/resetPassword`
+  - Validate reset token from Redis
+  - Hash new password and update
+
+#### Account Activation
+
+- **Activate** - `PUT /users/activate`
+  - Validate OTP from Redis
+  - Set user status to ACTIVE
+  - Mark email as verified
+  - Send welcome email
+- **Resend Activation** - `POST /users/resendActivationEmail`
+  - Decode JWT token
+  - Generate new OTP
+  - Send new activation email
+
+### Profile Management
+
+#### Handle Update - `PATCH /users/{id}/handle`
+
+- **Auth**: Admin/`update` scope
+- **Logic**: Check uniqueness, update handle
+
+#### Email Update - `PATCH /users/{id}/email`
+
+- **Auth**: Admin/`update` scope
+- **Logic**:
+  1. Validate new email
+  2. Create/update email record
+  3. Send verification OTP
+  4. Generate activation email
+
+#### Social Profiles
+
+- **Add** - `POST /users/{id}/profiles`
+- **Delete** - `DELETE /users/{id}/profiles/{provider}`
+- **Auth**: Admin scope required
+
+### Two-Factor Authentication
+
+#### 2FA Status
+
+- **Get** - `GET /users/{id}/2fa`
+- **Update** - `PATCH /users/{id}/2fa`
+- **Auth**: Self or Admin access
+
+#### OTP Flow
+
+- **Send OTP** - `POST /users/sendOtp`
+  - Generate 6-digit code
+  - Store in Redis with 5-minute expiry
+  - Send via email
+- **Resend OTP** - `POST /users/resendOtpEmail`
+  - Validate resend token
+  - Generate new OTP
+- **Check OTP** - `POST /users/checkOtp`
+  - Validate OTP from Redis
+  - Complete login process
+
+### Validation Endpoints
+
+#### Check Availability
+
+- **Handle** - `GET /users/validateHandle`
+- **Email** - `GET /users/validateEmail`
+- **Social Profile** - `GET /users/validateSocial`
+
+All return `{ valid: boolean, message?: string }`
+
+## Proposed TypeScript Structure
+
+### Controllers
+
+- `UserController` - Handle HTTP requests, validate input, format responses
+
+### Services
+
+- `UserService` - Core user CRUD operations
+- `AuthFlowService` - Login, password reset, activation flows
+- `UserProfileService` - Social profiles, SSO logins
+- `TwoFactorAuthService` - 2FA and OTP management
+- `ValidationService` - Handle/email/social validation
+- `NotificationService` - Event Bus publishing
+
+### Shared Services
+
+- `RoleService` - Role management (may exist from other migrations)
+- `CacheService` - Redis operations
+- `Auth0Service` - Auth0 API wrapper
+
+## Implementation Notes
+
+### Security
+
+- All passwords hashed with bcrypt
+- OTPs stored in Redis with expiration
+- JWT tokens for temporary operations
+- Scope-based authorization
+
+### Database
+
+- Use Prisma for all database operations
+- Two schemas: `common_oltp` and `authorization`
+- Maintain referential integrity
+
+### External Integrations
+
+- Event Bus for async operations (emails, notifications)
+- Redis for temporary data (OTPs, tokens, sessions)
+- Auth0 for identity management
+- Slack for system notifications
+
+### Error Handling
+
+- Return appropriate HTTP status codes
+- Don't leak user existence in validation responses
+- Log security events appropriately
+
+This structure provides a clean separation of concerns while maintaining all existing functionality.

@@ -135,7 +135,7 @@ Follow these steps to set up and run the application locally:
 
     Use below command to generate a user token
     ```bash
-    node scripts/generate-local-token.js "100000157" "Topcoder User" "user100000147handle" "user100000147@example.com" "read:dice,write:dice" "1h"
+    node scripts/generate-local-token.js "100000157" "Topcoder User" "user100000147handle" "user100000147@example.com" "" "1h"
     ```
 
 ### Prisma Setup
@@ -224,15 +224,6 @@ The following table summarizes the environment variables used by the application
 | `JWT_ISSUER_URL`           | Expected issuer URL in JWTs                                                 | `https://api.topcoder-dev.com` |
 | `JWT_AUDIENCE`             | Expected audience in JWTs                                                   | `www.example.com`             |
 | `JWT_JWKS_URI`             | JWKS endpoint URI for RS256 validation (prod/staging only)                  | *(commented out)*             |
-|                            | **DICE Authentication**                                                     |                               |
-| `DICEAUTH_DICE_API_URL`    | Base URL for the DICE API.                                                      | `https://console-api-uat.diceid.com/v1` (example) |
-| `DICEAUTH_DICE_API_KEY`    | API key for authenticating with the DICE API (used in `x-api-key` header).      | `wGu5zRfmgJ8zP...` (example)                |
-| `DICEAUTH_ORG_ID`          | Organization ID for DICE API calls (used in `org_id` header).                   | `4f541723-f581-44de-b61c-5f83e8b8ef1e` (example) |
-| `DICEAUTH_USER_ID`         | User ID for invoking DICE APIs (used in `invoked_by` header).                   | `a5e7e72a-fa5e-4acf-9eca-741d1443279b` (example) |
-| `DICEAUTH_TC_API_KEY`      | API key used by this application to validate incoming webhooks from DICE.       | `iQEErpTqL7ZiX...` (example)                |
-| `DICEAUTH_SCHEMA_NAME`     | Name of the credential schema used in DICE.                                     | `Topcoder` (example)                        |
-| `DICEAUTH_SCHEMA_VERSION`  | Version of the credential schema used in DICE.                                  | `1.4` (example)                             |
-| `DICEAUTH_OTP_DURATION`    | OTP validity duration in minutes (e.g., for 2FA flows). Defaults to 10 if `DEV_DICEAUTH_OTP_DURATION` is used by code and not set. | `10` (example, in minutes)                |
 |                            | **Slack Integration**                                                       |                               |
 | `SLACK_BOT_KEY`            | Bot token for Slack API authentication.                                         | `xoxb-3858018789-...` (example)             |
 | `SLACK_CHANNEL_ID`         | Default Slack channel ID for sending notifications.                             | `C04ENKCU4TZ` (example)                     |

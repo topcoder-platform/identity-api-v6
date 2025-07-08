@@ -15,7 +15,7 @@ import {
 } from '../../dto/role/role.dto';
 
 // Mock RoleService
-const mockRoleService = {
+const mockRoleService: jest.Mocked<Partial<RoleService>> = {
   findAll: jest.fn(),
   findOne: jest.fn(),
   create: jest.fn(),
@@ -32,6 +32,7 @@ const mockAdminUser: AuthenticatedUser = {
   roles: ['Administrator'],
   scopes: [],
   isAdmin: true,
+  isMachine: false,
   payload: {},
   handle: 'admin',
   email: 'admin@test.com',
@@ -42,6 +43,7 @@ const mockRegularUser: AuthenticatedUser = {
   roles: ['User'],
   scopes: [],
   isAdmin: false,
+  isMachine: false,
   payload: {},
   handle: 'user123',
   email: 'user123@test.com',
@@ -49,7 +51,6 @@ const mockRegularUser: AuthenticatedUser = {
 
 describe('RoleController', () => {
   let controller: RoleController;
-  let service: RoleService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -68,7 +69,6 @@ describe('RoleController', () => {
       .compile();
 
     controller = module.get<RoleController>(RoleController);
-    service = module.get<RoleService>(RoleService);
   });
 
   it('should be defined', () => {
@@ -88,10 +88,10 @@ describe('RoleController', () => {
       const mockResult: RoleResponseDto[] = [
         { id: 1, roleName: 'Admin' } as RoleResponseDto,
       ];
-      mockRoleService.findAll.mockResolvedValue(mockResult);
+      const mockFind = mockRoleService.findAll.mockResolvedValue(mockResult);
 
       await controller.findAll({}, req);
-      expect(service.findAll).toHaveBeenCalledWith(undefined, undefined);
+      expect(mockFind).toHaveBeenCalledWith(undefined);
     });
 
     it('should allow admin to find roles by subjectId', async () => {
@@ -99,10 +99,10 @@ describe('RoleController', () => {
       const mockResult: RoleResponseDto[] = [
         { id: 1, roleName: 'Admin' } as RoleResponseDto,
       ];
-      mockRoleService.findAll.mockResolvedValue(mockResult);
+      const mockFind = mockRoleService.findAll.mockResolvedValue(mockResult);
 
       await controller.findAll({ filter: 'subjectId=456' }, req);
-      expect(service.findAll).toHaveBeenCalledWith(456, undefined);
+      expect(mockFind).toHaveBeenCalledWith(456);
     });
 
     it('should allow non-admin to find their own roles with filter', async () => {
@@ -110,16 +110,13 @@ describe('RoleController', () => {
       const mockResult: RoleResponseDto[] = [
         { id: 2, roleName: 'User' } as RoleResponseDto,
       ];
-      mockRoleService.findAll.mockResolvedValue(mockResult);
+      const mockFind = mockRoleService.findAll.mockResolvedValue(mockResult);
 
       await controller.findAll(
         { filter: `subjectId=${mockRegularUser.userId}` },
         req,
       );
-      expect(service.findAll).toHaveBeenCalledWith(
-        Number(mockRegularUser.userId),
-        undefined,
-      );
+      expect(mockFind).toHaveBeenCalledWith(Number(mockRegularUser.userId));
     });
 
     it('should forbid non-admin from finding all roles (no filter)', async () => {
@@ -157,11 +154,11 @@ describe('RoleController', () => {
     it('should find a role by ID', async () => {
       const roleId = 1;
       const mockResult = { id: roleId, roleName: 'Admin' } as RoleResponseDto;
-      mockRoleService.findOne.mockResolvedValue(mockResult);
+      const mockFind = mockRoleService.findOne.mockResolvedValue(mockResult);
 
       const result = await controller.findOne(roleId);
       expect(result).toEqual(mockResult);
-      expect(service.findOne).toHaveBeenCalledWith(roleId, undefined);
+      expect(mockFind).toHaveBeenCalledWith(roleId, undefined);
     });
 
     it('should throw NotFoundException if role not found', async () => {
@@ -174,12 +171,12 @@ describe('RoleController', () => {
 
     it('should pass fields query to service', async () => {
       const roleId = 1;
-      mockRoleService.findOne.mockResolvedValue({
+      const mockFind = mockRoleService.findOne.mockResolvedValue({
         id: roleId,
         roleName: 'Admin',
       } as RoleResponseDto);
       await controller.findOne(roleId, 'subjects');
-      expect(service.findOne).toHaveBeenCalledWith(roleId, 'subjects');
+      expect(mockFind).toHaveBeenCalledWith(roleId, 'subjects');
     });
   });
 
@@ -188,11 +185,11 @@ describe('RoleController', () => {
       const req = createMockRequest(mockAdminUser);
       const body: CreateRoleBodyDto = { param: { roleName: 'NewRole' } };
       const mockResult = { id: 3, roleName: 'NewRole' } as RoleResponseDto;
-      mockRoleService.create.mockResolvedValue(mockResult);
+      const mockCreate = mockRoleService.create.mockResolvedValue(mockResult);
 
       const result = await controller.create(req, body);
       expect(result).toEqual(mockResult);
-      expect(service.create).toHaveBeenCalledWith(
+      expect(mockCreate).toHaveBeenCalledWith(
         { roleName: 'NewRole' },
         Number(mockAdminUser.userId),
       );
@@ -216,11 +213,11 @@ describe('RoleController', () => {
         id: roleId,
         roleName: 'UpdatedRole',
       } as RoleResponseDto;
-      mockRoleService.update.mockResolvedValue(mockResult);
+      const mockUpdate = mockRoleService.update.mockResolvedValue(mockResult);
 
       const result = await controller.update(req, roleId, body);
       expect(result).toEqual(mockResult);
-      expect(service.update).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
         roleId,
         { roleName: 'UpdatedRole' },
         Number(mockAdminUser.userId),
@@ -241,11 +238,11 @@ describe('RoleController', () => {
     it('should allow admin to delete a role', async () => {
       const req = createMockRequest(mockAdminUser);
       const roleId = 1;
-      mockRoleService.remove.mockResolvedValue(undefined);
+      const mockRemove = mockRoleService.remove.mockResolvedValue(undefined);
 
       const result = await controller.remove(req, roleId);
       expect(result).toBeUndefined();
-      expect(service.remove).toHaveBeenCalledWith(roleId);
+      expect(mockRemove).toHaveBeenCalledWith(roleId);
     });
 
     it('should forbid non-admin from deleting a role', async () => {
@@ -264,7 +261,8 @@ describe('RoleController', () => {
       const req = createMockRequest(mockAdminUser);
       const roleId = 1;
       const subjectId = 456;
-      mockRoleService.assignRoleToSubject.mockResolvedValue(undefined);
+      const mockFunc =
+        mockRoleService.assignRoleToSubject.mockResolvedValue(undefined);
 
       const result = await controller.assignRoleToSubject(
         req,
@@ -274,7 +272,7 @@ describe('RoleController', () => {
       expect(result).toEqual({
         message: `Role ${roleId} assigned to subject ${subjectId}.`,
       });
-      expect(service.assignRoleToSubject).toHaveBeenCalledWith(
+      expect(mockFunc).toHaveBeenCalledWith(
         roleId,
         subjectId,
         Number(mockAdminUser.userId),
@@ -307,7 +305,8 @@ describe('RoleController', () => {
       const req = createMockRequest(mockAdminUser);
       const roleId = 1;
       const subjectId = 456;
-      mockRoleService.deassignRoleFromSubject.mockResolvedValue(undefined);
+      const mockFunc =
+        mockRoleService.deassignRoleFromSubject.mockResolvedValue(undefined);
 
       const result = await controller.deassignRoleFromSubject(
         req,
@@ -317,10 +316,7 @@ describe('RoleController', () => {
       expect(result).toEqual({
         message: `Role ${roleId} unassigned from subject ${subjectId}.`,
       });
-      expect(service.deassignRoleFromSubject).toHaveBeenCalledWith(
-        roleId,
-        subjectId,
-      );
+      expect(mockFunc).toHaveBeenCalledWith(roleId, subjectId);
     });
 
     it('should forbid non-admin from deassigning a role', async () => {
@@ -350,7 +346,8 @@ describe('RoleController', () => {
       const roleId = 1;
       const subjectId = 456;
       const mockResult = { id: roleId, roleName: 'Admin' } as RoleResponseDto;
-      mockRoleService.checkSubjectHasRole.mockResolvedValue(mockResult);
+      const mockCheck =
+        mockRoleService.checkSubjectHasRole.mockResolvedValue(mockResult);
 
       const result = await controller.checkSubjectHasRole(
         req,
@@ -358,10 +355,7 @@ describe('RoleController', () => {
         `subjectId=${subjectId}`,
       );
       expect(result).toEqual(mockResult);
-      expect(service.checkSubjectHasRole).toHaveBeenCalledWith(
-        roleId,
-        subjectId,
-      );
+      expect(mockCheck).toHaveBeenCalledWith(roleId, subjectId);
     });
 
     it('should allow non-admin to check their own role', async () => {
@@ -369,7 +363,8 @@ describe('RoleController', () => {
       const roleId = 2;
       const subjectId = Number(mockRegularUser.userId);
       const mockResult = { id: roleId, roleName: 'User' } as RoleResponseDto;
-      mockRoleService.checkSubjectHasRole.mockResolvedValue(mockResult);
+      const mockCheck =
+        mockRoleService.checkSubjectHasRole.mockResolvedValue(mockResult);
 
       const result = await controller.checkSubjectHasRole(
         req,
@@ -377,10 +372,7 @@ describe('RoleController', () => {
         `subjectId=${subjectId}`,
       );
       expect(result).toEqual(mockResult);
-      expect(service.checkSubjectHasRole).toHaveBeenCalledWith(
-        roleId,
-        subjectId,
-      );
+      expect(mockCheck).toHaveBeenCalledWith(roleId, subjectId);
     });
 
     it('should forbid non-admin from checking another subject role', async () => {

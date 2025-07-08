@@ -1,0 +1,290 @@
+{
+	"info": {
+		"_postman_id": "2e9bf804-b86c-41c9-9129-28b1a2a05cb0",
+		"name": "authorizations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28573934"
+	},
+	"item": [
+		{
+			"name": "Login Redirect",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 302\", function () {\r",
+							"    pm.response.to.have.status(302);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get authorization with code - login_required",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 302\", function () {\r",
+							"    pm.response.to.have.status(302);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations?redirectUrl=https%3A%2F%2Fwww.topcoder.com&error=login_required&error_description=Login%20required&state=NkxDdTduQmN2RUF4",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations"
+					],
+					"query": [
+						{
+							"key": "redirectUrl",
+							"value": "https%3A%2F%2Fwww.topcoder.com"
+						},
+						{
+							"key": "error",
+							"value": "login_required"
+						},
+						{
+							"key": "error_description",
+							"value": "Login%20required"
+						},
+						{
+							"key": "state",
+							"value": "NkxDdTduQmN2RUF4"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create object with service account",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "clientId",
+							"value": "devadmin1",
+							"type": "text"
+						},
+						{
+							"key": "secret",
+							"value": "devadmin1",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Validate Client",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations/validateClient?clientId=8be46512-728f-4543-bf0d-1183d0e8ac4b&redirectUrl=http://127.0.0.1:3000/oauth",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations",
+						"validateClient"
+					],
+					"query": [
+						{
+							"key": "clientId",
+							"value": "8be46512-728f-4543-bf0d-1183d0e8ac4b"
+						},
+						{
+							"key": "redirectUrl",
+							"value": "http://127.0.0.1:3000/oauth"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Authorization",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXV3flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Authorization - with target id",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXV3flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/v3/authorizations/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"authorizations",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

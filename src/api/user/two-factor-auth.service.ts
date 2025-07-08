@@ -5,15 +5,10 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import {
   PrismaClient as PrismaClientCommonOltp,
-  user as UserModel,
-  user_2fa as User2faModel,
   Prisma,
-  email as EmailModel,
-  dice_connection as DiceConnectionModel,
 } from '@prisma/client-common-oltp';
 import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { ConfigService } from '@nestjs/config';
@@ -23,27 +18,16 @@ import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as DTOs from '../../dto/user/user.dto';
-import { DiceService } from '../../shared/dice/dice.service';
 import { SlackService } from '../../shared/slack/slack.service';
 import { AuthFlowService } from './auth-flow.service'; // For OTP completion
 import * as jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
 import { RoleService } from '../role/role.service';
-import { format } from 'date-fns';
 
 export const TFA_OTP_CACHE_PREFIX_KEY = 'USER_2FA_OTP';
 export const TFA_OTP_RESEND_TOKEN_CACHE_PREFIX_KEY = 'USER_2FA_RESEND_OTP';
 export const TFA_OTP_EXPIRY_SECONDS = 5 * 60; // 5 minutes
 export const TFA_RESEND_TOKEN_EXPIRY_SECONDS = 10 * 60; // 10 minutes
 export const TFA_OTP_MAX_ATTEMPTS = 5;
-
-// Interface for the expected decoded payload
-interface DecodedResendToken extends jwt.JwtPayload {
-  userId: string;
-  email: string;
-  type?: string;
-  aud?: string | string[]; // Explicitly add audience claim
-}
 
 @Injectable()
 export class TwoFactorAuthService {
@@ -59,7 +43,6 @@ export class TwoFactorAuthService {
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
     private readonly userService: UserService, // For user lookups
-    private readonly diceService: DiceService,
     private readonly slackService: SlackService,
     private readonly authFlowService: AuthFlowService, // Injected for login completion
     private readonly roleService: RoleService,
@@ -86,69 +69,69 @@ export class TwoFactorAuthService {
     return otp;
   }
 
-  private async generateResendToken(
-    userId: string,
-    email: string,
-  ): Promise<string> {
-    const payload = { userId, email, type: '2fa-resend' };
-    return jwt.sign(payload, this.resendTokenSecret, {
-      expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
-    });
-  }
+  // private async generateResendToken(
+  //   userId: string,
+  //   email: string,
+  // ): Promise<string> {
+  //   const payload = { userId, email, type: '2fa-resend' };
+  //   return jwt.sign(payload, this.resendTokenSecret, {
+  //     expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
+  //   });
+  // }
 
-  private async verifyResendToken(
-    token: string,
-  ): Promise<{ userId: string; email: string; aud?: string } | null> {
-    try {
-      const decoded = jwt.verify(
-        token,
-        this.resendTokenSecret,
-      ) as DecodedResendToken;
+  // private async verifyResendToken(
+  //   token: string,
+  // ): Promise<{ userId: string; email: string; aud?: string } | null> {
+  //   try {
+  //     const decoded = jwt.verify(
+  //       token,
+  //       this.resendTokenSecret,
+  //     ) as DecodedResendToken;
 
-      if (typeof decoded === 'string') {
-        this.logger.warn(
-          'JWT verification returned a string, expected an object.',
-        );
-        return null;
-      }
+  //     if (typeof decoded === 'string') {
+  //       this.logger.warn(
+  //         'JWT verification returned a string, expected an object.',
+  //       );
+  //       return null;
+  //     }
 
-      // Allow general resend tokens or specific '2fa-resend' type
-      if (decoded.type && decoded.type !== '2fa-resend') {
-        this.logger.warn(
-          `Invalid JWT type provided for 2FA resend: ${decoded.type}`,
-        );
-        return null;
-      }
-      // Add audience check if present
-      // decoded.aud can be string or string[]
-      const audience = Array.isArray(decoded.aud)
-        ? decoded.aud[0]
-        : decoded.aud;
+  //     // Allow general resend tokens or specific '2fa-resend' type
+  //     if (decoded.type && decoded.type !== '2fa-resend') {
+  //       this.logger.warn(
+  //         `Invalid JWT type provided for 2FA resend: ${decoded.type}`,
+  //       );
+  //       return null;
+  //     }
+  //     // Add audience check if present
+  //     // decoded.aud can be string or string[]
+  //     const audience = Array.isArray(decoded.aud)
+  //       ? decoded.aud[0]
+  //       : decoded.aud;
 
-      if (
-        audience &&
-        audience !== this.otp2faAudience &&
-        audience !== 'emailactivation' // also allow activation resend for now
-      ) {
-        this.logger.warn(`Invalid JWT audience for 2FA resend: ${audience}`);
-        return null;
-      }
+  //     if (
+  //       audience &&
+  //       audience !== this.otp2faAudience &&
+  //       audience !== 'emailactivation' // also allow activation resend for now
+  //     ) {
+  //       this.logger.warn(`Invalid JWT audience for 2FA resend: ${audience}`);
+  //       return null;
+  //     }
 
-      if (!decoded.userId || !decoded.email) {
-        this.logger.warn('JWT for 2FA resend missing userId or email.');
-        return null;
-      }
+  //     if (!decoded.userId || !decoded.email) {
+  //       this.logger.warn('JWT for 2FA resend missing userId or email.');
+  //       return null;
+  //     }
 
-      return {
-        userId: decoded.userId,
-        email: decoded.email,
-        aud: audience,
-      };
-    } catch (error) {
-      this.logger.error(`Error verifying 2FA resend token: ${error.message}`);
-      return null;
-    }
-  }
+  //     return {
+  //       userId: decoded.userId,
+  //       email: decoded.email,
+  //       aud: audience,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Error verifying 2FA resend token: ${error.message}`);
+  //     return null;
+  //   }
+  // }
 
   async getUser2faStatus(userIdString: string): Promise<DTOs.User2faDto> {
     this.logger.log(`Getting 2FA status for user: ${userIdString}`);
@@ -203,9 +186,6 @@ export class TwoFactorAuthService {
     let user2fa = await this.prismaOltp.user_2fa.findUnique({
       where: { user_id: userId },
     });
-    const operatorId = parseInt(authUser.userId, 10);
-
-    const oldMfaStatus = user2fa?.mfa_enabled ?? false;
     const oldDiceStatus = user2fa?.dice_enabled ?? false;
     const userHandle =
       (
@@ -339,336 +319,6 @@ export class TwoFactorAuthService {
     };
   }
 
-  async getDiceConnection(
-    userIdString: string,
-    authUser: AuthenticatedUser,
-  ): Promise<DTOs.DiceConnectionResponseDto> {
-    this.logger.log(
-      `Getting DICE connection for user: ${userIdString} (self-initiated by ${authUser.userId})`,
-    );
-    const userId = parseInt(userIdString, 10);
-    if (isNaN(userId) || userId.toString() !== authUser.userId) {
-      throw new ForbiddenException(
-        'Cannot access DICE connection for another user or invalid user ID.',
-      );
-    }
-
-    // Step 1: Fetch the user
-    const user = await this.prismaOltp.user.findUnique({
-      where: { user_id: userId },
-      select: {
-        // Select only direct user fields needed immediately
-        user_id: true,
-        handle: true,
-        first_name: true,
-        last_name: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found.`);
-    }
-
-    // Step 2: Fetch user_2fa status
-    const user2faStatus = await this.prismaOltp.user_2fa.findUnique({
-      where: { user_id: userId },
-      select: { mfa_enabled: true, dice_enabled: true },
-    });
-
-    if (!user2faStatus?.mfa_enabled) {
-      throw new BadRequestException(
-        'MFA must be enabled before initiating a DICE connection.',
-      );
-    }
-
-    // Step 3: Fetch the latest dice_connection
-    const latestDiceConnection =
-      await this.prismaOltp.dice_connection.findFirst({
-        where: { user_id: userId },
-        orderBy: { created_at: 'desc' },
-        select: {
-          id: true,
-          connection: true,
-          short_url: true,
-          accepted: true,
-          created_at: true,
-        },
-      });
-
-    // Step 4: Fetch primary email
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-      where: { user_id: userId, primary_ind: 1 },
-      select: { address: true },
-    });
-    const primaryEmail = primaryEmailRecord?.address;
-
-    // Use short_url for user-facing display
-    if (
-      latestDiceConnection &&
-      latestDiceConnection.short_url &&
-      !latestDiceConnection.accepted
-    ) {
-      this.logger.log(
-        `Existing non-accepted DICE connection found for user ${userId}. URL: ${latestDiceConnection.short_url}`,
-      );
-      return {
-        diceEnabled: user2faStatus?.dice_enabled ?? false,
-        connection: latestDiceConnection.short_url,
-        accepted: latestDiceConnection.accepted,
-      };
-    }
-
-    if (!primaryEmail) {
-      throw new InternalServerErrorException(
-        'Primary email not found for the user.',
-      );
-    }
-
-    const roleEntities = await this.roleService.findAll(userId);
-    const roles = roleEntities.map((r) => r.roleName);
-
-    const validTillDate = new Date();
-    validTillDate.setFullYear(validTillDate.getFullYear() + 1);
-    const formattedValidTill = format(validTillDate, 'dd-MMM-yyyy HH:mm:ss');
-
-    const invitationResponse = await this.diceService.sendDiceInvitation(
-      primaryEmail,
-      user.handle, // Use user.handle from fetched user object
-      `${user.first_name || ''} ${user.last_name || ''}`.trim(), // Use user fields
-      roles,
-      formattedValidTill,
-    );
-    this.logger.log(
-      `DICE Job created/invitation sent for user ${userId}: ${JSON.stringify(invitationResponse)}`,
-    );
-
-    await this.prismaOltp.dice_connection.upsert({
-      where: { user_id: userId },
-      create: {
-        user: { connect: { user_id: userId } },
-        connection: invitationResponse.jobId,
-        short_url: invitationResponse.shortUrl,
-        accepted: false,
-      },
-      update: {
-        connection: invitationResponse.jobId,
-        short_url: invitationResponse.shortUrl,
-        accepted: false,
-      },
-    });
-
-    this.slackService
-      .sendNotification('DICE connection process initiated.', user.handle)
-      .catch((e) =>
-        this.logger.error('Slack notification failed for DICE initiation', e),
-      );
-
-    return { diceEnabled: false /* status: 'invitation_sent' */ };
-  }
-
-  async handleDiceWebhook(
-    webhookPayload: DTOs.DiceStatusWebhookBodyDto,
-  ): Promise<{ message: string }> {
-    this.logger.log(`Received DICE webhook: ${JSON.stringify(webhookPayload)}`);
-    const { event, connectionId, emailId, shortUrl } = webhookPayload;
-    let userHandleForSlack = emailId || connectionId || 'Unknown';
-
-    try {
-      let diceConnectionRecord:
-        | (DiceConnectionModel & {
-            user?: { handle: string; user_id: Prisma.Decimal };
-          })
-        | null = null;
-
-      if (connectionId) {
-        diceConnectionRecord = await this.prismaOltp.dice_connection.findFirst({
-          where: { connection: connectionId },
-          include: { user: { select: { handle: true, user_id: true } } },
-        });
-      } else if (emailId) {
-        const userWithEmail = await this.prismaOltp.user.findFirst({
-          where: {
-            emails: {
-              some: {
-                address: emailId,
-                primary_ind: 1,
-              },
-            },
-          },
-          include: {
-            dice_connection: true,
-            user_2fa: true,
-          },
-        });
-
-        if (userWithEmail) {
-          userHandleForSlack = userWithEmail.handle;
-          if (userWithEmail.dice_connection) {
-            diceConnectionRecord = {
-              ...userWithEmail.dice_connection,
-              user: {
-                handle: userWithEmail.handle,
-                user_id: userWithEmail.user_id,
-              },
-            };
-          } else {
-            this.logger.warn(
-              `DICE Webhook: User ${emailId} found, but no DICE connection data associated. Event: ${event}`,
-            );
-          }
-        }
-      }
-
-      if (diceConnectionRecord && diceConnectionRecord.user?.handle) {
-        userHandleForSlack = diceConnectionRecord.user.handle;
-      }
-
-      this.logger.log(
-        `Processing DICE webhook event: ${event} for connection: ${connectionId}, email: ${emailId}`,
-      );
-
-      switch (event) {
-        case 'connection-invitation':
-          if (!connectionId || !shortUrl || !emailId) {
-            throw new BadRequestException(
-              'Missing connectionId, shortUrl or emailId for connection-invitation event',
-            );
-          }
-          let targetUserId: number;
-          if (diceConnectionRecord && diceConnectionRecord.user_id) {
-            targetUserId = diceConnectionRecord.user_id.toNumber();
-          } else {
-            const userToLink = await this.prismaOltp.user.findFirst({
-              where: {
-                emails: {
-                  some: {
-                    address: emailId,
-                    primary_ind: 1,
-                  },
-                },
-              },
-              select: { user_id: true, handle: true },
-            });
-            if (!userToLink)
-              throw new NotFoundException(
-                `User with email ${emailId} not found for DICE webhook.`,
-              );
-            targetUserId = userToLink.user_id.toNumber();
-            userHandleForSlack = userToLink.handle;
-          }
-
-          await this.prismaOltp.dice_connection.upsert({
-            where: { user_id: targetUserId },
-            create: {
-              user: { connect: { user_id: targetUserId } },
-              connection: connectionId,
-              short_url: shortUrl,
-              accepted: false,
-            },
-            update: {
-              connection: connectionId,
-              short_url: shortUrl,
-              accepted: false,
-            },
-          });
-          this.slackService
-            .sendNotification(
-              `DICE connection invitation created/updated. URL: ${shortUrl}`,
-              userHandleForSlack,
-            )
-            .catch((e) => this.logger.error('Slack notification failed', e));
-          break;
-        case 'connection-response':
-          if (!connectionId)
-            throw new BadRequestException(
-              'Missing connectionId for connection-response event',
-            );
-          if (!diceConnectionRecord)
-            throw new NotFoundException(
-              `DICE connection ${connectionId} not found for connection-response event.`,
-            );
-
-          await this.prismaOltp.dice_connection.updateMany({
-            where: { connection: connectionId },
-            data: { accepted: true },
-          });
-          this.slackService
-            .sendNotification(
-              'DICE connection accepted by user.',
-              userHandleForSlack,
-            )
-            .catch((e) => this.logger.error('Slack notification failed', e));
-          break;
-        case 'credential-issuance':
-          if (!connectionId)
-            throw new BadRequestException(
-              'Missing connectionId for credential-issuance event',
-            );
-          if (!diceConnectionRecord || !diceConnectionRecord.user_id)
-            throw new NotFoundException(
-              `DICE connection ${connectionId} or linked user not found for credential-issuance event.`,
-            );
-
-          await this.prismaOltp.user_2fa.update({
-            where: { user_id: diceConnectionRecord.user_id.toNumber() },
-            data: {
-              dice_enabled: true,
-              modified_by: diceConnectionRecord.user_id.toNumber(),
-              modified_at: new Date(),
-            },
-          });
-          this.logger.log(
-            `DICE credential-issuance processed for user ${userHandleForSlack}. DICE enabled.`,
-          );
-          this.slackService
-            .sendNotification(
-              'DICE credential issued and enabled for user! :smile_cat:',
-              userHandleForSlack,
-            )
-            .catch((e) => this.logger.error('Slack notification failed', e));
-          break;
-        case 'connection-declined':
-        case 'credential-declined':
-          if (!connectionId)
-            this.logger.warn(
-              `DICE Webhook: ${event} received without connectionId.`,
-            );
-          this.logger.log(
-            `DICE Webhook: ${event} received for connection ${connectionId}. User: ${userHandleForSlack}. No specific DB action taken beyond logging currently.`,
-          );
-          this.slackService
-            .sendNotification(
-              `DICE process event: ${event}`,
-              userHandleForSlack,
-            )
-            .catch((e) => this.logger.error('Slack notification failed', e));
-          break;
-        default:
-          this.logger.warn(`Received unhandled DICE webhook event: ${event}`);
-          this.slackService
-            .sendNotification(
-              `Received unhandled DICE event: ${event}`,
-              userHandleForSlack,
-            )
-            .catch((e) => this.logger.error('Slack notification failed', e));
-          break;
-      }
-    } catch (error) {
-      this.logger.error(
-        `Error processing DICE webhook: ${error.message}`,
-        error.stack,
-      );
-      this.slackService
-        .sendNotification(
-          'Error happened with DICE webhook, please check logs.',
-          userHandleForSlack,
-        )
-        .catch((e) => this.logger.error('Slack notification failed', e));
-      throw new InternalServerErrorException('Failed to process DICE webhook.');
-    }
-    return { message: 'DICE webhook processed successfully.' };
-  }
-
   async sendOtpFor2fa(userIdString: string): Promise<{ resendToken: string }> {
     this.logger.log(`Generating and sending 2FA OTP to user: ${userIdString}`);
     const userIdNum = parseInt(userIdString, 10);
@@ -714,16 +364,29 @@ export class TwoFactorAuthService {
       expiresIn: `${TFA_RESEND_TOKEN_EXPIRY_SECONDS}s`,
     });
 
+    const domain =
+      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const fromEmail = `Topcoder <noreply@${domain}>`;
+    // Use the specific template ID for resending activation emails
+    const sendgridTemplateId = this.configService.get<string>(
+      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
     try {
-      await this.eventService.postEnvelopedNotification('email.send.2fa_otp', {
-        userId: userIdString,
-        email: primaryEmail,
-        handle: user.handle,
-        otp: otp,
-        durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+      await this.eventService.postDirectBusMessage('external.action.email', {
+        data: {
+          userId: userIdString,
+          email: primaryEmail,
+          handle: user.handle,
+          code: otp,
+          durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+        },
+        from: { email: fromEmail },
+        version: 'v3',
+        sendgrid_template_id: sendgridTemplateId,
+        recipients: [primaryEmail], // The original email used for registration
       });
       this.logger.log(
-        `Published 'email.send.2fa_otp' event for user ${userIdString}`,
+        `Published 'external.action.email' event for user ${userIdString}`,
       );
     } catch (eventError) {
       this.logger.error(
@@ -797,17 +460,29 @@ export class TwoFactorAuthService {
     this.logger.log(
       `New 2FA OTP ${newOtp} generated and cached for user ${userIdString} (key: ${otpCacheKey}) during resend.`,
     );
-
+    const domain =
+      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const fromEmail = `Topcoder <noreply@${domain}>`;
+    // Use the specific template ID for resending activation emails
+    const sendgridTemplateId = this.configService.get<string>(
+      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
     try {
-      await this.eventService.postEnvelopedNotification('email.send.2fa_otp', {
-        userId: userIdString,
-        email: primaryEmail,
-        handle: user.handle,
-        otp: newOtp,
-        durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+      await this.eventService.postDirectBusMessage('external.action.email', {
+        data: {
+          userId: userIdString,
+          email: primaryEmail,
+          handle: user.handle,
+          code: newOtp,
+          durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
+        },
+        from: { email: fromEmail },
+        version: 'v3',
+        sendgrid_template_id: sendgridTemplateId,
+        recipients: [primaryEmail], // The original email used for registration
       });
       this.logger.log(
-        `Published 'email.send.2fa_otp' (resend) event for user ${userIdString}`,
+        `Published 'external.action.email' (resend) event for user ${userIdString}`,
       );
     } catch (eventError) {
       this.logger.error(
