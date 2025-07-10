@@ -269,7 +269,7 @@ async function main() {
     });
 
     // 4. Permission Policy - Note: mediumtext mapping needs verification in Prisma schema
-    await migrateTable(mysqlConn, 'permission_policy', 'permissionPolicy', {
+    /* await migrateTable(mysqlConn, 'permission_policy', 'permissionPolicy', {
       id: 'id',
       subjectId: 'subjectId',
       subjectType: 'subjectType',
@@ -279,7 +279,7 @@ async function main() {
       modifiedBy: 'modifiedBy',
       modifiedAt: 'modifiedAt',
       policy: 'policy', // Assuming 'policy' field is String in Prisma
-    });
+    }); */
 
     // 5. Role Assignment
     await migrateTable(mysqlConn, 'role_assignment', 'roleAssignment', {
@@ -306,7 +306,7 @@ async function main() {
     });
 
     // 7. Client User
-    await migrateTable(mysqlConn, 'client_user', 'clientUser', {
+    /* await migrateTable(mysqlConn, 'client_user', 'clientUser', {
       id: 'id',
       client_id: 'clientId', // Map snake_case -> camelCase
       user_id: 'userId', // Map snake_case -> camelCase
@@ -315,7 +315,7 @@ async function main() {
       createdAt: 'createdAt',
       modifiedBy: 'modifiedBy',
       modifiedAt: 'modifiedAt',
-    });
+    }); */
 
     // --- End Migrations ---
 
