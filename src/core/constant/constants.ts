@@ -29,4 +29,17 @@ export const Constants = {
   tcJwtCookieName: 'tcjwt',
   tcSsoCookieName: 'tcsso',
   tcV3JwtCookieName: 'v3jwt',
+
+  // default page size
+  defaultPageSize: 20,
+
+  // values used in email table
+  primaryEmailFlag: 1,
+  standardEmailType: 1,
+  verifiedEmailStatus: 1,
+  unverifiedEmailStatus: 2,
+
+  // prisma error code
+  prismaUniqueConflictcode: 'P2002',
+  prismaNotFoundCode: 'P2025',
 };

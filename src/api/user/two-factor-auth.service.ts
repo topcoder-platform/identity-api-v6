@@ -22,6 +22,7 @@ import { SlackService } from '../../shared/slack/slack.service';
 import { AuthFlowService } from './auth-flow.service'; // For OTP completion
 import * as jwt from 'jsonwebtoken';
 import { RoleService } from '../role/role.service';
+import { Constants } from '../../core/constant/constants';
 
 export const TFA_OTP_CACHE_PREFIX_KEY = 'USER_2FA_OTP';
 export const TFA_OTP_RESEND_TOKEN_CACHE_PREFIX_KEY = 'USER_2FA_RESEND_OTP';
@@ -337,7 +338,11 @@ export class TwoFactorAuthService {
 
     // Fetch primary email separately
     const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-      where: { user_id: userIdNum, primary_ind: 1, status_id: 1 }, // Assuming active email is needed
+      where: {
+        user_id: userIdNum,
+        primary_ind: Constants.primaryEmailFlag,
+        status_id: Constants.verifiedEmailStatus,
+      }, // Assuming active email is needed
       select: { address: true },
     });
 
@@ -439,7 +444,11 @@ export class TwoFactorAuthService {
 
     // Fetch primary email separately
     const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-      where: { user_id: userIdNum, primary_ind: 1, status_id: 1 }, // Assuming active email is needed
+      where: {
+        user_id: userIdNum,
+        primary_ind: Constants.primaryEmailFlag,
+        status_id: Constants.verifiedEmailStatus,
+      }, // Assuming active email is needed
       select: { address: true },
     });
 

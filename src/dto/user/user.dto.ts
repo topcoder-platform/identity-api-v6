@@ -19,6 +19,7 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
+import { Constants } from '../../core/constant/constants';
 
 // --- Base & Nested DTOs ---
 
@@ -474,7 +475,7 @@ export class UserSearchQueryDto {
     type: Number,
     description: 'Default 20',
   })
-  limit?: number;
+  limit?: number = Constants.defaultPageSize;
 
   @IsInt()
   @Min(0)
@@ -484,7 +485,7 @@ export class UserSearchQueryDto {
     type: Number,
     description: 'Default 0',
   })
-  offset?: number;
+  offset?: number = 0;
 
   // Add other potential search fields: status, role, etc.
 }

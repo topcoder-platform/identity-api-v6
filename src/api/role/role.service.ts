@@ -193,7 +193,10 @@ export class RoleService {
       } catch (error) {
         // The P2002 check for unique constraint violation on 'name'
         // becomes a fallback, as the explicit check above should catch it.
-        if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
+        if (
+          error.code === Constants.prismaUniqueConflictcode &&
+          error.meta?.target?.includes('name')
+        ) {
           throw new ConflictException(
             `Role with name '${updateRoleDto.roleName}' already exists.`,
           );
@@ -224,7 +227,10 @@ export class RoleService {
         where: { id: roleId },
       });
     } catch (error) {
-      if (error.code === 'P2003' || error.code === 'P2025') {
+      if (
+        error.code === 'P2003' ||
+        error.code === Constants.prismaNotFoundCode
+      ) {
         const assignments = await this.prismaAuth.roleAssignment.count({
           where: { roleId },
         });
@@ -272,7 +278,7 @@ export class RoleService {
         },
       });
     } catch (error) {
-      if (error.code === 'P2002') {
+      if (error.code === Constants.prismaUniqueConflictcode) {
         this.logger.warn(
           `Attempt to assign role ${roleId} to subject ${subjectId} which already exists.`,
         );

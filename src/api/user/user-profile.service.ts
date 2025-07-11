@@ -19,6 +19,7 @@ import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
 import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfileDto is suitable
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
+import { Constants } from '../../core/constant/constants';
 // Import other needed services
 
 @Injectable()
@@ -134,7 +135,7 @@ export class UserProfileService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === Constants.prismaUniqueConflictcode
       ) {
         // This error code means unique constraint failed - user_id_provider_id_sso_user_id PK likely
         this.logger.warn(
@@ -151,7 +152,7 @@ export class UserProfileService {
       // Re-check if it was a P2002 that somehow wasn't caught above, though unlikely
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === Constants.prismaUniqueConflictcode
       ) {
         this.logger.error(
           "Caught P2002 in final catch block - this shouldn't happen if first catch works. Rethrowing as Conflict.",
@@ -210,7 +211,7 @@ export class UserProfileService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
+        error.code === Constants.prismaNotFoundCode
       ) {
         // Record to update not found
         this.logger.warn(
@@ -285,7 +286,7 @@ export class UserProfileService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
+        error.code === Constants.prismaNotFoundCode
       ) {
         // Record to delete not found
         this.logger.warn(
@@ -377,7 +378,7 @@ export class UserProfileService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === Constants.prismaUniqueConflictcode
       ) {
         // Unique constraint failed (likely on social_login_provider_id, social_user_id or user_id, social_login_provider_id)
         this.logger.warn(

@@ -27,6 +27,7 @@ import { Prisma } from '@prisma/client-common-oltp';
 import { v4 as uuidv4 } from 'uuid';
 import { Decimal } from '@prisma/client/runtime/library'; // Import Decimal
 import * as CryptoJS from 'crypto-js'; // Import crypto-js for Blowfish
+import { Constants } from '../../core/constant/constants';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
@@ -166,7 +167,7 @@ export class AuthFlowService {
 
         // Find the primary email record for this user directly from the email table
         const primaryEmailRecord = await prisma.email.findFirst({
-          where: { user_id: userId, primary_ind: 1 },
+          where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
         });
 
         if (primaryEmailRecord) {
@@ -294,8 +295,8 @@ export class AuthFlowService {
     const primaryEmailRecord = await this.prismaOltp.email.findFirst({
       where: {
         user_id: userId,
-        primary_ind: 1,
-        status_id: 2, // Look for an UNVERIFIED primary email
+        primary_ind: Constants.primaryEmailFlag,
+        status_id: Constants.unverifiedEmailStatus, // Look for an UNVERIFIED primary email
       },
     });
 
@@ -554,7 +555,7 @@ export class AuthFlowService {
       const currentPrimaryEmail = await prisma.email.findFirst({
         where: {
           user_id: userId,
-          primary_ind: 1,
+          primary_ind: Constants.primaryEmailFlag,
         },
       });
 
@@ -579,7 +580,7 @@ export class AuthFlowService {
         where: {
           address: newEmailLower,
           user_id: { not: userId },
-          primary_ind: 1,
+          primary_ind: Constants.primaryEmailFlag,
         },
       });
 
@@ -913,7 +914,10 @@ export class AuthFlowService {
     // 1. Find User Record (without password)
     if (isEmail) {
       const emailRecord = await this.prismaOltp.email.findFirst({
-        where: { address: handleOrEmail.toLowerCase(), primary_ind: 1 }, // Ensure it's the primary email
+        where: {
+          address: handleOrEmail.toLowerCase(),
+          primary_ind: Constants.primaryEmailFlag,
+        }, // Ensure it's the primary email
         select: { user_id: true },
       });
 
@@ -964,7 +968,7 @@ export class AuthFlowService {
     let emailVerified: boolean = false;
     if (userId) {
       const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-        where: { user_id: userId, primary_ind: 1 },
+        where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
         select: { address: true, status_id: true },
       });
       if (primaryEmailRecord) {
@@ -1141,7 +1145,7 @@ export class AuthFlowService {
     // Fetch roles and primary email separately using userIdNumber
     const roles = await this.roleService.findAll(userIdNumber);
     const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-      where: { user_id: userIdNumber, primary_ind: 1 },
+      where: { user_id: userIdNumber, primary_ind: Constants.primaryEmailFlag },
       select: { address: true, status_id: true },
     });
     const primaryEmail = primaryEmailRecord?.address;

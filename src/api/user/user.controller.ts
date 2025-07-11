@@ -814,7 +814,7 @@ export class UserController {
 
   /**
    * Retrieves all SSO profiles linked to a user. Accessible only by admins.
-   * 
+   *
    * @param userId - The numeric ID of the user.
    * @param req - The request object containing authentication information.
    * @returns A list of UserProfileDto objects representing the user's SSO profiles.
@@ -858,7 +858,7 @@ export class UserController {
   // --- External Profiles (e.g. Topcoder, GitHub, etc. - Generic handling) ---
   /**
    * Adds an external profile (e.g., social media account) to a user. Accessible only by admins.
-   * 
+   *
    * @param resourceId - The numeric ID of the user.
    * @param createProfileDto - Data transfer object containing profile details.
    * @param req - The request object containing authentication information.
@@ -923,7 +923,7 @@ export class UserController {
   /**
    * Retrieves all external profiles (SSO, social, etc.) for a user.
    * Accessible by admins or the user themselves.
-   * 
+   *
    * @param userId - The numeric ID of the user.
    * @param req - The request object containing authentication information.
    * @returns A list of UserProfileDto objects representing the user's external profiles.
@@ -965,7 +965,7 @@ export class UserController {
 
   /**
    * Deletes all external profiles for a user under a specific provider. Accessible only by admins.
-   * 
+   *
    * @param resourceId - The numeric ID of the user.
    * @param providerName - The name of the external profile provider (e.g., 'github', 'topcoder').
    * @param req - The request object containing authentication information.
@@ -1024,7 +1024,7 @@ export class UserController {
 
   /**
    * Authenticates a user for Auth0's Custom Database script.
-   * 
+   *
    * @param loginData - An object containing handle/email and password for authentication.
    * @returns Authentication response data (structure depends on Auth0 requirements).
    * @throws BadRequestException if handle/email or password is missing.
@@ -1080,7 +1080,7 @@ export class UserController {
 
   /**
    * Retrieves user profile and roles for Auth0 Rules/Actions.
-   * 
+   *
    * @param rolesData - An object containing either email or handle to identify the user.
    * @returns User profile and role data formatted for Auth0.
    * @throws BadRequestException if both email and handle are missing.
@@ -1124,7 +1124,7 @@ export class UserController {
 
   /**
    * Handles password changes initiated by Auth0's post-password-reset flow.
-   * 
+   *
    * @param changePasswordData - An object containing email and new password.
    * @returns A success message indicating the password was changed.
    * @throws BadRequestException if email or new password is missing or invalid.
@@ -1219,15 +1219,15 @@ export class UserController {
    * Activates a new user account using the provided OTP (One-Time Password) and resend token.
    * This endpoint is part of the user registration flow, verifying the user's identity
    * and enabling their account for access.
-   * 
+   *
    * @param activateUserDto - Data transfer object containing activation parameters:
    *                          - userId: The unique identifier of the user to activate.
    *                          - otp: The one-time password sent to the user's email/mobile.
    *                          - resendToken: A token generated during initial registration
    *                                         to authorize activation attempts.
-   * 
+   *
    * @returns A UserResponseDto containing the activated user's details upon success.
-   * 
+   *
    * @throws BadRequestException If the provided input is invalid (e.g., missing fields).
    * @throws ForbiddenException If the resend token is invalid or mismatched.
    * @throws NotFoundException If the specified user is not found in the system.
@@ -1285,14 +1285,14 @@ export class UserController {
    * Resends the activation email/OTP to a user's registered email address using a valid resend token.
    * This endpoint allows users who did not receive the initial activation email to request a new one,
    * provided they have a valid, unexpired resend token.
-   * 
+   *
    * @param resendActivationDto - Data transfer object containing:
    *                              - userId: The ID of the user awaiting activation.
    *                              - resendToken: A token authorizing the resend request,
    *                                             typically generated during registration.
-   * 
+   *
    * @returns A success message indicating the email was resent.
-   * 
+   *
    * @throws BadRequestException If the input is invalid (e.g., missing userId or token).
    * @throws ForbiddenException If the resend token is invalid or mismatched.
    * @throws NotFoundException If the user associated with the ID is not found.
@@ -1335,14 +1335,14 @@ export class UserController {
   /**
    * Updates a user's handle (username) in the system. This endpoint is restricted to administrators
    * due to the sensitive nature of handle changes, which may impact user authentication and references.
-   * 
+   *
    * @param resourceId - The ID of the user whose handle is to be updated.
    * @param updateHandleDto - Data transfer object containing the new handle:
    *                          - handle: The desired new handle for the user.
    * @param req - The HTTP request containing authentication details of the administrator.
-   * 
+   *
    * @returns A UserResponseDto reflecting the updated user profile with the new handle.
-   * 
+   *
    * @throws BadRequestException If the new handle is missing or invalid.
    * @throws UnauthorizedException If the request lacks valid authentication.
    * @throws ForbiddenException If the requester is not an administrator.
@@ -1402,14 +1402,14 @@ export class UserController {
    * Updates a user's primary email address in the system. This endpoint is restricted to administrators
    * and initiates the email verification process for the new address. The updated email is marked as
    * unverified until the user confirms it via the verification link sent to the new address.
-   * 
+   *
    * @param resourceId - The ID of the user whose email is to be updated.
    * @param updateEmailDto - Data transfer object containing the new email:
    *                         - email: The desired new primary email address.
    * @param req - The HTTP request containing authentication details of the administrator.
-   * 
+   *
    * @returns A UserResponseDto reflecting the updated user profile with the new email.
-   * 
+   *
    * @throws BadRequestException If the new email is missing, invalid, or malformed.
    * @throws UnauthorizedException If the request lacks valid authentication.
    * @throws ForbiddenException If the requester is not an administrator.
@@ -1472,13 +1472,13 @@ export class UserController {
    * Generates a one-time token for sensitive operations like email updates.
    * This token serves as an additional security layer, requiring the user to authenticate
    * with their password before performing actions that affect critical account information.
-   * 
+   *
    * @param tokenData - An object containing:
    *                  - userId: The ID of the user requesting the token.
    *                  - password: The user's current password for authentication.
-   * 
+   *
    * @returns A OneTimeTokenResponseDto containing the generated token and its expiration details.
-   * 
+   *
    * @throws BadRequestException If userId or password is missing.
    * @throws UnauthorizedException If the provided credentials are invalid.
    * @throws ForbiddenException If the user account is inactive or disabled.
@@ -1537,13 +1537,13 @@ export class UserController {
    * Updates a user's primary email address using a one-time token for authentication.
    * This endpoint is part of a two-step verification process, allowing users to change
    * their email after successfully obtaining a one-time token via `getOneTimeToken()`.
-   * 
+   *
    * @param resourceId - The ID of the user whose email is being updated.
    * @param email - The new email address to set for the user.
    * @param req - The HTTP request containing the one-time token in the Authorization header.
-   * 
+   *
    * @returns A success message confirming the email update.
-   * 
+   *
    * @throws BadRequestException If the email format is invalid or the token is malformed.
    * @throws UnauthorizedException If the token is missing or invalid.
    * @throws ForbiddenException If the token is expired, already used, or mismatched.
@@ -1619,7 +1619,7 @@ export class UserController {
 
   /**
    * Updates the status of a user account. This endpoint is restricted to administrators.
-   * 
+   *
    * @param resourceId - The ID of the user whose status is to be updated.
    * @param updateStatusDto - Data transfer object containing the new status.
    * @param req - The request object containing authentication information.
@@ -1679,7 +1679,7 @@ export class UserController {
   /**
    * Updates the primary role for the currently authenticated user.
    * This endpoint allows users to set their primary role from their existing roles.
-   * 
+   *
    * @param req - The request object containing authentication information.
    * @param updatePrimaryRoleDto - Data transfer object containing the new primary role.
    * @returns A success message indicating the primary role was updated.
@@ -1738,7 +1738,7 @@ export class UserController {
   /**
    * Retrieves the 2FA (Two-Factor Authentication) status for a user, including MFA and DICE settings.
    * Accessible by the user themselves or administrators.
-   * 
+   *
    * @param resourceId - The ID of the user whose 2FA status is being retrieved.
    * @param req - The request object containing authentication information.
    * @returns A User2faDto containing the user's 2FA configuration and status.
@@ -1780,7 +1780,7 @@ export class UserController {
   /**
    * Updates the 2FA (Two-Factor Authentication) status for a user, including MFA and DICE settings.
    * Accessible by the user themselves or administrators.
-   * 
+   *
    * @param resourceId - The ID of the user whose 2FA status is being updated.
    * @param updateUser2faDto - Data transfer object containing the new 2FA settings.
    * @param req - The request object containing authentication information.
@@ -1831,7 +1831,7 @@ export class UserController {
   /**
    * Sends a 2FA One-Time Password (OTP) to a user for the login flow.
    * This is part of the two-factor authentication process after partial authentication.
-   * 
+   *
    * @param sendOtpDto - Data transfer object containing the user ID.
    * @returns A UserOtpResponseDto containing a resend token and status information.
    * @throws BadRequestException If the user ID is missing.
@@ -1870,7 +1870,7 @@ export class UserController {
   /**
    * Resends the 2FA OTP email using a valid resend token.
    * This allows users to request a new OTP if the previous one expired or was not received.
-   * 
+   *
    * @param resendOtpDto - Data transfer object containing the resend token.
    * @returns A success message indicating the OTP was resent.
    * @throws BadRequestException If the resend token is missing.
@@ -1931,7 +1931,7 @@ export class UserController {
   // --- Other Endpoints ---
   /**
    * Retrieves the list of achievements earned by a user. This endpoint is restricted to administrators.
-   * 
+   *
    * @param resourceId - The ID of the user whose achievements are being retrieved.
    * @param req - The request object containing authentication information.
    * @returns An array of AchievementDto objects representing the user's achievements.

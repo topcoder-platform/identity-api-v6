@@ -34,6 +34,7 @@ import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
 import * as CryptoJS from 'crypto-js';
 import { Decimal } from '@prisma/client/runtime/library';
+import { Constants } from 'src/core/constant/constants';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -118,7 +119,7 @@ export class UserService {
       return this.prismaOltp.user.findMany({
         where: whereClause,
         skip: query.offset ?? 0,
-        take: query.limit ?? 20,
+        take: query.limit ?? Constants.defaultPageSize,
       });
     } catch (error) {
       this.logger.error(`Error finding users: ${error.message}`, error.stack);
@@ -149,8 +150,8 @@ export class UserService {
     const primaryEmail = await this.prismaOltp.email.findFirst({
       where: {
         user_id: userId,
-        primary_ind: 1, // Assuming 1 represents primary based on DDL and Java DAO logic
-        email_type_id: 1, // Assuming email_type_id 1 is the standard type, as seen in Java DAO
+        primary_ind: Constants.primaryEmailFlag, // Assuming 1 represents primary based on DDL and Java DAO logic
+        email_type_id: Constants.standardEmailType, // Assuming email_type_id 1 is the standard type, as seen in Java DAO
       },
       // Optionally include status/type lookups if needed by consumers
       // include: { email_status_lu: true, email_type_lu: true }
@@ -197,7 +198,7 @@ export class UserService {
       const emailRecord = await this.prismaOltp.email.findFirst({
         where: {
           address: emailOrHandle.toLowerCase(),
-          primary_ind: 1,
+          primary_ind: Constants.primaryEmailFlag,
           // email_type_id: 1, // Assuming type 1 is standard primary
         },
         select: { user_id: true },
@@ -242,7 +243,7 @@ export class UserService {
     const primaryEmailRecord = await this.prismaOltp.email.findFirst({
       where: {
         user_id: user.user_id,
-        primary_ind: 1,
+        primary_ind: Constants.primaryEmailFlag,
       },
       select: { address: true, status_id: true },
     });
@@ -514,9 +515,9 @@ export class UserService {
               email_id: nextEmailId, // Use fetched ID
               user_id: nextUserId, // ADDED: Link directly to the user ID
               address: email, // Use provided email
-              primary_ind: 1, // Defaulted based on Java code logic
-              status_id: 2, // Defaulted based on Java code logic (Inactive/Unverified initially)
-              email_type_id: 1, // ADDED: Assume type 1 (Primary) as per Java DAO's email queries
+              primary_ind: Constants.primaryEmailFlag, // Defaulted based on Java code logic
+              status_id: Constants.unverifiedEmailStatus, // Defaulted based on Java code logic (Inactive/Unverified initially)
+              email_type_id: Constants.standardEmailType, // ADDED: Assume type 1 (Primary) as per Java DAO's email queries
               create_date: new Date(),
               modify_date: new Date(),
             },
@@ -534,7 +535,7 @@ export class UserService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
+        if (error.code === Constants.prismaUniqueConflictcode) {
           this.logger.warn(
             `Registration failed due to unique constraint: ${error.message}. Fields: ${JSON.stringify(error.meta?.target)}`,
           );
@@ -683,7 +684,7 @@ export class UserService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
+        error.code === Constants.prismaNotFoundCode
       ) {
         throw new NotFoundException(
           `User with ID ${userId} not found for update.`,
@@ -823,7 +824,7 @@ export class UserService {
       // Check if it's a unique constraint violation on security_user.user_id (the new handle)
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === Constants.prismaUniqueConflictcode
       ) {
         const target = error.meta?.target as string[];
         if (
@@ -883,7 +884,7 @@ export class UserService {
       const currentPrimaryEmailRecord = await tx.email.findFirst({
         where: {
           user_id: userId,
-          primary_ind: 1,
+          primary_ind: Constants.primaryEmailFlag,
         },
       });
 
@@ -908,7 +909,7 @@ export class UserService {
         where: {
           address: newEmail.toLowerCase(),
           user_id: { not: userId },
-          primary_ind: 1,
+          primary_ind: Constants.primaryEmailFlag,
         },
       });
 
@@ -952,7 +953,7 @@ export class UserService {
     const updatedEmailRecord = await this.prismaOltp.email.findFirst({
       where: {
         user_id: userId,
-        primary_ind: 1,
+        primary_ind: Constants.primaryEmailFlag,
       },
     });
 
@@ -1114,7 +1115,11 @@ export class UserService {
         }
 
         const primaryEmailRecord = await this.prismaOltp.email.findFirst({
-          where: { user_id: userId, primary_ind: 1, status_id: 1 }, // Ensure it's verified
+          where: {
+            user_id: userId,
+            primary_ind: Constants.primaryEmailFlag,
+            status_id: Constants.verifiedEmailStatus,
+          }, // Ensure it's verified
         });
 
         if (primaryEmailRecord?.address && updatedUser?.handle) {
@@ -1467,7 +1472,7 @@ export class UserService {
     const conflictingEmail = await this.prismaOltp.email.findFirst({
       where: {
         address: emailAddress.toLowerCase(),
-        primary_ind: 1, // It's a primary email
+        primary_ind: Constants.primaryEmailFlag, // It's a primary email
         user_id: {
           not: currentUserId, // And it does not belong to the current user
           // Also ensure user_id is not null, though primary_ind=1 implies a user_id, Prisma requires explicit not: null if not part of composite

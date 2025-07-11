@@ -43,15 +43,14 @@ const tcRedirectDomains = [
   'topcoder.com',
 ];
 
-export const AUTH0_STATE_CACHE_PREFIX_KEY: string =
-  'AUTH0_STATES_CACHE_PREFIX_KEY';
+const AUTH0_STATE_CACHE_PREFIX_KEY: string = 'AUTH0_STATES_CACHE_PREFIX_KEY';
 
-export const MAX_COOKIE_EXPIRY_SECONDS = 90 * 24 * 3600; // 90d
+const MAX_COOKIE_EXPIRY_SECONDS = 90 * 24 * 3600; // 90d
 
-export const AUTH_REFRESH_LOG_DATE_FORMAT = 'yyyy-MM-dd_HH:mm:ss';
+const AUTH_REFRESH_LOG_DATE_FORMAT = 'yyyy-MM-dd_HH:mm:ss';
 
-export const AUTH_REFRESH_LOG_KEY_PREFIX = 'identity:';
-export const AUTH_REFRESH_LOG_KEY_DELIM = ',';
+const AUTH_REFRESH_LOG_KEY_PREFIX = 'identity:';
+const AUTH_REFRESH_LOG_KEY_DELIM = ',';
 
 @Injectable()
 export class AuthorizationService {
