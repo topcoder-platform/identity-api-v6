@@ -428,20 +428,14 @@ export class AuthFlowService {
     }
 
     // 3. Decrypt Password (Blowfish)
-    let decryptedPassword = '';
+    let legacyEncodedPassword = '';
     try {
-      const key = CryptoJS.enc.Base64.parse(this.legacyBlowfishKey);
-      const encryptedBase64 = securityUserRecord.password;
-      const decrypted = CryptoJS.Blowfish.decrypt(encryptedBase64, key, {
-        mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7,
-      });
-      if (!decrypted || decrypted.sigBytes === 0) {
-        throw new Error('Decryption resulted in zero bytes');
-      }
-      decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8);
-      if (!decryptedPassword && decrypted.sigBytes > 0) {
-        throw new Error('Decrypted bytes could not be converted to UTF8');
+      legacyEncodedPassword =
+      this.userService.encodePasswordLegacy(passwordPlain);
+
+      // Additional check if conversion to UTF8 failed
+      if (!legacyEncodedPassword && legacyEncodedPassword.length > 0) {
+        throw new Error('Encrypted bytes could not be converted to UTF8');
       }
     } catch (error) {
       this.logger.error(
@@ -454,7 +448,7 @@ export class AuthFlowService {
     }
 
     // 4. Compare Passwords
-    if (decryptedPassword !== passwordPlain) {
+    if (legacyEncodedPassword !== securityUserRecord.password) {
       this.logger.warn(
         `generateOneTimeToken: Password mismatch for ${user.handle} (ID: ${userId})`,
       );
@@ -1009,24 +1003,14 @@ export class AuthFlowService {
       `[AuthFlow Auth0] Encrypted password for handle ${userHandle} from DB: ${securityUserRecord.password}`,
     );
 
-    let decryptedPassword = '';
+    let legacyEncodedPassword = '';
     try {
-      // Changed: Parse the Base64 key directly
-      const key = CryptoJS.enc.Base64.parse(this.legacyBlowfishKey);
-      const encryptedBase64 = securityUserRecord.password;
-      const decrypted = CryptoJS.Blowfish.decrypt(encryptedBase64, key, {
-        mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7,
-      });
-      // Explicitly check if decryption produced any bytes
-      if (!decrypted || decrypted.sigBytes === 0) {
-        throw new Error('Decryption resulted in zero bytes');
-      }
-      decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8);
+      legacyEncodedPassword =
+      this.userService.encodePasswordLegacy(passwordPlain);
 
       // Additional check if conversion to UTF8 failed
-      if (!decryptedPassword && decrypted.sigBytes > 0) {
-        throw new Error('Decrypted bytes could not be converted to UTF8');
+      if (!legacyEncodedPassword && legacyEncodedPassword.length > 0) {
+        throw new Error('Encrypted bytes could not be converted to UTF8');
       }
     } catch (error) {
       this.logger.error(
@@ -1040,7 +1024,7 @@ export class AuthFlowService {
     }
 
     // 4. Compare Passwords
-    if (decryptedPassword !== passwordPlain) {
+    if (legacyEncodedPassword !== securityUserRecord.password) {
       this.logger.warn(
         `Auth0 Custom DB: Password mismatch for ${userHandle} (ID: ${userId})`,
       );
