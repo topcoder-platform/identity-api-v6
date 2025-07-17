@@ -32,7 +32,6 @@ import * as jwt from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
-import * as CryptoJS from 'crypto-js';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from 'src/core/constant/constants';
 // Import other needed services like NotificationService, AuthFlowService
@@ -287,13 +286,12 @@ export class UserService {
       );
     }
     try {
-      // Changed: Parse the Base64 key directly
-      const key = CryptoJS.enc.Base64.parse(this.legacyBlowfishKey);
-      const encrypted = CryptoJS.Blowfish.encrypt(password, key, {
-        mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7,
-      });
-      return encrypted.toString(); // Base64 output
+      let key = Buffer.from(this.legacyBlowfishKey, 'base64');
+      const cipher = crypto.createCipheriv("bf-ecb", key, null);
+      let encryptedResult = cipher.update(password, "utf8", "base64");
+      encryptedResult += cipher.final("base64");
+      
+      return encryptedResult;
     } catch (error) {
       this.logger.error(
         `Failed to encode password using legacy Blowfish: ${error.message}`,
