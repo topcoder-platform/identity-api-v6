@@ -427,28 +427,11 @@ export class AuthFlowService {
       );
     }
 
-    // 3. Decrypt Password (Blowfish)
-    let legacyEncodedPassword = '';
-    try {
-      legacyEncodedPassword =
-      this.userService.encodePasswordLegacy(passwordPlain);
-
-      // Additional check if conversion to UTF8 failed
-      if (!legacyEncodedPassword && legacyEncodedPassword.length > 0) {
-        throw new Error('Encrypted bytes could not be converted to UTF8');
-      }
-    } catch (error) {
-      this.logger.error(
-        `generateOneTimeToken: Blowfish decryption failed for user ${user.handle} (ID: ${userId}): ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Authentication failed due to a security processing error.',
-      );
-    }
-
-    // 4. Compare Passwords
-    if (legacyEncodedPassword !== securityUserRecord.password) {
+    // Verify Password
+    let passwordsMatching = this.userService.verifyLegacyPassword(passwordPlain, securityUserRecord.password);
+ 
+    // Compare Passwords
+    if (!passwordsMatching) {
       this.logger.warn(
         `generateOneTimeToken: Password mismatch for ${user.handle} (ID: ${userId})`,
       );
@@ -1003,28 +986,11 @@ export class AuthFlowService {
       `[AuthFlow Auth0] Encrypted password for handle ${userHandle} from DB: ${securityUserRecord.password}`,
     );
 
-    let legacyEncodedPassword = '';
-    try {
-      legacyEncodedPassword =
-      this.userService.encodePasswordLegacy(passwordPlain);
+    // Verify Password
+    let passwordsMatching = this.userService.verifyLegacyPassword(passwordPlain, securityUserRecord.password);
 
-      // Additional check if conversion to UTF8 failed
-      if (!legacyEncodedPassword && legacyEncodedPassword.length > 0) {
-        throw new Error('Encrypted bytes could not be converted to UTF8');
-      }
-    } catch (error) {
-      this.logger.error(
-        `Auth0 Custom DB: Blowfish decryption failed for user ${userHandle} (ID: ${userId}): ${error.message}`,
-        error.stack, // Log stack trace for decryption errors
-      );
-      // Rethrow as Internal Server Error to avoid exposing details, but log the specific internal error
-      throw new InternalServerErrorException(
-        'Password decryption failed internally.',
-      );
-    }
-
-    // 4. Compare Passwords
-    if (legacyEncodedPassword !== securityUserRecord.password) {
+    // Compare Passwords
+    if (!passwordsMatching) {
       this.logger.warn(
         `Auth0 Custom DB: Password mismatch for ${userHandle} (ID: ${userId})`,
       );
