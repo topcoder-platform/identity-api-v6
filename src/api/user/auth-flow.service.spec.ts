@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthFlowService } from './auth-flow.service';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { UserService } from './user.service';
 import { EventService } from '../../shared/event/event.service';
 import { RoleService } from '../role/role.service';
@@ -20,7 +20,7 @@ import {
   user as UserModel,
   email as EmailModel,
   security_user as SecurityUserModel,
-} from '@prisma/client-common-oltp';
+} from '@prisma/client';
 import { ActivateUserBodyDto, UserOtpDto } from '../../dto/user/user.dto';
 import { RoleResponseDto } from 'src/dto/role/role.dto';
 import {
@@ -29,7 +29,6 @@ import {
 } from './user.service'; // Constants from UserService
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
-import * as CryptoJS from 'crypto-js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Constants from AuthFlowService
@@ -94,11 +93,13 @@ const mockConfigService = {
   }),
 };
 
+const mockVerifyLegacyPassword = jest.fn();
 const mockUserService = {
   findUserByEmailOrHandle: jest.fn(),
   encodePasswordLegacy: jest.fn(),
   generateSSOToken: jest.fn(),
   checkEmailAvailabilityForUser: jest.fn(),
+  verifyLegacyPassword: mockVerifyLegacyPassword,
 };
 
 const mockEventService = {
@@ -120,22 +121,6 @@ jest.mock('jsonwebtoken', () => ({
       this.name = 'TokenExpiredError';
     }
   },
-}));
-jest.mock('crypto-js', () => ({
-  ...jest.requireActual('crypto-js'),
-  Blowfish: {
-    decrypt: jest.fn(),
-  },
-  enc: {
-    ...jest.requireActual('crypto-js').enc,
-    Base64: {
-      ...jest.requireActual('crypto-js').enc.Base64,
-      parse: jest.fn(),
-    },
-    Utf8: jest.requireActual('crypto-js').enc.Utf8,
-  },
-  mode: jest.requireActual('crypto-js').mode,
-  pad: jest.requireActual('crypto-js').pad,
 }));
 jest.mock('uuid', () => ({
   v4: jest.fn(),
@@ -214,6 +199,7 @@ describe('AuthFlowService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockVerifyLegacyPassword.mockReturnValue('sha256HashedValue');
     loggerErrorSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => {});
@@ -224,7 +210,7 @@ describe('AuthFlowService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthFlowService,
-        { provide: PRISMA_CLIENT_COMMON_OLTP, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: UserService, useValue: mockUserService },
@@ -236,30 +222,13 @@ describe('AuthFlowService', () => {
       .compile();
 
     service = module.get<AuthFlowService>(AuthFlowService);
-    prismaOltp = module.get(PRISMA_CLIENT_COMMON_OLTP);
+    prismaOltp = module.get(PRISMA_CLIENT);
     cacheManager = module.get(CACHE_MANAGER);
     configService = module.get(ConfigService);
     userService = module.get(UserService);
     eventService = module.get(EventService);
     roleService = module.get(RoleService);
 
-    // Mock implementations for external libraries
-    (CryptoJS.enc.Base64.parse as jest.Mock).mockImplementation((val) =>
-      jest.requireActual('crypto-js').enc.Base64.parse(val),
-    );
-    (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-      (cipherParams) => {
-        // Simulate decryption success by returning a WordArray that can be stringified
-        // This needs to be robust enough for the `toString(CryptoJS.enc.Utf8)` call
-        const actualCryptoJS = jest.requireActual('crypto-js');
-        if (cipherParams === 'expectedEncryptedPassword') {
-          // A known good encrypted value for tests
-          return actualCryptoJS.enc.Utf8.parse('decryptedPassword');
-        }
-        // Simulate decryption failure or empty result
-        return { sigBytes: 0, words: [] }; // Represents an empty WordArray or failed decryption
-      },
-    );
     (uuidv4 as jest.Mock).mockReturnValue('mock-uuid-jti');
   });
 
@@ -603,26 +572,9 @@ describe('AuthFlowService', () => {
       password: 'expectedEncryptedPassword',
     });
 
-    let mockDecrypt;
     beforeEach(() => {
       prismaOltp.user.findUnique.mockResolvedValue(mockUser);
       prismaOltp.security_user.findUnique.mockResolvedValue(mockSecurityUser);
-      (CryptoJS.enc.Base64.parse as jest.Mock).mockReturnValue(
-        'parsedBlowfishKey',
-      );
-      // Configure Blowfish.decrypt to return a specific decrypted value for a specific encrypted input
-      mockDecrypt = (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-        (cipherParams, key) => {
-          const actualCryptoJS = jest.requireActual('crypto-js');
-          if (
-            cipherParams === 'expectedEncryptedPassword' &&
-            key === 'parsedBlowfishKey'
-          ) {
-            return actualCryptoJS.enc.Utf8.parse(passwordPlain);
-          }
-          return { sigBytes: 0, words: [] }; // Default to failed decryption
-        },
-      );
       (jwt.sign as jest.Mock).mockReturnValue('generated.one.time.token');
       (uuidv4 as jest.Mock).mockReturnValue('test-jti');
     });
@@ -640,11 +592,6 @@ describe('AuthFlowService', () => {
         where: { user_id: mockUser.handle },
         select: { password: true },
       });
-      expect(mockDecrypt).toHaveBeenCalledWith(
-        'expectedEncryptedPassword',
-        'parsedBlowfishKey',
-        expect.any(Object),
-      );
       expect(jwt.sign).toHaveBeenCalledWith(
         {
           sub: userIdString,
@@ -691,15 +638,16 @@ describe('AuthFlowService', () => {
         service.generateOneTimeToken(userIdString, passwordPlain),
       ).rejects.toThrow(InternalServerErrorException);
     });
-    it('should throw InternalServerErrorException on Blowfish decryption error', async () => {
-      (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(() => {
-        throw new Error('Decrypt fail');
+    it('should throw InternalServerErrorException on VerifyLegacyPassword decryption error', async () => {
+      mockVerifyLegacyPassword.mockImplementation(() => {
+        throw new InternalServerErrorException('Password encoding failed.');
       });
       await expect(
         service.generateOneTimeToken(userIdString, passwordPlain),
       ).rejects.toThrow(InternalServerErrorException);
     });
     it('should throw UnauthorizedException for password mismatch', async () => {
+      mockVerifyLegacyPassword.mockReturnValue(false);
       await expect(
         service.generateOneTimeToken(userIdString, 'wrongPassword'),
       ).rejects.toThrow(UnauthorizedException);
@@ -922,21 +870,6 @@ describe('AuthFlowService', () => {
         .mockResolvedValueOnce(mockPrimaryEmail) // For initial email lookup if identifier is email
         .mockResolvedValueOnce(mockPrimaryEmail); // For attaching primary email
       prismaOltp.security_user.findUnique.mockResolvedValue(mockSecurityUser);
-      (CryptoJS.enc.Base64.parse as jest.Mock).mockReturnValue(
-        'parsedBlowfishKey',
-      );
-      (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(
-        (cipherParams, key) => {
-          const actualCryptoJS = jest.requireActual('crypto-js');
-          if (
-            cipherParams === 'expectedEncryptedPassword' &&
-            key === 'parsedBlowfishKey'
-          ) {
-            return actualCryptoJS.enc.Utf8.parse(passwordPlain);
-          }
-          return { sigBytes: 0, words: [] };
-        },
-      );
       roleService.findAll.mockResolvedValue(mockRoles);
     });
 
@@ -967,15 +900,16 @@ describe('AuthFlowService', () => {
         service.authenticateForAuth0(handle, passwordPlain),
       ).rejects.toThrow(UnauthorizedException);
     });
-    it('should throw InternalServerErrorException on Blowfish decryption error', async () => {
-      (CryptoJS.Blowfish.decrypt as jest.Mock).mockImplementation(() => {
-        throw new Error('Decrypt fail');
+    it('should throw InternalServerErrorException on VerifyLegacyPassword decryption error', async () => {
+      mockVerifyLegacyPassword.mockImplementation(() => {
+        throw new InternalServerErrorException('Password encoding failed.');
       });
       await expect(
         service.authenticateForAuth0(handle, passwordPlain),
       ).rejects.toThrow(InternalServerErrorException);
     });
     it('should throw UnauthorizedException for password mismatch', async () => {
+      mockVerifyLegacyPassword.mockReturnValue(false);
       await expect(
         service.authenticateForAuth0(handle, 'wrongPassword'),
       ).rejects.toThrow(UnauthorizedException);

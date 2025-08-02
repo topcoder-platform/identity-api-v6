@@ -10,13 +10,13 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
-  PrismaClient as PrismaClientCommonOltp,
+  PrismaClient,
   user as UserModel,
   Prisma,
   user_sso_login as UserSsoLoginModel,
   sso_login_provider as SsoLoginProviderModel,
-} from '@prisma/client-common-oltp';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+} from '@prisma/client';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import {
   CreateUserBodyDto,
   UpdateUserBodyDto,
@@ -33,7 +33,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
-import { Constants } from 'src/core/constant/constants';
+import { Constants } from '../../core/constant/constants';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -61,8 +61,8 @@ export class UserService {
   private legacyBlowfishKey: string; // Changed: Store the raw Base64 key string directly
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
     @Inject(forwardRef(() => ValidationService))
     private readonly validationService: ValidationService,
     @Inject(forwardRef(() => RoleService))
@@ -115,7 +115,7 @@ export class UserService {
     }
 
     try {
-      return this.prismaOltp.user.findMany({
+      return this.prismaClient.user.findMany({
         where: whereClause,
         skip: query.offset ?? 0,
         take: query.limit ?? Constants.defaultPageSize,
@@ -129,7 +129,7 @@ export class UserService {
   async findUserById(userId: number): Promise<UserModel | null> {
     this.logger.log(`Finding user by ID: ${userId} for detailed view.`);
     // Step 1: Fetch the core user data
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
       include: {
         // Include other necessary relations like SSO, but not email directly
@@ -146,7 +146,7 @@ export class UserService {
     }
 
     // Step 2: Fetch the primary email separately using the structure from DDL
-    const primaryEmail = await this.prismaOltp.email.findFirst({
+    const primaryEmail = await this.prismaClient.email.findFirst({
       where: {
         user_id: userId,
         primary_ind: Constants.primaryEmailFlag, // Assuming 1 represents primary based on DDL and Java DAO logic
@@ -194,7 +194,7 @@ export class UserService {
 
     if (isEmail) {
       // 1. Find email record first to get user_id (primary email only)
-      const emailRecord = await this.prismaOltp.email.findFirst({
+      const emailRecord = await this.prismaClient.email.findFirst({
         where: {
           address: emailOrHandle.toLowerCase(),
           primary_ind: Constants.primaryEmailFlag,
@@ -215,7 +215,7 @@ export class UserService {
 
     // 2. Find user by userId (if found via email) or by handle
     if (userId) {
-      user = await this.prismaOltp.user.findUnique({
+      user = await this.prismaClient.user.findUnique({
         where: { user_id: userId },
         include: {
           user_sso_login: { include: { sso_login_provider: true } },
@@ -223,7 +223,7 @@ export class UserService {
       });
     } else if (!isEmail) {
       // Only search by handle if it wasn't an email or email lookup failed
-      user = await this.prismaOltp.user.findFirst({
+      user = await this.prismaClient.user.findFirst({
         where: { handle_lower: emailOrHandle.toLowerCase() },
         include: {
           user_sso_login: { include: { sso_login_provider: true } },
@@ -239,7 +239,7 @@ export class UserService {
     }
 
     // 3. Fetch primary email details separately and attach
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+    const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: user.user_id,
         primary_ind: Constants.primaryEmailFlag,
@@ -286,11 +286,11 @@ export class UserService {
       );
     }
     try {
-      let key = Buffer.from(this.legacyBlowfishKey, 'base64');
-      const cipher = crypto.createCipheriv("bf-ecb", key, null);
-      let encryptedResult = cipher.update(password, "utf8", "base64");
-      encryptedResult += cipher.final("base64");
-      
+      const key = Buffer.from(this.legacyBlowfishKey, 'base64');
+      const cipher = crypto.createCipheriv('bf-ecb', key, null);
+      let encryptedResult = cipher.update(password, 'utf8', 'base64');
+      encryptedResult += cipher.final('base64');
+
       return encryptedResult;
     } catch (error) {
       this.logger.error(
@@ -416,8 +416,8 @@ export class UserService {
     let nextUserId: number;
     try {
       // Prisma doesn't have a built-in nextval function, use raw query
-      const result: { nextval: bigint }[] = await this.prismaOltp
-        .$queryRaw`SELECT nextval('common_oltp.sequence_user_seq'::regclass)`;
+      const result: { nextval: bigint }[] = await this.prismaClient
+        .$queryRaw`SELECT nextval('sequence_user_seq'::regclass)`;
       if (!result || result.length === 0 || !result[0].nextval) {
         throw new Error('Failed to retrieve next user ID from sequence.');
       }
@@ -436,7 +436,7 @@ export class UserService {
     // Step 2: Perform inserts within a transaction using the fetched ID
     let newUser: UserModel;
     try {
-      newUser = await this.prismaOltp.$transaction(async (prisma) => {
+      newUser = await this.prismaClient.$transaction(async (prisma) => {
         const userData = {
           user_id: nextUserId,
           handle: handle,
@@ -488,7 +488,7 @@ export class UserService {
           let nextEmailId: number;
           try {
             const result: { nextval: bigint }[] =
-              await prisma.$queryRaw`SELECT nextval('common_oltp.sequence_email_seq'::regclass)`;
+              await prisma.$queryRaw`SELECT nextval('sequence_email_seq'::regclass)`;
             if (!result || result.length === 0 || !result[0].nextval) {
               throw new Error(
                 'Failed to retrieve next email ID from sequence.',
@@ -673,7 +673,7 @@ export class UserService {
     }
 
     try {
-      const updatedUser = await this.prismaOltp.user.update({
+      const updatedUser = await this.prismaClient.user.update({
         where: { user_id: userId },
         data: dataToUpdate,
       });
@@ -736,7 +736,7 @@ export class UserService {
     await this.validationService.validateHandle(newHandle);
 
     // Fetch the user to ensure they exist and get the old handle
-    const existingUser = await this.prismaOltp.user.findUnique({
+    const existingUser = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
     if (!existingUser) {
@@ -755,51 +755,53 @@ export class UserService {
 
     try {
       // Start a transaction to update both user and security_user tables
-      const updatedUser = await this.prismaOltp.$transaction(async (prisma) => {
-        const userInTx = await prisma.user.update({
-          where: { user_id: userId },
-          data: {
-            handle: newHandle,
-            handle_lower: newHandle.toLowerCase(),
-            modify_date: new Date(),
-            // modified_by: authUser.userId.toString(), // Consider adding if you have this field
-          },
-        });
-        this.logger.log(
-          `Successfully updated handle in 'user' table for user ${userId} from ${oldHandle} to ${newHandle}`,
-        );
-
-        // Now update the security_user table.
-        // The 'user_id' column in 'security_user' stores the handle.
-        // We need to find the record by the old handle and update it to the new handle.
-        // The 'login_id' in 'security_user' stores the numeric user_id from the 'user' table.
-
-        // First, check if a security_user record exists with the old handle
-        const securityUserRecord = await prisma.security_user.findUnique({
-          where: { user_id: oldHandle }, // user_id in security_user is the handle
-        });
-
-        if (securityUserRecord) {
-          // If it exists, update its user_id (which is the handle) to the new handle
-          // This assumes that security_user.user_id (the handle) must be unique.
-          // If another user already has newHandle in security_user.user_id, this would fail.
-          // This should ideally be caught by the initial validateHandle if security_user.user_id mirrors user.handle.
-          await prisma.security_user.update({
-            where: { user_id: oldHandle },
-            data: { user_id: newHandle },
+      const updatedUser = await this.prismaClient.$transaction(
+        async (prisma) => {
+          const userInTx = await prisma.user.update({
+            where: { user_id: userId },
+            data: {
+              handle: newHandle,
+              handle_lower: newHandle.toLowerCase(),
+              modify_date: new Date(),
+              // modified_by: authUser.userId.toString(), // Consider adding if you have this field
+            },
           });
           this.logger.log(
-            `Successfully updated handle in 'security_user' table from ${oldHandle} to ${newHandle} for numeric user ID ${userId}`,
+            `Successfully updated handle in 'user' table for user ${userId} from ${oldHandle} to ${newHandle}`,
           );
-        } else {
-          // This case might occur if a user record exists but its security_user counterpart was never created
-          // or was created with a different convention. Log a warning.
-          this.logger.warn(
-            `No security_user record found with handle (user_id) '${oldHandle}' for numeric user ID ${userId}. Cannot update handle in security_user.`,
-          );
-        }
-        return userInTx;
-      });
+
+          // Now update the security_user table.
+          // The 'user_id' column in 'security_user' stores the handle.
+          // We need to find the record by the old handle and update it to the new handle.
+          // The 'login_id' in 'security_user' stores the numeric user_id from the 'user' table.
+
+          // First, check if a security_user record exists with the old handle
+          const securityUserRecord = await prisma.security_user.findUnique({
+            where: { user_id: oldHandle }, // user_id in security_user is the handle
+          });
+
+          if (securityUserRecord) {
+            // If it exists, update its user_id (which is the handle) to the new handle
+            // This assumes that security_user.user_id (the handle) must be unique.
+            // If another user already has newHandle in security_user.user_id, this would fail.
+            // This should ideally be caught by the initial validateHandle if security_user.user_id mirrors user.handle.
+            await prisma.security_user.update({
+              where: { user_id: oldHandle },
+              data: { user_id: newHandle },
+            });
+            this.logger.log(
+              `Successfully updated handle in 'security_user' table from ${oldHandle} to ${newHandle} for numeric user ID ${userId}`,
+            );
+          } else {
+            // This case might occur if a user record exists but its security_user counterpart was never created
+            // or was created with a different convention. Log a warning.
+            this.logger.warn(
+              `No security_user record found with handle (user_id) '${oldHandle}' for numeric user ID ${userId}. Cannot update handle in security_user.`,
+            );
+          }
+          return userInTx;
+        },
+      );
 
       // Convert to camelCase and publish event.user.updated event
       const eventPayload = this.toCamelCase(updatedUser);
@@ -868,7 +870,7 @@ export class UserService {
     }
 
     await this.checkEmailAvailabilityForUser(newEmail, userId);
-    const updatedUserInTx = await this.prismaOltp.$transaction(async (tx) => {
+    const updatedUserInTx = await this.prismaClient.$transaction(async (tx) => {
       // Find the user first
       const userInDB = await tx.user.findUnique({
         where: { user_id: userId },
@@ -948,7 +950,7 @@ export class UserService {
     });
 
     // Generate OTP and resend token for email verification using the updated email record
-    const updatedEmailRecord = await this.prismaOltp.email.findFirst({
+    const updatedEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: userId,
         primary_ind: Constants.primaryEmailFlag,
@@ -1045,7 +1047,7 @@ export class UserService {
     }
     const normalizedNewStatus = newStatus.toUpperCase();
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
     if (!user) {
@@ -1063,7 +1065,7 @@ export class UserService {
     }
 
     try {
-      const updatedUser = await this.prismaOltp.user.update({
+      const updatedUser = await this.prismaClient.user.update({
         where: { user_id: userId },
         data: {
           status: normalizedNewStatus,
@@ -1112,7 +1114,7 @@ export class UserService {
           );
         }
 
-        const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+        const primaryEmailRecord = await this.prismaClient.email.findFirst({
           where: {
             user_id: userId,
             primary_ind: Constants.primaryEmailFlag,
@@ -1173,7 +1175,7 @@ export class UserService {
   async getAchievements(userId: number): Promise<AchievementDto[]> {
     this.logger.debug(`Fetching achievements for user ID: ${userId}`);
     try {
-      const achievements = await this.prismaOltp.user_achievement.findMany({
+      const achievements = await this.prismaClient.user_achievement.findMany({
         where: { user_id: userId },
         include: {
           achievement_type_lu: true, // Include the description lookup table
@@ -1216,7 +1218,7 @@ export class UserService {
     }
 
     // 1. Find Auth0 Provider ID
-    const auth0Provider = await this.prismaOltp.sso_login_provider.findFirst({
+    const auth0Provider = await this.prismaClient.sso_login_provider.findFirst({
       where: { name: this.AUTH0_PROVIDER_NAME },
     });
 
@@ -1231,7 +1233,7 @@ export class UserService {
     }
 
     // 2. Try to find user by Auth0 sub
-    const existingSsoLogin = await this.prismaOltp.user_sso_login.findFirst({
+    const existingSsoLogin = await this.prismaClient.user_sso_login.findFirst({
       where: {
         sso_user_id: auth0Profile.sub,
         provider_id: auth0Provider.sso_login_provider_id,
@@ -1252,7 +1254,7 @@ export class UserService {
     // 3. If not found by sub, try to find by email (if provided and verified)
     let userByEmail: UserModel | null = null;
     if (auth0Profile.email && auth0Profile.email_verified) {
-      const emailRecord = await this.prismaOltp.email.findFirst({
+      const emailRecord = await this.prismaClient.email.findFirst({
         where: { address: auth0Profile.email },
         include: {
           user_email_xref: {
@@ -1272,7 +1274,7 @@ export class UserService {
           `User found by email ${auth0Profile.email}: ID ${userByEmail.user_id.toNumber()}. Linking Auth0 sub.`,
         );
         // Link Auth0 sub to this existing user
-        await this.prismaOltp.user_sso_login.create({
+        await this.prismaClient.user_sso_login.create({
           data: {
             user_id: userByEmail.user_id,
             sso_user_id: auth0Profile.sub,
@@ -1295,7 +1297,7 @@ export class UserService {
     const handleLower = handle.toLowerCase();
 
     // Ensure handle is unique
-    const existingUserByHandle = await this.prismaOltp.user.findFirst({
+    const existingUserByHandle = await this.prismaClient.user.findFirst({
       where: { handle_lower: handleLower },
     });
     if (existingUserByHandle) {
@@ -1309,7 +1311,7 @@ export class UserService {
       );
     }
 
-    const transactionResult = await this.prismaOltp.$transaction(
+    const transactionResult = await this.prismaClient.$transaction(
       async (prisma) => {
         const newUser = await prisma.user.create({
           data: {
@@ -1363,7 +1365,7 @@ export class UserService {
   async updateLastLoginDate(userId: number): Promise<void> {
     this.logger.debug(`Updating last login date for user ID: ${userId}`);
     try {
-      await this.prismaOltp.user.update({
+      await this.prismaClient.user.update({
         where: { user_id: userId },
         data: { last_login: new Date() },
       });
@@ -1441,7 +1443,7 @@ export class UserService {
     );
     // Basic lookup for now, replace with full logic
     const auth0ProviderId = 1; // Assuming '1'
-    const ssoLogin = await this.prismaOltp.user_sso_login.findFirst({
+    const ssoLogin = await this.prismaClient.user_sso_login.findFirst({
       where: {
         provider_id: auth0ProviderId,
         sso_user_id: auth0Sub,
@@ -1467,7 +1469,7 @@ export class UserService {
       throw new BadRequestException('Email address cannot be empty.');
     }
 
-    const conflictingEmail = await this.prismaOltp.email.findFirst({
+    const conflictingEmail = await this.prismaClient.email.findFirst({
       where: {
         address: emailAddress.toLowerCase(),
         primary_ind: Constants.primaryEmailFlag, // It's a primary email
@@ -1505,7 +1507,7 @@ export class UserService {
       `Attempting to update primary role for user ID: ${userId} to ${newPrimaryRole}`,
     );
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
     if (!user) {

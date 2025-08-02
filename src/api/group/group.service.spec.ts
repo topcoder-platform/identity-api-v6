@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GroupService } from './group.service';
-import {
-  PRISMA_CLIENT_AUTHORIZATION,
-  PRISMA_CLIENT_COMMON_OLTP,
-} from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT, PRISMA_CLIENT_GROUP } from '../../shared/prisma/prisma.module';
 import {
   NotFoundException,
   ConflictException,
@@ -12,7 +9,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { GroupMembership } from '@prisma/client-authorization';
+import { GroupMembership } from '@prisma/client-group';
 import {
   GroupResponseDto,
   GroupDto,
@@ -27,7 +24,7 @@ import { MembershipType, MembershipTypeHelper } from './membership-type.enum';
 import { Constants } from '../../core/constant/constants';
 
 // Mock Prisma Clients
-const mockPrismaAuth = {
+const mockPrisma = {
   group: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -45,19 +42,16 @@ const mockPrismaAuth = {
     deleteMany: jest.fn(),
     count: jest.fn(),
   },
-  $transaction: jest
-    .fn()
-    .mockImplementation(async (callback) =>
-      Promise.resolve(callback(mockPrismaAuth)),
-    ),
-};
-
-const mockPrismaCommonClient = {
   security_groups: {
     findFirst: jest.fn(),
     findUnique: jest.fn(),
     create: jest.fn(),
   },
+  $transaction: jest
+    .fn()
+    .mockImplementation(async (callback) =>
+      Promise.resolve(callback(mockPrisma)),
+    ),
 };
 
 // Mock Authenticated Users
@@ -149,12 +143,12 @@ describe('GroupService', () => {
       providers: [
         GroupService,
         {
-          provide: PRISMA_CLIENT_AUTHORIZATION,
-          useValue: mockPrismaAuth,
+          provide: PRISMA_CLIENT,
+          useValue: mockPrisma,
         },
         {
-          provide: PRISMA_CLIENT_COMMON_OLTP,
-          useValue: mockPrismaCommonClient,
+          provide: PRISMA_CLIENT_GROUP,
+          useValue: mockPrisma,
         },
       ],
     }).compile();
@@ -227,7 +221,7 @@ describe('GroupService', () => {
     };
 
     it('should throw BadRequestException when user is null', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null); // groupExists check
+      mockPrisma.group.findUnique.mockResolvedValue(null); // groupExists check
 
       // Test should expect an exception to be thrown
       await expect(service.create(groupData, null)).rejects.toThrow(
@@ -235,12 +229,12 @@ describe('GroupService', () => {
       );
 
       // Verify that create method was NOT called since authentication failed
-      expect(mockPrismaAuth.group.create).not.toHaveBeenCalled();
+      expect(mockPrisma.group.create).not.toHaveBeenCalled();
     });
 
     it('should allow admin to create a group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null); // groupExists check
-      mockPrismaAuth.group.create.mockResolvedValue({
+      mockPrisma.group.findUnique.mockResolvedValue(null); // groupExists check
+      mockPrisma.group.create.mockResolvedValue({
         ...sampleGroupDb,
         ...groupData,
         id: 2,
@@ -248,7 +242,7 @@ describe('GroupService', () => {
       });
 
       const result = await service.create(groupData, mockAdminUser);
-      expect(mockPrismaAuth.group.create).toHaveBeenCalledWith(
+      expect(mockPrisma.group.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             name: groupData.name,
@@ -260,8 +254,8 @@ describe('GroupService', () => {
     });
 
     it('should allow machine user with write scopes to create a group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
-      mockPrismaAuth.group.create.mockResolvedValue({
+      mockPrisma.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.create.mockResolvedValue({
         ...sampleGroupDb,
         ...groupData,
         id: 2,
@@ -272,7 +266,7 @@ describe('GroupService', () => {
         groupData,
         mockMachineUserWithWriteScope,
       );
-      expect(mockPrismaAuth.group.create).toHaveBeenCalledWith(
+      expect(mockPrisma.group.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             name: groupData.name,
@@ -284,7 +278,7 @@ describe('GroupService', () => {
     });
 
     it('should throw ConflictException if group name already exists', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb); // groupExists returns true
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb); // groupExists returns true
       await expect(service.create(groupData, mockAdminUser)).rejects.toThrow(
         ConflictException,
       );
@@ -296,8 +290,8 @@ describe('GroupService', () => {
         name: 'New Group Conflict ID',
         description: 'A new group',
       };
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(null); // for name check
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // for ID check
+      mockPrisma.group.findUnique.mockResolvedValueOnce(null); // for name check
+      mockPrisma.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // for ID check
       await expect(
         service.create(groupDataWithId, mockAdminUser),
       ).rejects.toThrow(ConflictException);
@@ -316,8 +310,8 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma create error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
-      mockPrismaAuth.group.create.mockRejectedValue(new Error('DB error'));
+      mockPrisma.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.create.mockRejectedValue(new Error('DB error'));
       await expect(service.create(groupData, mockAdminUser)).rejects.toThrow(
         InternalServerErrorException,
       );
@@ -333,9 +327,9 @@ describe('GroupService', () => {
     const authUser = mockAdminUser;
 
     it('should create a security group for admin user', async () => {
-      mockPrismaCommonClient.security_groups.findFirst.mockResolvedValue(null); // name check
-      mockPrismaCommonClient.security_groups.findUnique.mockResolvedValue(null); // id check
-      mockPrismaCommonClient.security_groups.create.mockResolvedValue({
+      mockPrisma.security_groups.findFirst.mockResolvedValue(null); // name check
+      mockPrisma.security_groups.findUnique.mockResolvedValue(null); // id check
+      mockPrisma.security_groups.create.mockResolvedValue({
         group_id: securityData.id,
         description: securityData.name,
         create_user_id: Number(authUser.userId),
@@ -343,9 +337,7 @@ describe('GroupService', () => {
 
       const result = await service.createSecurityGroup(securityData, authUser);
       expect(result.securityGroups.name).toEqual(securityData.name);
-      expect(
-        mockPrismaCommonClient.security_groups.create,
-      ).toHaveBeenCalledWith({
+      expect(mockPrisma.security_groups.create).toHaveBeenCalledWith({
         data: {
           group_id: securityData.id,
           description: securityData.name,
@@ -355,7 +347,7 @@ describe('GroupService', () => {
     });
 
     it('should throw ConflictException if security group name already exists', async () => {
-      mockPrismaCommonClient.security_groups.findFirst.mockResolvedValue({
+      mockPrisma.security_groups.findFirst.mockResolvedValue({
         group_id: 99,
         description: securityData.name,
       });
@@ -365,8 +357,8 @@ describe('GroupService', () => {
     });
 
     it('should throw ConflictException if security group ID already exists', async () => {
-      mockPrismaCommonClient.security_groups.findFirst.mockResolvedValue(null);
-      mockPrismaCommonClient.security_groups.findUnique.mockResolvedValue({
+      mockPrisma.security_groups.findFirst.mockResolvedValue(null);
+      mockPrisma.security_groups.findUnique.mockResolvedValue({
         group_id: securityData.id,
         description: 'Other SG',
       });
@@ -382,9 +374,9 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma create error', async () => {
-      mockPrismaCommonClient.security_groups.findFirst.mockResolvedValue(null);
-      mockPrismaCommonClient.security_groups.findUnique.mockResolvedValue(null);
-      mockPrismaCommonClient.security_groups.create.mockRejectedValue(
+      mockPrisma.security_groups.findFirst.mockResolvedValue(null);
+      mockPrisma.security_groups.findUnique.mockResolvedValue(null);
+      mockPrisma.security_groups.create.mockRejectedValue(
         new Error('DB error'),
       );
       await expect(
@@ -395,22 +387,22 @@ describe('GroupService', () => {
 
   describe('findGroupById', () => {
     it('should return a group if found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
       const group = await service.findGroupById(1);
       expect(group).toEqual(sampleGroupDb);
-      expect(mockPrismaAuth.group.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
     });
 
     it('should return null if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       const group = await service.findGroupById(99);
       expect(group).toBeNull();
     });
 
     it('should throw InternalServerErrorException on prisma error', async () => {
-      mockPrismaAuth.group.findUnique.mockRejectedValue(new Error('DB error'));
+      mockPrisma.group.findUnique.mockRejectedValue(new Error('DB error'));
       await expect(service.findGroupById(1)).rejects.toThrow(
         InternalServerErrorException,
       );
@@ -422,9 +414,9 @@ describe('GroupService', () => {
     const updateData: Partial<GroupDto> = { name: 'Updated Group Name' };
 
     it('should allow admin to update a group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // existing group
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(null); // name conflict check
-      mockPrismaAuth.group.update.mockResolvedValue({
+      mockPrisma.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // existing group
+      mockPrisma.group.findUnique.mockResolvedValueOnce(null); // name conflict check
+      mockPrisma.group.update.mockResolvedValue({
         ...sampleGroupDb,
         ...updateData,
         modifiedBy: Number(mockAdminUser.userId),
@@ -432,7 +424,7 @@ describe('GroupService', () => {
 
       const result = await service.update(groupId, updateData, mockAdminUser);
       expect(result.name).toEqual(updateData.name);
-      expect(mockPrismaAuth.group.update).toHaveBeenCalledWith(
+      expect(mockPrisma.group.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: groupId },
           data: expect.objectContaining({
@@ -450,15 +442,15 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group to update does not exist', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.update(groupId, updateData, mockAdminUser),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ConflictException if updated group name already exists', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // existing group
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce({
+      mockPrisma.group.findUnique.mockResolvedValueOnce(sampleGroupDb); // existing group
+      mockPrisma.group.findUnique.mockResolvedValueOnce({
         ...sampleGroupDb,
         id: 2,
         name: updateData.name,
@@ -475,9 +467,9 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma update error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(sampleGroupDb);
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(null);
-      mockPrismaAuth.group.update.mockRejectedValue(new Error('DB Error'));
+      mockPrisma.group.findUnique.mockResolvedValueOnce(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.group.update.mockRejectedValue(new Error('DB Error'));
       await expect(
         service.update(groupId, updateData, mockAdminUser),
       ).rejects.toThrow(InternalServerErrorException);
@@ -488,26 +480,26 @@ describe('GroupService', () => {
     const groupId = 1;
 
     it('should allow admin to delete a group and its memberships', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.deleteMany.mockResolvedValue({ count: 5 });
-      mockPrismaAuth.group.delete.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.deleteMany.mockResolvedValue({ count: 5 });
+      mockPrisma.group.delete.mockResolvedValue(sampleGroupDb);
 
       const result = await service.deleteGroupAndMemberships(
         groupId,
         mockAdminUser,
       );
       expect(result).toEqual(sampleGroupDb);
-      expect(mockPrismaAuth.$transaction).toHaveBeenCalled();
-      expect(mockPrismaAuth.groupMembership.deleteMany).toHaveBeenCalledWith({
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockPrisma.groupMembership.deleteMany).toHaveBeenCalledWith({
         where: { groupId },
       });
-      expect(mockPrismaAuth.group.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.group.delete).toHaveBeenCalledWith({
         where: { id: groupId },
       });
     });
 
     it('should throw NotFoundException if group to delete is not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.deleteGroupAndMemberships(groupId, mockAdminUser),
       ).rejects.toThrow(NotFoundException);
@@ -520,8 +512,8 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on transaction error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.$transaction.mockRejectedValueOnce(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.$transaction.mockRejectedValueOnce(
         new Error('Transaction failed'),
       );
       await expect(
@@ -535,8 +527,8 @@ describe('GroupService', () => {
     const memberId = 2;
 
     it('should return membership if found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb); // Group exists
-      mockPrismaAuth.groupMembership.findFirst.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb); // Group exists
+      mockPrisma.groupMembership.findFirst.mockResolvedValue(
         sampleGroupMembershipWithGroupDb,
       );
 
@@ -551,15 +543,15 @@ describe('GroupService', () => {
           memberId,
         }),
       );
-      expect(mockPrismaAuth.groupMembership.findFirst).toHaveBeenCalledWith({
+      expect(mockPrisma.groupMembership.findFirst).toHaveBeenCalledWith({
         where: { groupId, memberId },
         include: { group: { select: { name: true } } },
       });
     });
 
     it('should return null if membership not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findFirst.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findFirst.mockResolvedValue(null);
       const result = await service.findMembershipByGroupAndMember(
         groupId,
         memberId,
@@ -568,15 +560,15 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.findMembershipByGroupAndMember(groupId, memberId),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw InternalServerErrorException on prisma error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findFirst.mockRejectedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findFirst.mockRejectedValue(
         new Error('DB error'),
       );
       await expect(
@@ -589,12 +581,12 @@ describe('GroupService', () => {
     const groupId = 1;
 
     it('should return member count for a group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(5);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockResolvedValue(5);
 
       const count = await service.getMemberCount(groupId, false);
       expect(count).toEqual(5);
-      expect(mockPrismaAuth.groupMembership.count).toHaveBeenCalledWith({
+      expect(mockPrisma.groupMembership.count).toHaveBeenCalledWith({
         where: { groupId: { in: [groupId] }, membershipType: 1 },
       });
     });
@@ -608,33 +600,31 @@ describe('GroupService', () => {
         subGroups: [{ ...sampleGroupDb, id: subGroupId }],
       };
 
-      mockPrismaAuth.group.findUnique.mockResolvedValueOnce(groupWithSubgroups); // Initial group fetch
-      mockPrismaAuth.groupMembership.findMany.mockResolvedValueOnce([
+      mockPrisma.group.findUnique.mockResolvedValueOnce(groupWithSubgroups); // Initial group fetch
+      mockPrisma.groupMembership.findMany.mockResolvedValueOnce([
         { memberId: subGroupId },
       ]); // group -> subGroup
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([
+      mockPrisma.group.findMany.mockResolvedValueOnce([
         { ...sampleGroupDb, id: subGroupId },
       ]); // fetch subGroup
-      mockPrismaAuth.groupMembership.findMany.mockResolvedValueOnce([]); // subGroup has no further subgroups
+      mockPrisma.groupMembership.findMany.mockResolvedValueOnce([]); // subGroup has no further subgroups
 
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(10);
+      mockPrisma.groupMembership.count.mockResolvedValue(10);
 
       const count = await service.getMemberCount(groupId, true, 1);
       expect(count).toEqual(10);
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(service.getMemberCount(groupId, false)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('should throw InternalServerErrorException on prisma count error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockRejectedValue(
-        new Error('DB error'),
-      );
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockRejectedValue(new Error('DB error'));
       await expect(service.getMemberCount(groupId, false)).rejects.toThrow(
         InternalServerErrorException,
       );
@@ -647,20 +637,20 @@ describe('GroupService', () => {
     const membershipType = 1;
 
     it('should return true if member is part of the group', async () => {
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(1);
+      mockPrisma.groupMembership.count.mockResolvedValue(1);
       const result = await service.isMemberOfGroup(
         memberId,
         groupId,
         membershipType,
       );
       expect(result).toBe(true);
-      expect(mockPrismaAuth.groupMembership.count).toHaveBeenCalledWith({
+      expect(mockPrisma.groupMembership.count).toHaveBeenCalledWith({
         where: { groupId, memberId, membershipType },
       });
     });
 
     it('should return false if member is not part of the group', async () => {
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0);
+      mockPrisma.groupMembership.count.mockResolvedValue(0);
       const result = await service.isMemberOfGroup(
         memberId,
         groupId,
@@ -670,9 +660,7 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma error', async () => {
-      mockPrismaAuth.groupMembership.count.mockRejectedValue(
-        new Error('DB error'),
-      );
+      mockPrisma.groupMembership.count.mockRejectedValue(new Error('DB error'));
       await expect(
         service.isMemberOfGroup(memberId, groupId, membershipType),
       ).rejects.toThrow(InternalServerErrorException);
@@ -690,9 +678,9 @@ describe('GroupService', () => {
     }; // User type
 
     it('should allow admin to add a member', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0); // Membership does not exist
-      mockPrismaAuth.groupMembership.create.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockResolvedValue(0); // Membership does not exist
+      mockPrisma.groupMembership.create.mockResolvedValue(
         sampleGroupMembershipWithGroupDb,
       );
       (MembershipTypeHelper.getByKey as jest.Mock).mockReturnValue(1);
@@ -705,7 +693,7 @@ describe('GroupService', () => {
       expect(result).toEqual(
         expect.objectContaining(sampleGroupMembershipResponseDto),
       );
-      expect(mockPrismaAuth.groupMembership.create).toHaveBeenCalledWith({
+      expect(mockPrisma.groupMembership.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           groupId,
           memberId: memberData.memberId,
@@ -717,26 +705,26 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.addMemberToGroup(mockAdminUser, groupId, memberData),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ConflictException if member already exists in group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(1); // Membership exists
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockResolvedValue(1); // Membership exists
       await expect(
         service.addMemberToGroup(mockAdminUser, groupId, memberData),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should throw ForbiddenException if non-admin tries to add another member to non-selfRegister group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue({
+      mockPrisma.group.findUnique.mockResolvedValue({
         ...sampleGroupDb,
         selfRegister: false,
       });
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0);
+      mockPrisma.groupMembership.count.mockResolvedValue(0);
       await expect(
         service.addMemberToGroup(mockRegularUser, groupId, {
           memberId: 3,
@@ -748,8 +736,8 @@ describe('GroupService', () => {
     });
 
     it('should throw ForbiddenException if machine user has no write scope', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockResolvedValue(0);
       await expect(
         service.addMemberToGroup(
           mockMachineUserWithoutScope,
@@ -760,9 +748,9 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma create error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0);
-      mockPrismaAuth.groupMembership.create.mockRejectedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.count.mockResolvedValue(0);
+      mockPrisma.groupMembership.create.mockRejectedValue(
         new Error('DB error'),
       );
       await expect(
@@ -771,7 +759,7 @@ describe('GroupService', () => {
     });
 
     it('should throw Error when memberId is null', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
 
       const memberDataWithNullId: GroupMemberDto = {
         memberId: null,
@@ -792,11 +780,11 @@ describe('GroupService', () => {
     const membershipId = 1;
 
     it('should allow admin to remove a membership', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue(
         sampleGroupMembershipDb,
       );
-      mockPrismaAuth.groupMembership.delete.mockResolvedValue(
+      mockPrisma.groupMembership.delete.mockResolvedValue(
         sampleGroupMembershipDb,
       );
 
@@ -808,7 +796,7 @@ describe('GroupService', () => {
       expect(result).toEqual(
         expect.objectContaining(sampleGroupMembershipResponseDto),
       );
-      expect(mockPrismaAuth.groupMembership.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.groupMembership.delete).toHaveBeenCalledWith({
         where: { id: membershipId },
       });
     });
@@ -819,11 +807,11 @@ describe('GroupService', () => {
         ...mockRegularUser,
         userId: String(sampleGroupMembershipDb.memberId),
       }; // User is the member
-      mockPrismaAuth.group.findUnique.mockResolvedValue(selfRegisterGroup);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(selfRegisterGroup);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue(
         sampleGroupMembershipDb,
       );
-      mockPrismaAuth.groupMembership.delete.mockResolvedValue(
+      mockPrisma.groupMembership.delete.mockResolvedValue(
         sampleGroupMembershipDb,
       );
 
@@ -836,23 +824,23 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.removeMembershipById(mockAdminUser, groupId, membershipId),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if membership not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue(null);
       await expect(
         service.removeMembershipById(mockAdminUser, groupId, membershipId),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException if membership does not belong to group', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue({
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue({
         ...sampleGroupMembershipDb,
         groupId: 2,
       });
@@ -864,8 +852,8 @@ describe('GroupService', () => {
     it('should throw ForbiddenException if non-admin tries to remove another member from non-selfRegister group', async () => {
       const nonSelfRegisterGroup = { ...sampleGroupDb, selfRegister: false };
       const otherUser = { ...mockRegularUser, userId: '99' }; // Not the member, not admin
-      mockPrismaAuth.group.findUnique.mockResolvedValue(nonSelfRegisterGroup);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(nonSelfRegisterGroup);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue(
         sampleGroupMembershipDb,
       ); // memberId is 2
       await expect(
@@ -874,11 +862,11 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma delete error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findUnique.mockResolvedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findUnique.mockResolvedValue(
         sampleGroupMembershipDb,
       );
-      mockPrismaAuth.groupMembership.delete.mockRejectedValue(
+      mockPrisma.groupMembership.delete.mockRejectedValue(
         new Error('DB error'),
       );
       await expect(
@@ -891,28 +879,28 @@ describe('GroupService', () => {
     const groupId = 1;
 
     it('should return group for admin user', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
       const result = await service.getGroupByGroupId(groupId, mockAdminUser);
       expect(result).toEqual(sampleGroupResponseDto);
     });
 
     it('should return public group for any authenticated user', async () => {
       const publicGroup = { ...sampleGroupDb, privateGroup: false };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(publicGroup);
+      mockPrisma.group.findUnique.mockResolvedValue(publicGroup);
       const result = await service.getGroupByGroupId(groupId, mockRegularUser);
       expect(result.id).toEqual(groupId);
     });
 
     it('should return private group if user is a member', async () => {
       const privateGroup = { ...sampleGroupDb, privateGroup: true };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(privateGroup);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(1); // User is a member
+      mockPrisma.group.findUnique.mockResolvedValue(privateGroup);
+      mockPrisma.groupMembership.count.mockResolvedValue(1); // User is a member
       const result = await service.getGroupByGroupId(groupId, mockRegularUser);
       expect(result.id).toEqual(groupId);
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.getGroupByGroupId(groupId, mockAdminUser),
       ).rejects.toThrow(NotFoundException);
@@ -920,8 +908,8 @@ describe('GroupService', () => {
 
     it('should throw ForbiddenException if user tries to access private group without membership or admin role', async () => {
       const privateGroup = { ...sampleGroupDb, privateGroup: true };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(privateGroup);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0); // User is NOT a member
+      mockPrisma.group.findUnique.mockResolvedValue(privateGroup);
+      mockPrisma.groupMembership.count.mockResolvedValue(0); // User is NOT a member
       await expect(
         service.getGroupByGroupId(groupId, mockRegularUser),
       ).rejects.toThrow(ForbiddenException);
@@ -929,7 +917,7 @@ describe('GroupService', () => {
 
     it('should allow machine user with read scopes to access private group', async () => {
       const privateGroup = { ...sampleGroupDb, privateGroup: true };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(privateGroup);
+      mockPrisma.group.findUnique.mockResolvedValue(privateGroup);
 
       const result = await service.getGroupByGroupId(
         1,
@@ -937,7 +925,7 @@ describe('GroupService', () => {
       );
 
       expect(result.id).toEqual(1);
-      expect(mockPrismaAuth.group.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
     });
@@ -948,7 +936,7 @@ describe('GroupService', () => {
     const subGroupId = 2;
 
     it('should get group without subgroups', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
       const result = await service.getGroupById(
         groupId,
         mockAdminUser,
@@ -957,7 +945,7 @@ describe('GroupService', () => {
       );
       expect(result.id).toBe(groupId);
       expect(result.subGroups).toEqual([]); // or undefined based on mapping
-      expect(mockPrismaAuth.groupMembership.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.groupMembership.findMany).not.toHaveBeenCalled();
     });
 
     it('should get group with one level of subgroups', async () => {
@@ -967,14 +955,14 @@ describe('GroupService', () => {
         id: subGroupId,
         name: 'SubGroup 1',
       };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(parentGroupData);
+      mockPrisma.group.findUnique.mockResolvedValue(parentGroupData);
       // Mock for getSubGroupsRecursively (depth 1)
-      mockPrismaAuth.groupMembership.findMany.mockResolvedValueOnce([
+      mockPrisma.groupMembership.findMany.mockResolvedValueOnce([
         { memberId: subGroupId },
       ]); // Parent has subGroup
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([subGroupData]); // Fetch subGroup
+      mockPrisma.group.findMany.mockResolvedValueOnce([subGroupData]); // Fetch subGroup
       // subGroup has no further subgroups for this call path
-      mockPrismaAuth.groupMembership.findMany.mockResolvedValueOnce([]);
+      mockPrisma.groupMembership.findMany.mockResolvedValueOnce([]);
 
       const result = await service.getGroupById(
         groupId,
@@ -989,7 +977,7 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.getGroupById(groupId, mockAdminUser, true, false),
       ).rejects.toThrow(NotFoundException);
@@ -1012,8 +1000,8 @@ describe('GroupService', () => {
         name: 'Parent',
       };
 
-      mockPrismaAuth.group.findUnique.mockResolvedValue(childGroupData); // Find child
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([parentGroupData]); // findPrimaryParentGroup for child
+      mockPrisma.group.findUnique.mockResolvedValue(childGroupData); // Find child
+      mockPrisma.group.findMany.mockResolvedValueOnce([parentGroupData]); // findPrimaryParentGroup for child
 
       const result = await service.getParentGroupByGroupId(
         childGroupId,
@@ -1030,14 +1018,14 @@ describe('GroupService', () => {
       const group2 = { ...sampleGroupDb, id: 2, name: 'G2-Parent' };
       const group3 = { ...sampleGroupDb, id: 3, name: 'G3-Child' };
 
-      mockPrismaAuth.group.findUnique.mockResolvedValue(group3); // Find child G3
+      mockPrisma.group.findUnique.mockResolvedValue(group3); // Find child G3
 
       // G3's parent is G2
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([group2]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([group2]);
       // G2's parent is G1 (recursive call in getParentGroupsRecursively)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([group1]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([group1]);
       // G1 has no parent
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([]);
 
       const result = await service.getParentGroupByGroupId(
         3,
@@ -1049,8 +1037,8 @@ describe('GroupService', () => {
     });
 
     it('should return null if no parent group found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb); // Child group exists
-      mockPrismaAuth.group.findMany.mockResolvedValue([]); // No parent found
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb); // Child group exists
+      mockPrisma.group.findMany.mockResolvedValue([]); // No parent found
 
       const result = await service.getParentGroupByGroupId(
         childGroupId,
@@ -1061,7 +1049,7 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if child group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(
         service.getParentGroupByGroupId(childGroupId, mockAdminUser, true),
       ).rejects.toThrow(NotFoundException);
@@ -1072,7 +1060,7 @@ describe('GroupService', () => {
       const membershipType = 2;
       const dbError = new Error('Database connection failed');
 
-      mockPrismaAuth.group.findMany.mockRejectedValue(dbError);
+      mockPrisma.group.findMany.mockRejectedValue(dbError);
       const loggerErrorSpy = jest.spyOn(service['logger'], 'error');
 
       // Act & Assert
@@ -1085,7 +1073,7 @@ describe('GroupService', () => {
         dbError.stack,
       );
 
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findMany).toHaveBeenCalledWith({
         where: {
           memberships: { some: { memberId: childMemberId, membershipType } },
         },
@@ -1144,32 +1132,28 @@ describe('GroupService', () => {
 
       // Mock Prisma responses:
       // 1. For parentGroup (G1), find its subgroups (subGroupL1)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([
-        subGroupL1,
-      ] as any[]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([subGroupL1] as any[]);
       // 2. For subGroupL1, find its subgroups (subGroupL2)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([
-        subGroupL2,
-      ] as any[]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([subGroupL2] as any[]);
       // 3. For subGroupL2, find its subgroups (none)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([]);
 
       await service.getSubGroupsRecursivelyOrignal(parentGroup as any);
 
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledTimes(3);
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(1, {
+      expect(mockPrisma.group.findMany).toHaveBeenCalledTimes(3);
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(1, {
         where: {
           memberships: { some: { groupId: parentGroup.id, membershipType: 2 } },
         },
         orderBy: { id: 'asc' },
       });
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(2, {
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(2, {
         where: {
           memberships: { some: { groupId: subGroupL1.id, membershipType: 2 } },
         },
         orderBy: { id: 'asc' },
       });
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(3, {
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(3, {
         where: {
           memberships: { some: { groupId: subGroupL2.id, membershipType: 2 } },
         },
@@ -1200,12 +1184,12 @@ describe('GroupService', () => {
         subGroups: [],
       };
 
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([]); // No subgroups for G10
+      mockPrisma.group.findMany.mockResolvedValueOnce([]); // No subgroups for G10
 
       await service.getSubGroupsRecursivelyOrignal(parentGroup as any);
 
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledTimes(1);
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.group.findMany).toHaveBeenCalledWith({
         where: {
           memberships: { some: { groupId: parentGroup.id, membershipType: 2 } },
         },
@@ -1223,14 +1207,14 @@ describe('GroupService', () => {
         subGroups: [],
       };
       const dbError = new Error('Database query failed');
-      mockPrismaAuth.group.findMany.mockRejectedValueOnce(dbError);
+      mockPrisma.group.findMany.mockRejectedValueOnce(dbError);
 
       const loggerErrorSpy = jest.spyOn(service['logger'], 'error');
 
       await service.getSubGroupsRecursivelyOrignal(parentGroup as any);
 
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledTimes(1);
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.group.findMany).toHaveBeenCalledWith({
         where: {
           memberships: { some: { groupId: parentGroup.id, membershipType: 2 } },
         },
@@ -1266,31 +1250,31 @@ describe('GroupService', () => {
 
       // Mock Prisma responses:
       // 1. For parentGroup (G30), find its subgroups (subGroup1, subGroup2)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([
+      mockPrisma.group.findMany.mockResolvedValueOnce([
         subGroup1,
         subGroup2,
       ] as any[]);
       // 2. For subGroup1, find its subgroups (none)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([]);
       // 3. For subGroup2, find its subgroups (none)
-      mockPrismaAuth.group.findMany.mockResolvedValueOnce([]);
+      mockPrisma.group.findMany.mockResolvedValueOnce([]);
 
       await service.getSubGroupsRecursivelyOrignal(parentGroup as any);
 
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledTimes(3);
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(1, {
+      expect(mockPrisma.group.findMany).toHaveBeenCalledTimes(3);
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(1, {
         where: {
           memberships: { some: { groupId: parentGroup.id, membershipType: 2 } },
         },
         orderBy: { id: 'asc' },
       });
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(2, {
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(2, {
         where: {
           memberships: { some: { groupId: subGroup1.id, membershipType: 2 } },
         },
         orderBy: { id: 'asc' },
       });
-      expect(mockPrismaAuth.group.findMany).toHaveBeenNthCalledWith(3, {
+      expect(mockPrisma.group.findMany).toHaveBeenNthCalledWith(3, {
         where: {
           memberships: { some: { groupId: subGroup2.id, membershipType: 2 } },
         },
@@ -1315,7 +1299,7 @@ describe('GroupService', () => {
       const publicGroup = { ...sampleGroupDb, privateGroup: false };
 
       // Mock all the methods that getMembers calls
-      mockPrismaAuth.groupMembership.findMany.mockResolvedValue([
+      mockPrisma.groupMembership.findMany.mockResolvedValue([
         sampleGroupMembershipDb,
       ]);
 
@@ -1342,7 +1326,7 @@ describe('GroupService', () => {
     });
 
     it('should throw NotFoundException if group not found', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       await expect(service.getMembers(mockAdminUser, groupId)).rejects.toThrow(
         NotFoundException,
       );
@@ -1350,8 +1334,8 @@ describe('GroupService', () => {
 
     it('should throw ForbiddenException for private group if user is not admin and not member', async () => {
       const privateGroup = { ...sampleGroupDb, privateGroup: true };
-      mockPrismaAuth.group.findUnique.mockResolvedValue(privateGroup);
-      mockPrismaAuth.groupMembership.count.mockResolvedValue(0); // User is NOT member
+      mockPrisma.group.findUnique.mockResolvedValue(privateGroup);
+      mockPrisma.groupMembership.count.mockResolvedValue(0); // User is NOT member
 
       await expect(
         service.getMembers(mockRegularUser, groupId),
@@ -1359,8 +1343,8 @@ describe('GroupService', () => {
     });
 
     it('should throw InternalServerErrorException on prisma findMany error', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
-      mockPrismaAuth.groupMembership.findMany.mockRejectedValue(
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.groupMembership.findMany.mockRejectedValue(
         new Error('DB error'),
       );
       await expect(service.getMembers(mockAdminUser, groupId)).rejects.toThrow(
@@ -1373,11 +1357,11 @@ describe('GroupService', () => {
     const memberId = 2;
 
     it('should return groups for the authenticated non-admin user', async () => {
-      mockPrismaAuth.group.findMany.mockResolvedValue([sampleGroupDb]);
+      mockPrisma.group.findMany.mockResolvedValue([sampleGroupDb]);
       jest.spyOn(MembershipTypeHelper, 'getByKey').mockReturnValueOnce(1);
       const result = await service.getGroupByMember(mockRegularUser, null, ''); // memberId and type ignored for non-admin
       expect(result).toHaveLength(1);
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findMany).toHaveBeenCalledWith({
         where: {
           memberships: {
             some: {
@@ -1397,9 +1381,9 @@ describe('GroupService', () => {
     });
 
     it('should allow machine user with read scopes to get all groups if no memberId/type', async () => {
-      mockPrismaAuth.group.findMany.mockResolvedValue([sampleGroupDb]);
+      mockPrisma.group.findMany.mockResolvedValue([sampleGroupDb]);
       await service.getGroupByMember(mockMachineUserWithReadScope, null, '');
-      expect(mockPrismaAuth.group.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findMany).toHaveBeenCalledWith({
         orderBy: { id: 'asc' },
       });
     });
@@ -1419,22 +1403,22 @@ describe('GroupService', () => {
     const groupName = 'Existing Group';
 
     it('should return true if group exists', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(sampleGroupDb);
+      mockPrisma.group.findUnique.mockResolvedValue(sampleGroupDb);
       const exists = await service.groupExists(groupName);
       expect(exists).toBe(true);
-      expect(mockPrismaAuth.group.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.group.findUnique).toHaveBeenCalledWith({
         where: { name: groupName },
       });
     });
 
     it('should return false if group does not exist', async () => {
-      mockPrismaAuth.group.findUnique.mockResolvedValue(null);
+      mockPrisma.group.findUnique.mockResolvedValue(null);
       const exists = await service.groupExists('Non Existing Group');
       expect(exists).toBe(false);
     });
 
     it('should throw InternalServerErrorException on prisma error', async () => {
-      mockPrismaAuth.group.findUnique.mockRejectedValue(new Error('DB error'));
+      mockPrisma.group.findUnique.mockRejectedValue(new Error('DB error'));
       await expect(service.groupExists(groupName)).rejects.toThrow(
         InternalServerErrorException,
       );

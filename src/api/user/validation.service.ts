@@ -5,11 +5,9 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import {
-  PrismaClient as PrismaClientCommonOltp,
-  country,
-} from '@prisma/client-common-oltp';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { country, PrismaClient } from '@prisma/client';
 import * as DTOs from '../../dto/user/user.dto';
 import {
   getProviderDetails,
@@ -47,8 +45,8 @@ export class ValidationService {
   private readonly logger = new Logger(ValidationService.name);
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
   ) {}
 
   async validateHandle(handle: string): Promise<DTOs.ValidationResponseDto> {
@@ -65,7 +63,7 @@ export class ValidationService {
       throw new BadRequestException(`Handle '${handle}' is reserved.`);
     }
 
-    const existingUser = await this.prismaOltp.user.findFirst({
+    const existingUser = await this.prismaClient.user.findFirst({
       where: { handle_lower: handle.toLowerCase() },
     });
 
@@ -87,7 +85,7 @@ export class ValidationService {
     }
 
     // Check if email exists in the email table and is associated with a user
-    const existingEmailRecord = await this.prismaOltp.email.findFirst({
+    const existingEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         address: email.toLowerCase(),
         // user_id: { not: null } // Ensures it's linked to a user. If an email can exist unlinked, this check is important.
@@ -123,7 +121,7 @@ export class ValidationService {
     providerNumericId: ProviderId,
     socialProviderUserId: string,
   ): Promise<boolean> {
-    const count = await this.prismaOltp.user_social_login.count({
+    const count = await this.prismaClient.user_social_login.count({
       // Model name from schema
       where: {
         social_login_provider_id: providerNumericId, // Field name from schema
@@ -242,7 +240,7 @@ export class ValidationService {
     if (!countryCode) {
       throw new BadRequestException('Country code cannot be empty.');
     }
-    const countryRecord = await this.prismaOltp.country.findUnique({
+    const countryRecord = await this.prismaClient.country.findUnique({
       where: { country_code: countryCode },
     });
     if (!countryRecord) {
@@ -301,7 +299,7 @@ export class ValidationService {
 
     let dbCountryRecord: country | null;
     try {
-      dbCountryRecord = await this.prismaOltp.country.findUnique({
+      dbCountryRecord = await this.prismaClient.country.findUnique({
         // Ensure 'country' is your Prisma model name
         where: { country_code: countryInput.code },
       });
@@ -415,14 +413,16 @@ export class ValidationService {
     }
 
     if (internalUserId !== undefined) {
-      const existingLink = await this.prismaOltp.user_social_login.findUnique({
-        where: {
-          user_id_social_login_provider_id: {
-            user_id: internalUserId,
-            social_login_provider_id: providerDetails.id, // Use id from your ProviderDetails
+      const existingLink = await this.prismaClient.user_social_login.findUnique(
+        {
+          where: {
+            user_id_social_login_provider_id: {
+              user_id: internalUserId,
+              social_login_provider_id: providerDetails.id, // Use id from your ProviderDetails
+            },
           },
         },
-      });
+      );
       if (existingLink) {
         this.logger.warn(
           `User ${internalUserId} already bound with provider ${providerDetails.key} (ID: ${providerDetails.id})`,
@@ -432,7 +432,7 @@ export class ValidationService {
     }
 
     const socialProfileInUse =
-      await this.prismaOltp.user_social_login.findFirst({
+      await this.prismaClient.user_social_login.findFirst({
         where: {
           social_login_provider_id: providerDetails.id, // Use id from your ProviderDetails
           social_user_id: profile.userId,
@@ -470,7 +470,7 @@ export class ValidationService {
       );
     }
 
-    return this.prismaOltp.user_social_login.findMany({
+    return this.prismaClient.user_social_login.findMany({
       where: {
         user_id: internalUserId,
         social_login_provider_id: providerDetails.id, // Use id from your ProviderDetails
@@ -539,7 +539,7 @@ export class ValidationService {
 
     let ssoLink;
     if (profile.email) {
-      ssoLink = await this.prismaOltp.user_sso_login.findFirst({
+      ssoLink = await this.prismaClient.user_sso_login.findFirst({
         where: {
           provider_id: providerDetails.id, // Use id from your ProviderDetails
           email: profile.email,
@@ -549,7 +549,7 @@ export class ValidationService {
     }
 
     if (!ssoLink && profile.userId) {
-      ssoLink = await this.prismaOltp.user_sso_login.findFirst({
+      ssoLink = await this.prismaClient.user_sso_login.findFirst({
         where: {
           provider_id: providerDetails.id, // Use id from your ProviderDetails
           sso_user_id: profile.userId,
@@ -622,7 +622,7 @@ export class ValidationService {
     const normalizedHandle = handle.toLowerCase();
 
     try {
-      const count = await this.prismaOltp.user.count({
+      const count = await this.prismaClient.user.count({
         where: {
           // handle: handle, // Case-sensitive
           handle_lower: normalizedHandle, // Case-insensitive

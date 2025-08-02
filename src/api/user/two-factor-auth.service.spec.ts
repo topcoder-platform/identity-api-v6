@@ -8,7 +8,7 @@ import {
 } from './two-factor-auth.service';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { EventService } from '../../shared/event/event.service';
 import { UserService } from './user.service';
 import { SlackService } from '../../shared/slack/slack.service';
@@ -23,7 +23,7 @@ import {
 import {
   // Import specific Prisma models if needed for explicit typing, otherwise Prisma.ModelName suffices for mock shapes
   Prisma,
-} from '@prisma/client-common-oltp';
+} from '@prisma/client';
 import * as DTOs from '../../dto/user/user.dto'; // Using your DTO import
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { AuthenticatedUser, JwtPayload } from '../../core/auth/jwt.strategy';
@@ -207,7 +207,7 @@ describe('TwoFactorAuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TwoFactorAuthService,
-        { provide: PRISMA_CLIENT_COMMON_OLTP, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EventService, useValue: mockEventService },

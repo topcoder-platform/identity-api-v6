@@ -9,20 +9,21 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import {
-  PRISMA_CLIENT_AUTHORIZATION,
-  PRISMA_CLIENT_COMMON_OLTP,
+  PRISMA_CLIENT,
+  PRISMA_CLIENT_GROUP,
 } from '../../shared/prisma/prisma.module';
 import {
-  PrismaClient as PrismaClientAuthorization,
-  Group as PrismaGroupFromDb,
-  GroupMembership,
   Prisma,
-} from '@prisma/client-authorization';
-import {
-  PrismaClient as PrismaCommonClient,
+  PrismaClient,
   security_groups as PrismaSecurityGroupsFromDb,
-  Prisma as PrismaCommon,
-} from '@prisma/client-common-oltp';
+} from '@prisma/client';
+import {
+  Prisma as PrismaGroup,
+  Group as PrismaGroupFromDb,
+  PrismaClient as PrismaClientGroup,
+  GroupMembership,
+} from '@prisma/client-group';
+
 import {
   GroupResponseDto,
   GroupDto,
@@ -56,10 +57,10 @@ export class GroupService {
   private readonly logger = new Logger(GroupService.name);
 
   constructor(
-    @Inject(PRISMA_CLIENT_AUTHORIZATION)
-    private readonly prismaAuth: PrismaClientAuthorization,
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaCommonClient: PrismaCommonClient,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
+    @Inject(PRISMA_CLIENT_GROUP)
+    private readonly groupClient: PrismaClientGroup,
   ) {}
 
   // --- UTILITY METHODS ---
@@ -147,7 +148,7 @@ export class GroupService {
   }
 
   private mapPrismaMembershipToDto(
-    membership: Prisma.GroupMembershipGetPayload<{
+    membership: PrismaGroup.GroupMembershipGetPayload<{
       include: { group: { select: { name: true } } };
     }>,
   ): GroupMembershipResponseDto {
@@ -183,7 +184,7 @@ export class GroupService {
     }
 
     const now = new Date();
-    const dataToCreate: Prisma.GroupCreateInput = {
+    const dataToCreate: PrismaGroup.GroupCreateInput = {
       name: groupData.name,
       description: groupData.description,
       privateGroup: groupData.privateGroup ?? true,
@@ -193,7 +194,9 @@ export class GroupService {
     };
 
     try {
-      const group = await this.prismaAuth.group.create({ data: dataToCreate });
+      const group = await this.groupClient.group.create({
+        data: dataToCreate,
+      });
       return this.mapToGroupResponseDto(group);
     } catch (error) {
       this.logger.error(`Error creating group: ${error.message}`, error.stack);
@@ -227,14 +230,14 @@ export class GroupService {
       );
     }
 
-    const dataToCreate: PrismaCommon.security_groupsCreateInput = {
+    const dataToCreate: Prisma.security_groupsCreateInput = {
       group_id: securityData.id,
       description: securityData.name,
       create_user_id: authUser.isMachine ? null : Number(authUser.userId),
     };
 
     try {
-      await this.prismaCommonClient.security_groups.create({
+      await this.prismaClient.security_groups.create({
         data: dataToCreate,
       });
       return { securityGroups: securityData };
@@ -252,7 +255,7 @@ export class GroupService {
   async findGroupById(id: number): Promise<Group | null> {
     this.logger.debug(`Finding group with ID: ${id}`);
     try {
-      return (await this.prismaAuth.group.findUnique({
+      return (await this.groupClient.group.findUnique({
         where: { id },
       })) as Group | null;
     } catch (error) {
@@ -301,7 +304,7 @@ export class GroupService {
       }
     }
 
-    const dataToUpdate: Prisma.GroupUpdateInput = {
+    const dataToUpdate: PrismaGroup.GroupUpdateInput = {
       modifiedAt: new Date(),
       modifiedBy: authUser.isMachine ? undefined : Number(authUser.userId),
       name: groupUpdateData.name ?? existingGroup.name,
@@ -311,7 +314,7 @@ export class GroupService {
     };
 
     try {
-      const updatedGroup = await this.prismaAuth.group.update({
+      const updatedGroup = await this.groupClient.group.update({
         where: { id: groupId },
         data: dataToUpdate,
       });
@@ -343,7 +346,7 @@ export class GroupService {
     const group = await this.getGroupOrThrow(groupId);
 
     try {
-      await this.prismaAuth.$transaction(async (prisma) => {
+      await this.groupClient.$transaction(async (prisma) => {
         await prisma.groupMembership.deleteMany({ where: { groupId } });
         await prisma.group.delete({ where: { id: groupId } });
       });
@@ -378,7 +381,7 @@ export class GroupService {
     await this.getGroupOrThrow(groupId);
 
     try {
-      const membership = await this.prismaAuth.groupMembership.findFirst({
+      const membership = await this.groupClient.groupMembership.findFirst({
         where: { groupId, memberId },
         include: { group: { select: { name: true } } },
       });
@@ -412,7 +415,7 @@ export class GroupService {
     }
 
     try {
-      return await this.prismaAuth.groupMembership.count({
+      return await this.groupClient.groupMembership.count({
         where: { groupId: { in: groupIds }, membershipType: memberType },
       });
     } catch (error) {
@@ -436,7 +439,7 @@ export class GroupService {
     );
     try {
       return (
-        (await this.prismaAuth.groupMembership.count({
+        (await this.groupClient.groupMembership.count({
           where: { groupId, memberId, membershipType },
         })) > 0
       );
@@ -518,7 +521,7 @@ export class GroupService {
     };
 
     try {
-      const created = await this.prismaAuth.groupMembership.create({
+      const created = await this.groupClient.groupMembership.create({
         data: membershipData,
         include: { group: { select: { name: true } } },
       });
@@ -536,7 +539,9 @@ export class GroupService {
   }
 
   private async findMembership(id: number): Promise<GroupMembership | null> {
-    return await this.prismaAuth.groupMembership.findUnique({ where: { id } });
+    return await this.groupClient.groupMembership.findUnique({
+      where: { id },
+    });
   }
 
   async removeMembershipById(
@@ -578,7 +583,7 @@ export class GroupService {
     }
 
     try {
-      await this.prismaAuth.groupMembership.delete({
+      await this.groupClient.groupMembership.delete({
         where: { id: membershipId },
       });
       return this.mapMembershipToDto(membership);
@@ -704,13 +709,15 @@ export class GroupService {
     visitedGroups.add(parent.id);
 
     try {
-      const membershipRecords = await this.prismaAuth.groupMembership.findMany({
-        where: {
-          groupId: parent.id,
-          membershipType: Constants.subGroupMembershipType,
+      const membershipRecords = await this.groupClient.groupMembership.findMany(
+        {
+          where: {
+            groupId: parent.id,
+            membershipType: Constants.subGroupMembershipType,
+          },
+          select: { memberId: true },
         },
-        select: { memberId: true },
-      });
+      );
 
       const memberIds = membershipRecords.map((record) => record.memberId);
       if (!memberIds.length) {
@@ -718,7 +725,7 @@ export class GroupService {
         return;
       }
 
-      parent.subGroups = (await this.prismaAuth.group.findMany({
+      parent.subGroups = (await this.groupClient.group.findMany({
         where: { id: { in: memberIds } },
         orderBy: { id: 'asc' },
       })) as Group[];
@@ -747,7 +754,7 @@ export class GroupService {
   ): Promise<PrismaGroupFromDb[] | null> {
     this.logger.debug(`Finding primary parent for group ID: ${childMemberId}`);
     try {
-      return await this.prismaAuth.group.findMany({
+      return await this.groupClient.group.findMany({
         where: {
           memberships: { some: { memberId: childMemberId, membershipType } },
         },
@@ -796,7 +803,7 @@ export class GroupService {
 
   async getSubGroupsRecursivelyOrignal(parent: Group): Promise<void> {
     try {
-      const subGroups = await this.prismaAuth.group.findMany({
+      const subGroups = await this.groupClient.group.findMany({
         where: {
           memberships: {
             some: {
@@ -860,7 +867,7 @@ export class GroupService {
     );
 
     try {
-      const memberships = await this.prismaAuth.groupMembership.findMany({
+      const memberships = await this.groupClient.groupMembership.findMany({
         where: { groupId },
         orderBy: { id: 'asc' },
       });
@@ -911,7 +918,7 @@ export class GroupService {
   }
 
   private async findAllGroups(): Promise<Group[]> {
-    return await this.prismaAuth.group.findMany({
+    return await this.groupClient.group.findMany({
       orderBy: { id: 'asc' },
     });
   }
@@ -920,7 +927,7 @@ export class GroupService {
     memberId: number,
     type: number,
   ): Promise<Group[]> {
-    return await this.prismaAuth.group.findMany({
+    return await this.groupClient.group.findMany({
       where: { memberships: { some: { memberId, membershipType: type } } },
       orderBy: { id: 'asc' },
     });
@@ -929,7 +936,7 @@ export class GroupService {
   async groupExists(name: string): Promise<boolean> {
     this.logger.debug(`Checking if group exists with name: ${name}`);
     try {
-      return !!(await this.prismaAuth.group.findUnique({ where: { name } }));
+      return !!(await this.groupClient.group.findUnique({ where: { name } }));
     } catch (error) {
       this.logger.error(
         `Error checking if group exists: ${error.message}`,
@@ -944,7 +951,7 @@ export class GroupService {
   private async findSecurityGroupByName(
     name: string,
   ): Promise<PrismaSecurityGroupsFromDb | null> {
-    return await this.prismaCommonClient.security_groups.findFirst({
+    return await this.prismaClient.security_groups.findFirst({
       where: { description: name },
     });
   }
@@ -952,7 +959,7 @@ export class GroupService {
   private async findSecurityGroupById(
     id: number,
   ): Promise<PrismaSecurityGroupsFromDb | null> {
-    return await this.prismaCommonClient.security_groups.findUnique({
+    return await this.prismaClient.security_groups.findUnique({
       where: { group_id: id },
     });
   }

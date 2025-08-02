@@ -4,19 +4,16 @@ import {
   ProviderTypes,
 } from '../../core/constant/provider-type.enum';
 import { UserProfileDto } from '../../dto/user/user.dto';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
-import {
-  Prisma,
-  PrismaClient as PrismaCommonClient,
-} from '@prisma/client-common-oltp';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class UserProfileHelper {
   private readonly logger = new Logger(UserProfileHelper.name);
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaCommonClient: PrismaCommonClient,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
   ) {}
 
   createProfile(decoded: Record<string, any>): UserProfileDto {
@@ -92,7 +89,7 @@ export class UserProfileHelper {
     let userId: Prisma.Decimal = null;
     try {
       const localUserId = this.getLocalUserIdThrow(profile);
-      const record = await this.prismaCommonClient.user_social_login.findFirst({
+      const record = await this.prismaClient.user_social_login.findFirst({
         where: {
           social_user_id: String(localUserId),
           social_login_provider_id: providerType.id,
@@ -111,7 +108,7 @@ export class UserProfileHelper {
       );
     }
     if (profile.email != null && profile.email.length > 0) {
-      const record = await this.prismaCommonClient.user_social_login.findFirst({
+      const record = await this.prismaClient.user_social_login.findFirst({
         where: {
           social_email: profile.email,
           social_email_verified: profile.isEmailVerified,
@@ -120,7 +117,7 @@ export class UserProfileHelper {
       });
       userId = record?.user_id;
     } else if (profile.name != null && profile.name.length > 0) {
-      const record = await this.prismaCommonClient.user_social_login.findFirst({
+      const record = await this.prismaClient.user_social_login.findFirst({
         where: {
           social_user_name: profile.name,
           social_login_provider_id: providerType.id,
@@ -134,7 +131,7 @@ export class UserProfileHelper {
     }
     if (userId != null) {
       try {
-        await this.prismaCommonClient.user_social_login.updateMany({
+        await this.prismaClient.user_social_login.updateMany({
           where: { user_id: userId },
           data: { social_user_id: String(this.getLocalUserIdThrow(profile)) },
         });
@@ -152,16 +149,17 @@ export class UserProfileHelper {
     profile: UserProfileDto,
   ): Promise<number | null> {
     // find sso provider id
-    const providerRecord =
-      await this.prismaCommonClient.sso_login_provider.findFirst({
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
         where: { name: profile.provider },
-      });
+      },
+    );
     const ssoProviderId = providerRecord?.sso_login_provider_id;
     if (ssoProviderId == null) {
       throw new Error(`Unsupported SSO provider: ${profile.provider}`);
     }
     let userId = null;
-    let userRecord = await this.prismaCommonClient.user_sso_login.findFirst({
+    let userRecord = await this.prismaClient.user_sso_login.findFirst({
       where: {
         email: profile.email,
         provider_id: ssoProviderId,
@@ -169,7 +167,7 @@ export class UserProfileHelper {
     });
     userId = userRecord?.user_id;
     if (userId == null) {
-      userRecord = await this.prismaCommonClient.user_sso_login.findFirst({
+      userRecord = await this.prismaClient.user_sso_login.findFirst({
         where: {
           sso_user_id: String(this.getLocalUserId(profile)),
           provider_id: ssoProviderId,
@@ -201,6 +199,7 @@ export class UserProfileHelper {
   }
 
   private getLocalUserId(profile: UserProfileDto): number | null {
+    console.log(profile);
     const userIdStr = String(profile.userId);
     if (userIdStr == null || userIdStr.length === 0) {
       return null;

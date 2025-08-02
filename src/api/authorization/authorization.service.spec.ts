@@ -48,15 +48,13 @@ describe('AuthorizationService', () => {
   const mockZendeskPlugin = {
     process: jest.fn(),
   };
-  const mockPrismaAuth = {
+  const mockPrisma = {
     client: {
       findUnique: jest.fn(),
     },
     roleAssignment: {
       findMany: jest.fn(),
     },
-  };
-  const mockPrismaCommonClient = {
     user: {
       update: jest.fn(),
     },
@@ -116,11 +114,7 @@ describe('AuthorizationService', () => {
         { provide: UserService, useValue: mockUserService },
         { provide: AuthDataStore, useValue: mockAuthDataStore },
         { provide: ZendeskAuthPlugin, useValue: mockZendeskPlugin },
-        { provide: 'PRISMA_CLIENT_AUTHORIZATION', useValue: mockPrismaAuth },
-        {
-          provide: 'PRISMA_CLIENT_COMMON_OLTP',
-          useValue: mockPrismaCommonClient,
-        },
+        { provide: 'PRISMA_CLIENT', useValue: mockPrisma },
         { provide: UserProfileHelper, useValue: mockUserProfileHelper },
         { provide: ConfigurationService, useValue: mockConfigService },
       ],
@@ -344,7 +338,7 @@ describe('AuthorizationService', () => {
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
-      mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
 
       const result = await service.createObject(mockReq, mockRes, null);
 
@@ -367,7 +361,7 @@ describe('AuthorizationService', () => {
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
-      mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
       (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
         alg: 'HS256',
       });
@@ -398,7 +392,7 @@ describe('AuthorizationService', () => {
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
-      mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
       (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
         alg: 'RS256',
       });
@@ -418,7 +412,7 @@ describe('AuthorizationService', () => {
         secret: 'secret1',
       };
 
-      mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
 
       const result = await service.createObjectForm(form);
 
@@ -444,7 +438,7 @@ describe('AuthorizationService', () => {
         secret: 'secret1',
       };
 
-      mockPrismaAuth.roleAssignment.findMany.mockResolvedValue([]);
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
       mockAuthDataStore.put.mockRejectedValueOnce(new Error('Store error'));
 
       await expect(service.createObjectForm(form)).rejects.toThrow(Error);
@@ -824,7 +818,7 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://valid.com',
       };
 
-      mockPrismaAuth.client.findUnique.mockResolvedValue({
+      mockPrisma.client.findUnique.mockResolvedValue({
         clientId: 'valid-client',
         redirectUri: 'https://valid.com,https://another.com',
       });
@@ -840,7 +834,7 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://valid.com',
       };
 
-      mockPrismaAuth.client.findUnique.mockResolvedValue(null);
+      mockPrisma.client.findUnique.mockResolvedValue(null);
 
       await expect(service.validateClient(dto)).rejects.toThrow(
         UnauthorizedException,
@@ -853,7 +847,7 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://valid.com',
       };
 
-      mockPrismaAuth.client.findUnique.mockResolvedValue({
+      mockPrisma.client.findUnique.mockResolvedValue({
         clientId: 'valid-client',
         redirectUri: null,
       });
@@ -869,7 +863,7 @@ describe('AuthorizationService', () => {
         redirectUrl: 'https://invalid.com',
       };
 
-      mockPrismaAuth.client.findUnique.mockResolvedValue({
+      mockPrisma.client.findUnique.mockResolvedValue({
         clientId: 'valid-client',
         redirectUri: 'https://valid.com',
       });

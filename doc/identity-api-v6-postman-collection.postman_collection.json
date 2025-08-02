@@ -1,0 +1,3582 @@
+{
+	"info": {
+		"_postman_id": "bb325d16-db81-40c0-b33b-ec5640fd9f6a",
+		"name": "identity-api-v6-postman-collection",
+		"description": "Comprehensive Postman collection for testing all endpoints in the Topcoder Identity API v6",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1574174"
+	},
+	"item": [
+		{
+			"name": "Authorization",
+			"item": [
+				{
+					"name": "User Login Redirect",
+					"protocolProfileBehavior": {
+						"followRedirects": false
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/login?next=http://localhost:3000/redirect",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"login"
+							],
+							"query": [
+								{
+									"key": "next",
+									"value": "http://localhost:3000/redirect",
+									"description": "Optional redirect URL override"
+								}
+							]
+						},
+						"description": "Initiates user login flow and redirects to Auth0"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Token by Authorization Code",
+					"protocolProfileBehavior": {
+						"followRedirects": false
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations?code=auth_code&redirectUrl=https%3A%2F%2Fwww.topcoder.com&state=NkxDdTduQmN2RUF4&error=login_required",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							],
+							"query": [
+								{
+									"key": "code",
+									"value": "auth_code",
+									"description": "Authorization code from Auth0"
+								},
+								{
+									"key": "redirectUrl",
+									"value": "https%3A%2F%2Fwww.topcoder.com",
+									"description": "Redirect URL"
+								},
+								{
+									"key": "state",
+									"value": "NkxDdTduQmN2RUF4",
+									"description": "State string from login request"
+								},
+								{
+									"key": "error",
+									"value": "login_required"
+								}
+							]
+						},
+						"description": "Exchanges authorization code for access token"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Authorization (JSON)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.json() && pm.response.json().id) {",
+									"    const target = pm.response.json().target;",
+									"    pm.collectionVariables.set('targetId', target);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"param\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"target\": \"1\",\n    \"externalToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiNDAxNDEyMzUiLCJyb2xlcyI6WyJhZG1pbmlzdHJhdG9yIiwiVG9wY29kZXIgVXNlciJdLCJoYW5kbGUiOiJUb255SiIsImVtYWlsIjoidGplZnRocytmaXhAdG9wY29kZXIuY29tIiwic2NvcGVzIjpbInJlYWQ6dXNlcnMiLCJ3cml0ZTp1c2VycyJdLCJpZGVudGl0aWVzIjpbeyJpZGVudGl0eUlkIjoiNDAxNDEyMzUiLCJ1c2VyX2lkIjoiNDAxNDEyMzUiLCJjb25uZWN0aW9uIjoiVEMtVXNlci1EYXRhYmFzZSIsInByb3ZpZGVyIjoiYWQiLCJpZGVudGl0eVR5cGUiOiJ0b3Bjb2RlciIsImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX1dLCJpYXQiOjE3NTMyNzAzNTAsImV4cCI6MTc1Mzk2MTU1MH0.5iKcfWP8kkIP9wsWQegb6DZl5nQKKnxhnN3AyokX1S0\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/authorizations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							]
+						},
+						"description": "Creates a new authorization record using JSON payload"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Authorization (JSON) with illegal externalToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response should be successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(401);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"param\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"target\": \"1\",\n    \"externalToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/authorizations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							]
+						},
+						"description": "Creates a new authorization record using JSON payload"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Authorization (Form)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "clientId",
+									"value": "devadmin1",
+									"type": "text"
+								},
+								{
+									"key": "secret",
+									"value": "devadmin1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/authorizations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							]
+						},
+						"description": "Creates a new authorization record using form data"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Authorization (Form) with wrong clientId",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response should be successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(401);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "clientId",
+									"value": "wrong",
+									"type": "text"
+								},
+								{
+									"key": "secret",
+									"value": "devadmin1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/authorizations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							]
+						},
+						"description": "Creates a new authorization record using form data"
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Client",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/validateClient?clientId=8be46512-728f-4543-bf0d-1183d0e8ac4b&redirectUrl=http://127.0.0.1:3000/oauth",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"validateClient"
+							],
+							"query": [
+								{
+									"key": "clientId",
+									"value": "8be46512-728f-4543-bf0d-1183d0e8ac4b",
+									"description": "Client ID to validate"
+								},
+								{
+									"key": "redirectUrl",
+									"value": "http://127.0.0.1:3000/oauth",
+									"description": "Redirect URL to validate"
+								}
+							]
+						},
+						"description": "Validates client credentials and redirect URL"
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Client with wrong clientId",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response should be successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(401);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/validateClient?clientId=8be46512-728f-4543-bf0d-1183d0e8ac4a&redirectUrl=http://127.0.0.1:3000/oauth",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"validateClient"
+							],
+							"query": [
+								{
+									"key": "clientId",
+									"value": "8be46512-728f-4543-bf0d-1183d0e8ac4a",
+									"description": "Client ID to validate"
+								},
+								{
+									"key": "redirectUrl",
+									"value": "http://127.0.0.1:3000/oauth",
+									"description": "Redirect URL to validate"
+								}
+							]
+						},
+						"description": "Validates client credentials and redirect URL"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Authorization by Resource ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/{{targetId}}?fields=token,refreshToken",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"{{targetId}}"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "token,refreshToken",
+									"description": "Optional fields to include in response"
+								}
+							]
+						},
+						"description": "Retrieves authorization object by resource ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Authorization by Resource ID with other target",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response should be successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(401);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/1001?fields=token,refreshToken",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"1001"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "token,refreshToken",
+									"description": "Optional fields to include in response"
+								}
+							]
+						},
+						"description": "Retrieves authorization object by resource ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Authorization by Target ID",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/{{targetId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"{{targetId}}"
+							]
+						},
+						"description": "Deletes authorization token by target ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Authorization by Resource ID After delete",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response should be successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(401);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations/{{targetId}}?fields=token,refreshToken",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations",
+								"{{targetId}}"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "token,refreshToken",
+									"description": "Optional fields to include in response"
+								}
+							]
+						},
+						"description": "Retrieves authorization object by resource ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Current User Authorization",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/authorizations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"authorizations"
+							]
+						},
+						"description": "Deletes authorization token of currently logged-in user"
+					},
+					"response": []
+				}
+			],
+			"description": "Authorization and authentication related endpoints"
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Public Endpoints",
+					"item": [
+						{
+							"name": "Get Reset Token",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/resetToken?email=user@example.com&resetPasswordUrlPrefix=http://localhost:3001/reset?token=",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"resetToken"
+									],
+									"query": [
+										{
+											"key": "email",
+											"value": "user@example.com",
+											"description": "User's email address"
+										},
+										{
+											"key": "resetPasswordUrlPrefix",
+											"value": "http://localhost:3001/reset?token=",
+											"description": "Base URL for reset link"
+										}
+									]
+								},
+								"description": "Generates and sends password reset token"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Reset Token with handle",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/resetToken?handle=userhandle&resetPasswordUrlPrefix=http://localhost:3001/reset?token=",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"resetToken"
+									],
+									"query": [
+										{
+											"key": "handle",
+											"value": "userhandle",
+											"description": "User's handle (alternative to email)"
+										},
+										{
+											"key": "resetPasswordUrlPrefix",
+											"value": "http://localhost:3001/reset?token=",
+											"description": "Base URL for reset link"
+										}
+									]
+								},
+								"description": "Generates and sends password reset token"
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Handle",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/validateHandle?handle=newuser12345",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"validateHandle"
+									],
+									"query": [
+										{
+											"key": "handle",
+											"value": "newuser12345",
+											"description": "Handle to validate"
+										}
+									]
+								},
+								"description": "Validates if a user handle is available"
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Exist Handle",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/validateHandle?handle=newuser",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"validateHandle"
+									],
+									"query": [
+										{
+											"key": "handle",
+											"value": "newuser",
+											"description": "Handle to validate"
+										}
+									]
+								},
+								"description": "Validates if a user handle is available"
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Email",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/validateEmail?email=newuser12345@example.com",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"validateEmail"
+									],
+									"query": [
+										{
+											"key": "email",
+											"value": "newuser12345@example.com",
+											"description": "Email to validate"
+										}
+									]
+								},
+								"description": "Validates if an email address is available"
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Exist Email",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/validateEmail?email=newuser@example.com",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"validateEmail"
+									],
+									"query": [
+										{
+											"key": "email",
+											"value": "newuser@example.com",
+											"description": "Email to validate"
+										}
+									]
+								},
+								"description": "Validates if an email address is available"
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Social",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/users/validateSocial?socialUserId=123456789&socialProvider=google-oauth2",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"validateSocial"
+									],
+									"query": [
+										{
+											"key": "socialUserId",
+											"value": "123456789",
+											"description": "User's ID within the social provider"
+										},
+										{
+											"key": "socialProvider",
+											"value": "google-oauth2",
+											"description": "Key of the social provider"
+										}
+									]
+								},
+								"description": "Validates social provider and user ID availability"
+							},
+							"response": []
+						},
+						{
+							"name": "Register User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Auto-extract IDs from responses for use in subsequent requests",
+											"if (pm.response.json() && pm.response.json().id) {",
+											"    const responseId = pm.response.json().id;",
+											"    pm.collectionVariables.set('userId', responseId);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"handle\": \"newuser12345\",\n    \"email\": \"newuser12345@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"credential\": {\n      \"password\": \"SecurePassword123!\"\n    },\n    \"country\": {\n      \"code\": \"US\",\n      \"name\": \"United States\"\n    },\n    \"status\": \"U\",\n    \"regSource\": \"web\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Register User with exist handle",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"handle\": \"newuser12345\",\n    \"email\": \"newuser12345789@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"credential\": {\n      \"password\": \"SecurePassword123!\"\n    },\n    \"country\": {\n      \"code\": \"US\",\n      \"name\": \"United States\"\n    },\n    \"status\": \"U\",\n    \"regSource\": \"web\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Register User with exist email",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"handle\": \"newuser12345789\",\n    \"email\": \"newuser12345@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"credential\": {\n      \"password\": \"SecurePassword123!\"\n    },\n    \"country\": {\n      \"code\": \"US\",\n      \"name\": \"United States\"\n    },\n    \"status\": \"U\",\n    \"regSource\": \"web\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Authenticated Endpoints",
+					"item": [
+						{
+							"name": "Find Users",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users?handle=testuser&limit=20&offset=0",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users"
+									],
+									"query": [
+										{
+											"key": "handle",
+											"value": "testuser",
+											"description": "Search by handle"
+										},
+										{
+											"key": "email",
+											"value": "user@example.com",
+											"description": "Search by email",
+											"disabled": true
+										},
+										{
+											"key": "limit",
+											"value": "20",
+											"description": "Page size limit"
+										},
+										{
+											"key": "offset",
+											"value": "0",
+											"description": "Page offset"
+										}
+									]
+								},
+								"description": "Finds users based on query parameters (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get User by ID",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}"
+									]
+								},
+								"description": "Gets a specific user by ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Update User Basic Info",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"firstName\": \"UpdatedFirstName\",\n    \"lastName\": \"UpdatedLastName\",\n    \"description\": \"Updated bio description\",\n    \"company\": \"New Company\",\n    \"photoURL\": \"https://example.com/photo.jpg\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}"
+									]
+								},
+								"description": "Updates basic user information"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "SSO Management",
+					"item": [
+						{
+							"name": "Create SSO User Login",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"provider\": \"okta-customer\",\n    \"userId\": \"user123@company.com\",\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@company.com\",\n    \"providerType\": \"enterprise\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogin",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogin"
+									]
+								},
+								"description": "Links an SSO profile to a user (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Create SSO User Login with no exist provider",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(400);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"provider\": \"no-exist-customer\",\n    \"userId\": \"user123@company.com\",\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@company.com\",\n    \"providerType\": \"enterprise\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogin",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogin"
+									]
+								},
+								"description": "Links an SSO profile to a user (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Update SSO User Login",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"provider\": \"okta-customer\",\n    \"userId\": \"user123@company.com\",\n    \"name\": \"John Updated Doe\",\n    \"email\": \"john.updated@company.com\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogin",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogin"
+									]
+								},
+								"description": "Updates an existing SSO profile linked to a user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get SSO User Logins Before Delete",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogins",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogins"
+									]
+								},
+								"description": "Retrieves all SSO profiles linked to a user (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete SSO User Login",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogin?provider=okta-customer&ssoUserId=user123@company.com",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogin"
+									],
+									"query": [
+										{
+											"key": "provider",
+											"value": "okta-customer",
+											"description": "SSO Provider Name"
+										},
+										{
+											"key": "ssoUserId",
+											"value": "user123@company.com",
+											"description": "User ID from external SSO provider"
+										}
+									]
+								},
+								"description": "Deletes an SSO login link for a user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get SSO User Logins After Delete",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/SSOUserLogins",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"SSOUserLogins"
+									]
+								},
+								"description": "Retrieves all SSO profiles linked to a user (Admin only)"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "External Profiles",
+					"item": [
+						{
+							"name": "Add External Profile",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"provider\": \"github\",\n    \"userId\": \"githubuser123\",\n    \"name\": \"GitHub User\",\n    \"email\": \"user@github.com\",\n    \"providerType\": \"social\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/profiles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"profiles"
+									]
+								},
+								"description": "Adds an external profile to a user (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get All External Profiles",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/profiles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"profiles"
+									]
+								},
+								"description": "Gets all external profiles for a user (Admin or self)"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete External Profiles by Provider",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/profiles/github",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"profiles",
+										"github"
+									]
+								},
+								"description": "Deletes all external profiles for a provider (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get All External Profiles After Delete",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/profiles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"profiles"
+									]
+								},
+								"description": "Gets all external profiles for a user (Admin or self)"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Authentication/Session Related",
+					"item": [
+						{
+							"name": "Auth0 Login",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"handleOrEmail\": \"newuser12345@example.com\",\n  \"password\": \"SecurePassword123!\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"login"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Auth0 Login with wrong password",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(401);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"handleOrEmail\": \"newuser12345@example.com\",\n  \"password\": \"SecurePassword123%\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"login"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Auth0 Roles",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"newuser12345@example.com\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/roles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"roles"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Auth0 Roles by handle",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"handle\": \"newuser12345\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/roles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"roles"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Auth0 Change Password",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"newuser12345@example.com\",\n  \"password\": \"SecurePassword321$\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/changePassword",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"changePassword"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Password/Activation Flows",
+					"item": [
+						{
+							"name": "Resend Activation Email with not match token and userId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(403);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n        \"userId\": 40159250,\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/resendActivationEmail",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"resendActivationEmail"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Resend Activation Email",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n        \"userId\": 40159253,\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/resendActivationEmail",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"resendActivationEmail"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Activate User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"userId\": 40159253,\n        \"otp\": \"025450\",\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n    }\n  \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/activate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"activate"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Profile Updates",
+					"item": [
+						{
+							"name": "Update Handle",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"handle\": \"updatedHandle12345\"\n    } \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/handle",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"handle"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Primary Email",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"email\": \"updateuser12345@example.com\"\n    } \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/email",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"email"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"status\": \"A\"\n    } \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"status"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get OneTimeToken",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Auto-extract IDs from responses for use in subsequent requests",
+											"if (pm.response.json() && pm.response.json().token) {",
+											"    const token = pm.response.json().token;",
+											"    pm.collectionVariables.set('oneTimeToken', token);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"userId\": {{userId}},\n    \"password\": \"SecurePassword321$\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/oneTimeToken",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"oneTimeToken"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Email With OneTimeToken",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{oneTimeToken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"userId\": {{userId}},\n    \"password\": \"SecurePassword321$\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/email/updateOneTime12345@example.com",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"email",
+										"updateOneTime12345@example.com"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Primary Role",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"primaryRole\": \"Topcoder Talent\"\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/updatePrimaryRole",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"updatePrimaryRole"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get User 2fa Status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/2fa",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"2fa"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Update User 2fa Status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"mfaEnabled\": true\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/2fa",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"2fa"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Send Otp",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Auto-extract IDs from responses for use in subsequent requests",
+											"if (pm.response.json() && pm.response.json().resendToken) {",
+											"    const token = pm.response.json().resendToken;",
+											"    pm.collectionVariables.set('resendToken', token);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"userId\": {{userId}}\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/sendOtp",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"sendOtp"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Resend Otp Email",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"resendToken\": \"{{resendToken}}\"\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/resendOtpEmail",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"resendOtpEmail"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Send Otp for check",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Auto-extract IDs from responses for use in subsequent requests",
+											"if (pm.response.json() && pm.response.json().resendToken) {",
+											"    const token = pm.response.json().resendToken;",
+											"    pm.collectionVariables.set('resendToken', token);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"userId\": {{userId}}\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/sendOtp",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"sendOtp"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Check Otp",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"param\": {\n        \"userId\": \"{{userId}}\",\n        \"otp\": 488550\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/checkOtp",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"checkOtp"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Achievements",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/{{userId}}/achievements",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"{{userId}}",
+										"achievements"
+									]
+								},
+								"description": "Registers a new user"
+							},
+							"response": []
+						}
+					]
+				}
+			],
+			"description": "User management endpoints including registration, profile management, and SSO"
+		},
+		{
+			"name": "Groups",
+			"item": [
+				{
+					"name": "Group Management",
+					"item": [
+						{
+							"name": "Create Group",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.json() && pm.response.json().result.content) {",
+											"    const responseId = pm.response.json().result.content.id;",
+											"    pm.collectionVariables.set('groupId', responseId);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"name\": \"Test Group\",\n    \"description\": \"A test group for demonstration\",\n    \"privateGroup\": true,\n    \"selfRegister\": false\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups"
+									]
+								},
+								"description": "Creates a new group"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Group with same group name",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"name\": \"Test Group\",\n    \"description\": \"A test group for demonstration\",\n    \"privateGroup\": true,\n    \"selfRegister\": false\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups"
+									]
+								},
+								"description": "Creates a new group"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Security Group",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"id\": 1090101,\n    \"name\": \"Security Admin Group 100\",\n    \"createuserId\": 1\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups/securityGroups",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"securityGroups"
+									]
+								},
+								"description": "Creates a new security group"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Exist Security Group",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"id\": 1090101,\n    \"name\": \"Security Admin Group 100\",\n    \"createuserId\": 1\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups/securityGroups",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"securityGroups"
+									]
+								},
+								"description": "Creates a new security group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Group by ID",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}?fields=name,description",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "name,description",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a specific group by its ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Group",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"name\": \"Updated Group Name\",\n    \"description\": \"Updated group description\",\n    \"privateGroup\": false\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}"
+									]
+								},
+								"description": "Updates an existing group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Group by ID After updated",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}?fields=name,description",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "name,description",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a specific group by its ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Group",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}"
+									]
+								},
+								"description": "Deletes a group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Group by ID After Delete",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(404);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}?fields=name,description",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "name,description",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a specific group by its ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Groups by Member",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups?memberId={{userId}}&membershipType=user",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups"
+									],
+									"query": [
+										{
+											"key": "memberId",
+											"value": "{{userId}}",
+											"description": "Member ID to search for"
+										},
+										{
+											"key": "membershipType",
+											"value": "user",
+											"description": "Type of membership"
+										}
+									]
+								},
+								"description": "Gets groups associated with a specific member"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Group Hierarchy",
+					"item": [
+						{
+							"name": "Get Group with Subgroups",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/getSubGroups?includeSubGroups=true&oneLevel=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"getSubGroups"
+									],
+									"query": [
+										{
+											"key": "includeSubGroups",
+											"value": "true",
+											"description": "Whether to include subgroups"
+										},
+										{
+											"key": "oneLevel",
+											"value": "false",
+											"description": "Whether to fetch only one level deep"
+										}
+									]
+								},
+								"description": "Gets a group along with its subgroups"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Parent Group",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/getParentGroup?oneLevel=true",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"getParentGroup"
+									],
+									"query": [
+										{
+											"key": "oneLevel",
+											"value": "true",
+											"description": "Fetch only direct parent"
+										}
+									]
+								},
+								"description": "Gets the primary parent or ultimate ancestor of a group"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Group Membership",
+					"item": [
+						{
+							"name": "Add Member to Group",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.json() && pm.response.json().result.content) {",
+											"    const responseId = pm.response.json().result.content.id;",
+											"    pm.collectionVariables.set('membershipId', responseId);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"memberId\": {{userId}},\n    \"membershipType\": \"user\",\n    \"groupId\": {{groupId}}\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/members",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"members"
+									]
+								},
+								"description": "Adds a member to a group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Group Members",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/members",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"members"
+									]
+								},
+								"description": "Gets all members of a specific group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Single Member from Group",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/singleMember/{{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"singleMember",
+										"{{userId}}"
+									]
+								},
+								"description": "Gets a single member from a group"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Members Count",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/membersCount?includeSubGroups=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"membersCount"
+									],
+									"query": [
+										{
+											"key": "includeSubGroups",
+											"value": "false",
+											"description": "Whether to include members from subgroups"
+										}
+									]
+								},
+								"description": "Gets the count of members in a group"
+							},
+							"response": []
+						},
+						{
+							"name": "Remove Member from Group",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/groups/{{groupId}}/members/{{membershipId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"groups",
+										"{{groupId}}",
+										"members",
+										"{{membershipId}}"
+									]
+								},
+								"description": "Removes a member from a group using membership ID"
+							},
+							"response": []
+						}
+					]
+				}
+			],
+			"description": "Group management, hierarchy, and membership endpoints"
+		},
+		{
+			"name": "Roles",
+			"item": [
+				{
+					"name": "Role Management",
+					"item": [
+						{
+							"name": "Search Roles",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles?filter=subjectId={{userId}}&fields=subjects",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Filter by subject ID"
+										},
+										{
+											"key": "fields",
+											"value": "subjects",
+											"description": "Fields to include in response"
+										}
+									]
+								},
+								"description": "Searches for roles based on query parameters"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Role",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.json() && pm.response.json().id) {",
+											"    const responseId = pm.response.json().id;",
+											"    pm.collectionVariables.set('roleId', responseId);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"roleName\": \"Test Role12345\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/roles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles"
+									]
+								},
+								"description": "Creates a new role (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Exist Role",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"roleName\": \"Test Role12345\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/roles",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles"
+									]
+								},
+								"description": "Creates a new role (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Role by ID",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}?fields=subjects",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "subjects",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a role by its unique ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Role",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"param\": {\n    \"roleName\": \"Updated Role Name\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}"
+									]
+								},
+								"description": "Updates an existing role (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Role by ID After update",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}?fields=subjects",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "subjects",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a role by its unique ID"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Role",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}"
+									]
+								},
+								"description": "Deletes a role (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Role by ID After Delete",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(404);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}?fields=subjects",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}"
+									],
+									"query": [
+										{
+											"key": "fields",
+											"value": "subjects",
+											"description": "Optional fields to include"
+										}
+									]
+								},
+								"description": "Gets a role by its unique ID"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Role Assignment",
+					"item": [
+						{
+							"name": "Assign Role to Subject",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}/assign?filter=subjectId={{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}",
+										"assign"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Subject ID in filter format"
+										}
+									]
+								},
+								"description": "Assigns a role to a subject (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Assign Role to Subject Again",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(409);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}/assign?filter=subjectId={{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}",
+										"assign"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Subject ID in filter format"
+										}
+									]
+								},
+								"description": "Assigns a role to a subject (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Check if Subject Has Role",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}/hasrole?filter=subjectId={{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}",
+										"hasrole"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Subject ID in filter format"
+										}
+									]
+								},
+								"description": "Checks if a subject has a specific role"
+							},
+							"response": []
+						},
+						{
+							"name": "Deassign Role from Subject",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}/deassign?filter=subjectId={{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}",
+										"deassign"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Subject ID in filter format"
+										}
+									]
+								},
+								"description": "Deassigns a role from a subject (Admin only)"
+							},
+							"response": []
+						},
+						{
+							"name": "Check if Subject Does Not Have Role",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response should be successful', function () {",
+											"    pm.expect(pm.response.code).to.equal(404);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{authToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/roles/{{roleId}}/hasrole?filter=subjectId={{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"roles",
+										"{{roleId}}",
+										"hasrole"
+									],
+									"query": [
+										{
+											"key": "filter",
+											"value": "subjectId={{userId}}",
+											"description": "Subject ID in filter format"
+										}
+									]
+								},
+								"description": "Checks if a subject has a specific role"
+							},
+							"response": []
+						}
+					]
+				}
+			],
+			"description": "Role management and assignment endpoints"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{authToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set variables from environment or previous responses",
+					"if (!pm.collectionVariables.get('baseUrl')) {",
+					"    pm.collectionVariables.set('baseUrl', 'http://localhost:3000/v3');",
+					"}",
+					"",
+					"// You can add logic here to automatically refresh tokens",
+					"// or set other dynamic variables"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test scripts that run after every request",
+					"pm.test('Response should be successful', function () {",
+					"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204, 302, 401, 403, 404, 409]);",
+					"});",
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/v3",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiNDAxNDEyMzUiLCJyb2xlcyI6WyJhZG1pbmlzdHJhdG9yIiwiVG9wY29kZXIgVXNlciJdLCJoYW5kbGUiOiJUb255SiIsImVtYWlsIjoidGplZnRocytmaXhAdG9wY29kZXIuY29tIiwic2NvcGVzIjpbInJlYWQ6dXNlcnMiLCJ3cml0ZTp1c2VycyJdLCJpYXQiOjE3NTMyNTM0NTgsImV4cCI6MTc1Mzk0NDY1OH0.tltWXF7NtObKSbDOm7JYP76ATjVMW43b0NDMFlhIK8M",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "groupId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "roleId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "membershipId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "targetId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "oneTimeToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAxMjYiLCJhdWQiOiJvbmV0aW1lX2VtYWlsX3VwZGF0ZSIsImp0aSI6IjI4MTE0OTkyLWUxYTgtNDEwNS1iNzcxLTNmNGU4MDBlMmI2YiIsImlhdCI6MTc1MzI4NDI3NiwiZXhwIjoxNzUzMjg0ODc2fQ.ecSASFjNCUSpBw7YiXq0-Hun-pcQ0VF2F2fmLqoQd8g",
+			"type": "string"
+		},
+		{
+			"key": "resendToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAxMjYiLCJhdWQiOiIyZmFlbWFpbCIsImlhdCI6MTc1MzI4NjM4MiwiZXhwIjoxNzUzMjg2OTgyfQ.tO-MvmSXPmSIvCH3fDU0S1uYvaTa5vmwi4ywOYZ5QyA"
+		}
+	]
+}

@@ -10,8 +10,8 @@ import { ExtractJwt, Strategy, StrategyOptions } from 'passport-jwt';
 import { passportJwtSecret } from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager'; // Re-add Cache type import
-import { PRISMA_CLIENT_AUTHORIZATION } from '../../shared/prisma/prisma.module';
-import { PrismaClient as PrismaClientAuthorization } from '@prisma/client-authorization';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { PrismaClient } from '@prisma/client';
 
 // Combined payload structure for both HS256 and RS256 tokens
 export interface JwtPayload {
@@ -112,8 +112,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   constructor(
     private configService: ConfigService,
-    @Inject(PRISMA_CLIENT_AUTHORIZATION)
-    private prismaAuth: PrismaClientAuthorization,
+    @Inject(PRISMA_CLIENT)
+    private prisma: PrismaClient,
     @Inject(CACHE_MANAGER) private cacheManager: Cache, // Re-add Inject Cache Manager
   ) {
     const strategyOptions = createStrategyOptions(configService);
@@ -294,7 +294,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     try {
       // Find all role assignments for the user (assuming subjectType 1 = User)
-      const assignments = await this.prismaAuth.roleAssignment.findMany({
+      const assignments = await this.prisma.roleAssignment.findMany({
         where: {
           subjectId: numericUserId,
           subjectType: 1, // Hardcoded assumption: 1 = User

@@ -8,14 +8,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import {
-  PrismaClient as PrismaClientCommonOltp,
+  PrismaClient,
   user_sso_login as UserSsoLoginModel,
   sso_login_provider as SsoLoginProviderModel,
   user_social_login as UserSocialLoginModel,
   social_login_provider as SocialLoginProviderModel,
   Prisma,
-} from '@prisma/client-common-oltp';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+} from '@prisma/client';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfileDto is suitable
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
@@ -27,8 +27,8 @@ export class UserProfileService {
   private readonly logger = new Logger(UserProfileService.name);
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
     private readonly eventService: EventService,
     private readonly configService: ConfigService,
     // Inject other services
@@ -81,7 +81,7 @@ export class UserProfileService {
 
   async findSSOUserLoginsByUserId(userId: number): Promise<UserProfileDto[]> {
     this.logger.debug(`Finding SSO logins for user ID: ${userId}`);
-    const ssoLogins = await this.prismaOltp.user_sso_login.findMany({
+    const ssoLogins = await this.prismaClient.user_sso_login.findMany({
       where: { user_id: userId },
       include: { sso_login_provider: true }, // Essential for mapSsoLoginToDto
     });
@@ -101,9 +101,11 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = await this.prismaOltp.sso_login_provider.findFirst({
-      where: { name: profileDto.provider },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: profileDto.provider },
+      },
+    );
 
     if (!providerRecord) {
       this.logger.error(
@@ -115,7 +117,7 @@ export class UserProfileService {
     }
 
     try {
-      const newSsoLogin = await this.prismaOltp.user_sso_login.create({
+      const newSsoLogin = await this.prismaClient.user_sso_login.create({
         data: {
           user_id: userId,
           provider_id: providerRecord.sso_login_provider_id,
@@ -178,9 +180,11 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = await this.prismaOltp.sso_login_provider.findFirst({
-      where: { name: profileDto.provider },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: profileDto.provider },
+      },
+    );
 
     if (!providerRecord) {
       throw new NotFoundException(
@@ -189,7 +193,7 @@ export class UserProfileService {
     }
 
     try {
-      const updatedSsoLogin = await this.prismaOltp.user_sso_login.update({
+      const updatedSsoLogin = await this.prismaClient.user_sso_login.update({
         where: {
           user_id_provider_id: {
             user_id: userId,
@@ -244,9 +248,11 @@ export class UserProfileService {
       `Deleting SSO login for user ID: ${userId}, provider: ${providerName}, ssoUserId: ${ssoUserIdForEvent}`,
     );
 
-    const providerRecord = await this.prismaOltp.sso_login_provider.findFirst({
-      where: { name: providerName },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: providerName },
+      },
+    );
 
     if (!providerRecord) {
       this.logger.warn(
@@ -256,7 +262,7 @@ export class UserProfileService {
     }
 
     try {
-      await this.prismaOltp.user_sso_login.delete({
+      await this.prismaClient.user_sso_login.delete({
         where: {
           user_id_provider_id: {
             user_id: userId,
@@ -329,7 +335,7 @@ export class UserProfileService {
     }
 
     const socialProvider =
-      await this.prismaOltp.social_login_provider.findFirst({
+      await this.prismaClient.social_login_provider.findFirst({
         where: { name: { equals: profileDto.provider, mode: 'insensitive' } }, // Case-insensitive match for provider name
       });
 
@@ -344,7 +350,7 @@ export class UserProfileService {
     }
 
     try {
-      const newSocialLogin = await this.prismaOltp.user_social_login.create({
+      const newSocialLogin = await this.prismaClient.user_social_login.create({
         data: {
           user_id: userId,
           social_login_provider_id: socialProvider.social_login_provider_id,
@@ -427,7 +433,7 @@ export class UserProfileService {
       `Found ${ssoProfiles.length} SSO profiles for user ID: ${userId}`,
     );
 
-    const socialLogins = await this.prismaOltp.user_social_login.findMany({
+    const socialLogins = await this.prismaClient.user_social_login.findMany({
       where: { user_id: userId },
       include: { social_login_provider: true },
     });
@@ -450,7 +456,7 @@ export class UserProfileService {
     );
 
     const socialProvider =
-      await this.prismaOltp.social_login_provider.findFirst({
+      await this.prismaClient.social_login_provider.findFirst({
         where: { name: { equals: providerName, mode: 'insensitive' } },
       });
 
@@ -464,12 +470,14 @@ export class UserProfileService {
     }
 
     try {
-      const deleteResult = await this.prismaOltp.user_social_login.deleteMany({
-        where: {
-          user_id: userId,
-          social_login_provider_id: socialProvider.social_login_provider_id,
+      const deleteResult = await this.prismaClient.user_social_login.deleteMany(
+        {
+          where: {
+            user_id: userId,
+            social_login_provider_id: socialProvider.social_login_provider_id,
+          },
         },
-      });
+      );
 
       if (deleteResult.count === 0) {
         this.logger.warn(

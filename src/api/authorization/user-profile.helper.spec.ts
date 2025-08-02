@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserProfileHelper } from './user-profile.helper';
 import { UserProfileDto } from '../../dto/user/user.dto';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client-common-oltp';
+import { Prisma } from '@prisma/client';
 import { ProviderId } from '../../core/constant/provider-type.enum';
 
 const userIdValue = new Prisma.Decimal(123);
@@ -31,7 +31,7 @@ describe('UserProfileHelper', () => {
       providers: [
         UserProfileHelper,
         {
-          provide: PRISMA_CLIENT_COMMON_OLTP,
+          provide: PRISMA_CLIENT,
           useValue: mockPrismaClient,
         },
       ],

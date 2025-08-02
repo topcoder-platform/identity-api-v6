@@ -44,8 +44,8 @@ import {
 } from '@nestjs/swagger'; // For Swagger documentation
 import { ValidationExceptionFilter } from '../../shared/filters/validation-exception.filter';
 import { AuthGuard } from '@nestjs/passport';
-import { PrismaClient as PrismaClientCommonOltp } from '@prisma/client-common-oltp'; // Import PrismaClient
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module'; // Import injection token
+import { PrismaClient } from '@prisma/client'; // Import PrismaClient
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module'; // Import injection token
 
 // Helper function to map UserModel to UserResponseDto
 /**
@@ -119,8 +119,8 @@ export class UserController {
     private readonly twoFactorAuthService: TwoFactorAuthService,
     private readonly validationService: ValidationService,
     private readonly roleService: RoleService,
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp, // Inject PrismaClient
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient, // Inject PrismaClient
   ) {}
 
   /**
@@ -781,7 +781,7 @@ export class UserController {
         `Provider name not given, looking up by providerId: ${providerId}`,
       );
       const providerRecord =
-        await this.prismaOltp.sso_login_provider.findUnique({
+        await this.prismaClient.sso_login_provider.findUnique({
           where: { sso_login_provider_id: providerId },
         });
       if (!providerRecord) {

@@ -62,7 +62,7 @@ export class CommonUtils {
     validIssuers: string[],
     secret: string,
   ): Promise<Record<string, any>> {
-    const validator = tokenValidator(validIssuers);
+    const validator = tokenValidator.auth.verifier(validIssuers);
     return new Promise((resolve, reject) => {
       validator.validateToken(token, secret, (err, decoded) => {
         if (err) {

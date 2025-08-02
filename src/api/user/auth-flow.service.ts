@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { PrismaClient as PrismaClientCommonOltp } from '@prisma/client-common-oltp';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { Cache } from 'cache-manager'; // Import Cache type
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -23,10 +23,8 @@ import {
   ACTIVATION_OTP_EXPIRY_SECONDS,
   ACTIVATION_OTP_LENGTH,
 } from './user.service';
-import { Prisma } from '@prisma/client-common-oltp';
 import { v4 as uuidv4 } from 'uuid';
 import { Decimal } from '@prisma/client/runtime/library'; // Import Decimal
-import * as CryptoJS from 'crypto-js'; // Import crypto-js for Blowfish
 import { Constants } from '../../core/constant/constants';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,8 +44,8 @@ export class AuthFlowService {
   private readonly legacyBlowfishKey: string; // For legacy password decryption
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly configService: ConfigService,
@@ -135,7 +133,7 @@ export class AuthFlowService {
 
     await this.cacheManager.del(otpCacheKey);
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
     if (!user) {
@@ -158,7 +156,7 @@ export class AuthFlowService {
     let primaryEmailAddress: string | undefined;
 
     try {
-      await this.prismaOltp.$transaction(async (prisma) => {
+      await this.prismaClient.$transaction(async (prisma) => {
         await prisma.user.update({
           where: { user_id: userId },
           data: { status: 'A', modify_date: new Date() },
@@ -250,7 +248,7 @@ export class AuthFlowService {
     }
 
     this.logger.log(`User ${userId} activated successfully.`);
-    const activatedUser = await this.prismaOltp.user.findUnique({
+    const activatedUser = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
     return activatedUser;
@@ -284,7 +282,7 @@ export class AuthFlowService {
       throw new ForbiddenException('Invalid or expired resend token.');
     }
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
     });
 
@@ -292,7 +290,7 @@ export class AuthFlowService {
       throw new NotFoundException('User not found.');
     }
 
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+    const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: userId,
         primary_ind: Constants.primaryEmailFlag,
@@ -395,7 +393,7 @@ export class AuthFlowService {
     }
 
     // 1. Fetch user by ID to get handle and status
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
       select: { user_id: true, handle: true, status: true },
     });
@@ -413,10 +411,12 @@ export class AuthFlowService {
     }
 
     // 2. Fetch Encrypted Password from security_user using the user's handle
-    const securityUserRecord = await this.prismaOltp.security_user.findUnique({
-      where: { user_id: user.handle }, // security_user.user_id is the user handle
-      select: { password: true },
-    });
+    const securityUserRecord = await this.prismaClient.security_user.findUnique(
+      {
+        where: { user_id: user.handle }, // security_user.user_id is the user handle
+        select: { password: true },
+      },
+    );
 
     if (!securityUserRecord || !securityUserRecord.password) {
       this.logger.error(
@@ -428,8 +428,11 @@ export class AuthFlowService {
     }
 
     // Verify Password
-    let passwordsMatching = this.userService.verifyLegacyPassword(passwordPlain, securityUserRecord.password);
- 
+    const passwordsMatching = this.userService.verifyLegacyPassword(
+      passwordPlain,
+      securityUserRecord.password,
+    );
+
     // Compare Passwords
     if (!passwordsMatching) {
       this.logger.warn(
@@ -516,7 +519,7 @@ export class AuthFlowService {
     }
 
     // 4. Prisma Transaction: Update email - SIMPLIFIED TO JUST UPDATE THE EXISTING PRIMARY EMAIL
-    await this.prismaOltp.$transaction(async (prisma) => {
+    await this.prismaClient.$transaction(async (prisma) => {
       const newEmailLower = newEmail.toLowerCase();
 
       // Find the user first
@@ -596,7 +599,7 @@ export class AuthFlowService {
 
     // 5. Publish user.updated event
     try {
-      const user = await this.prismaOltp.user.findUnique({
+      const user = await this.prismaClient.user.findUnique({
         where: { user_id: userId },
       });
       if (user) {
@@ -839,13 +842,13 @@ export class AuthFlowService {
   //   );
 
   //   // Update the password in the security_user table using the user's handle
-  //   await this.prismaOltp.security_user.update({
+  //   await this.prismaClient.security_user.update({
   //     where: { user_id: user.handle }, // security_user.user_id is the user handle
   //     data: { password: legacyEncodedPassword },
   //   });
 
   //   // Also update the modify_date on the main user record
-  //   await this.prismaOltp.user.update({
+  //   await this.prismaClient.user.update({
   //     where: { user_id: user.user_id.toNumber() },
   //     data: { modify_date: new Date() }, // Only update modify_date here
   //   });
@@ -890,7 +893,7 @@ export class AuthFlowService {
 
     // 1. Find User Record (without password)
     if (isEmail) {
-      const emailRecord = await this.prismaOltp.email.findFirst({
+      const emailRecord = await this.prismaClient.email.findFirst({
         where: {
           address: handleOrEmail.toLowerCase(),
           primary_ind: Constants.primaryEmailFlag,
@@ -900,7 +903,7 @@ export class AuthFlowService {
 
       if (emailRecord) {
         userId = emailRecord.user_id.toNumber();
-        userRecord = await this.prismaOltp.user.findUnique({
+        userRecord = await this.prismaClient.user.findUnique({
           where: { user_id: userId },
           select: {
             user_id: true,
@@ -920,7 +923,7 @@ export class AuthFlowService {
       }
     } else {
       // Find user by handle
-      userRecord = await this.prismaOltp.user.findFirst({
+      userRecord = await this.prismaClient.user.findFirst({
         where: { handle_lower: handleOrEmail.toLowerCase() },
         select: {
           user_id: true,
@@ -944,7 +947,7 @@ export class AuthFlowService {
     let primaryEmail: string | undefined;
     let emailVerified: boolean = false;
     if (userId) {
-      const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+      const primaryEmailRecord = await this.prismaClient.email.findFirst({
         where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
         select: { address: true, status_id: true },
       });
@@ -968,10 +971,12 @@ export class AuthFlowService {
     }
 
     // 2. Fetch Encrypted Password from security_user using the handle
-    const securityUserRecord = await this.prismaOltp.security_user.findUnique({
-      where: { user_id: userHandle }, // Java logic uses handle as security_user.user_id
-      select: { password: true },
-    });
+    const securityUserRecord = await this.prismaClient.security_user.findUnique(
+      {
+        where: { user_id: userHandle }, // Java logic uses handle as security_user.user_id
+        select: { password: true },
+      },
+    );
 
     if (!securityUserRecord || !securityUserRecord.password) {
       this.logger.error(
@@ -987,7 +992,10 @@ export class AuthFlowService {
     );
 
     // Verify Password
-    let passwordsMatching = this.userService.verifyLegacyPassword(passwordPlain, securityUserRecord.password);
+    const passwordsMatching = this.userService.verifyLegacyPassword(
+      passwordPlain,
+      securityUserRecord.password,
+    );
 
     // Compare Passwords
     if (!passwordsMatching) {
@@ -1055,14 +1063,14 @@ export class AuthFlowService {
 
     if (isEmail) {
       // 1. Find email to get user_id
-      const emailRecord = await this.prismaOltp.email.findFirst({
+      const emailRecord = await this.prismaClient.email.findFirst({
         where: { address: handleOrEmail.toLowerCase() },
         select: { user_id: true },
       });
       if (emailRecord) {
         userIdNumber = emailRecord.user_id.toNumber();
         // 2. Find user by user_id
-        user = await this.prismaOltp.user.findUnique({
+        user = await this.prismaClient.user.findUnique({
           where: { user_id: userIdNumber },
           select: {
             user_id: true,
@@ -1073,7 +1081,7 @@ export class AuthFlowService {
       }
     } else {
       // Find user by handle
-      user = await this.prismaOltp.user.findFirst({
+      user = await this.prismaClient.user.findFirst({
         where: { handle_lower: handleOrEmail.toLowerCase() },
         select: {
           user_id: true,
@@ -1094,7 +1102,7 @@ export class AuthFlowService {
 
     // Fetch roles and primary email separately using userIdNumber
     const roles = await this.roleService.findAll(userIdNumber);
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+    const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: { user_id: userIdNumber, primary_ind: Constants.primaryEmailFlag },
       select: { address: true, status_id: true },
     });
@@ -1175,13 +1183,13 @@ export class AuthFlowService {
     );
 
     // Update the password in the security_user table using the user's handle
-    await this.prismaOltp.security_user.update({
+    await this.prismaClient.security_user.update({
       where: { user_id: user.handle }, // Find security_user record by handle
       data: { password: legacyEncodedPassword },
     });
 
     // Also update the modify_date on the main user record
-    await this.prismaOltp.user.update({
+    await this.prismaClient.user.update({
       where: { user_id: user.user_id.toNumber() },
       data: { modify_date: new Date() },
     });

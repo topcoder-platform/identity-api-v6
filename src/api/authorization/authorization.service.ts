@@ -26,12 +26,8 @@ import { UserService } from '../user/user.service';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { AuthDataStore } from './auth-data-store.service';
 import { ZendeskAuthPlugin } from './zendesk.service';
-import {
-  PRISMA_CLIENT_AUTHORIZATION,
-  PRISMA_CLIENT_COMMON_OLTP,
-} from '../../shared/prisma/prisma.module';
-import { PrismaClient as PrismaClientAuthorization } from '@prisma/client-authorization';
-import { PrismaClient as PrismaCommonClient } from '@prisma/client-common-oltp';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { PrismaClient } from '@prisma/client';
 import { UserProfileHelper } from './user-profile.helper';
 import { ProviderTypes } from '../../core/constant/provider-type.enum';
 import { ConfigurationService } from '../../config/configuration.service';
@@ -65,10 +61,8 @@ export class AuthorizationService {
     private readonly userService: UserService,
     private readonly authDataStore: AuthDataStore,
     private readonly zendeskPlugin: ZendeskAuthPlugin,
-    @Inject(PRISMA_CLIENT_AUTHORIZATION)
-    private readonly prismaAuth: PrismaClientAuthorization,
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaCommonClient: PrismaCommonClient,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
     private readonly userProfileHelper: UserProfileHelper,
   ) {
     this.cookieExpirySeconds =
@@ -372,7 +366,7 @@ export class AuthorizationService {
    * @param dto query dto
    */
   async validateClient(dto: ValidateClientQueryDto): Promise<string> {
-    const client = await this.prismaAuth.client.findUnique({
+    const client = await this.prismaClient.client.findUnique({
       where: { clientId: dto.clientId },
     });
     if (client == null) {
@@ -463,7 +457,7 @@ export class AuthorizationService {
     if (userId == null) {
       return;
     }
-    await this.prismaCommonClient.user.update({
+    await this.prismaClient.user.update({
       where: { user_id: userId },
       data: { last_login: new Date() },
     });
@@ -707,7 +701,7 @@ export class AuthorizationService {
   }
 
   private async getRoleNames(userId: number): Promise<string[]> {
-    const assignments = await this.prismaAuth.roleAssignment.findMany({
+    const assignments = await this.prismaClient.roleAssignment.findMany({
       where: {
         subjectId: userId,
         subjectType: Constants.memberSubjectType,

@@ -21,8 +21,8 @@ import {
   Prisma,
   user as UserModel,
   sso_login_provider as SsoLoginProviderModel,
-} from '@prisma/client-common-oltp'; // Import Prisma
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+} from '@prisma/client'; // Import Prisma
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
@@ -223,7 +223,7 @@ describe('UserController', () => {
         { provide: ValidationService, useValue: mockValidationService },
         { provide: RoleService, useValue: mockRoleService },
         {
-          provide: PRISMA_CLIENT_COMMON_OLTP,
+          provide: PRISMA_CLIENT,
           useValue: mockPrismaClientCommonOltp,
         },
         { provide: ConfigService, useValue: mockConfigService },
@@ -249,7 +249,7 @@ describe('UserController', () => {
       .compile();
 
     controller = module.get<UserController>(UserController);
-    prismaOltp = module.get(PRISMA_CLIENT_COMMON_OLTP);
+    prismaOltp = module.get(PRISMA_CLIENT);
   });
 
   it('should be defined', () => {

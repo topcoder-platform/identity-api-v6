@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ValidationService } from './validation.service';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import {
   user as UserModel,
   email as EmailModel,
   country as CountryModel,
   user_social_login as UserSocialLoginModel,
-} from '@prisma/client-common-oltp';
+} from '@prisma/client';
 import * as DTOs from '../../dto/user/user.dto';
 import {
   ProviderId,
@@ -172,14 +172,14 @@ describe('ValidationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ValidationService,
-        { provide: PRISMA_CLIENT_COMMON_OLTP, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
       ],
     })
       .setLogger(nullLogger)
       .compile();
 
     service = module.get<ValidationService>(ValidationService);
-    prismaOltp = module.get(PRISMA_CLIENT_COMMON_OLTP);
+    prismaOltp = module.get(PRISMA_CLIENT);
   });
 
   it('should be defined', () => {

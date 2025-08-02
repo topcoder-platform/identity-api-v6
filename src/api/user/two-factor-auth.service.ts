@@ -6,11 +6,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  PrismaClient as PrismaClientCommonOltp,
-  Prisma,
-} from '@prisma/client-common-oltp';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { EventService } from '../../shared/event/event.service';
 import { UserService } from './user.service';
@@ -38,8 +35,8 @@ export class TwoFactorAuthService {
   private readonly otp2faAudience: string = '2faemail'; // As per Java UserResource
 
   constructor(
-    @Inject(PRISMA_CLIENT_COMMON_OLTP)
-    private readonly prismaOltp: PrismaClientCommonOltp,
+    @Inject(PRISMA_CLIENT)
+    private readonly prismaClient: PrismaClient,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
@@ -141,7 +138,7 @@ export class TwoFactorAuthService {
       throw new BadRequestException('Invalid user ID format.');
     }
 
-    const user2fa = await this.prismaOltp.user_2fa.findUnique({
+    const user2fa = await this.prismaClient.user_2fa.findUnique({
       where: { user_id: userId },
     });
 
@@ -184,13 +181,13 @@ export class TwoFactorAuthService {
       );
     }
 
-    let user2fa = await this.prismaOltp.user_2fa.findUnique({
+    let user2fa = await this.prismaClient.user_2fa.findUnique({
       where: { user_id: userId },
     });
     const oldDiceStatus = user2fa?.dice_enabled ?? false;
     const userHandle =
       (
-        await this.prismaOltp.user.findUnique({
+        await this.prismaClient.user.findUnique({
           where: { user_id: userId },
           select: { handle: true },
         })
@@ -224,7 +221,7 @@ export class TwoFactorAuthService {
       this.logger.log(
         `No existing user_2fa record for user ${userId}. Creating new record.`,
       );
-      const emailCount = await this.prismaOltp.email.count({
+      const emailCount = await this.prismaClient.email.count({
         where: { user_id: userId },
       });
       if (emailCount > 1) {
@@ -275,7 +272,7 @@ export class TwoFactorAuthService {
         );
       }
 
-      user2fa = await this.prismaOltp.user_2fa.create({
+      user2fa = await this.prismaClient.user_2fa.create({
         data: createData,
       });
     } else {
@@ -290,7 +287,7 @@ export class TwoFactorAuthService {
             user2fa[key] !== updatePayload[key],
         )
       ) {
-        user2fa = await this.prismaOltp.user_2fa.update({
+        user2fa = await this.prismaClient.user_2fa.update({
           where: { user_id: userId },
           data: updatePayload,
         });
@@ -306,7 +303,7 @@ export class TwoFactorAuthService {
       this.logger.log(
         `DICE was enabled and is now disabled for user ${userId}. Deleting DICE connection if any.`,
       );
-      await this.prismaOltp.dice_connection.deleteMany({
+      await this.prismaClient.dice_connection.deleteMany({
         where: { user_id: userId },
       });
       this.slackService
@@ -327,7 +324,7 @@ export class TwoFactorAuthService {
       throw new BadRequestException('Invalid user ID format.');
     }
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userIdNum },
       select: { handle: true }, // Only select handle initially
     });
@@ -337,7 +334,7 @@ export class TwoFactorAuthService {
     }
 
     // Fetch primary email separately
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+    const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: userIdNum,
         primary_ind: Constants.primaryEmailFlag,
@@ -433,7 +430,7 @@ export class TwoFactorAuthService {
       throw new BadRequestException('Invalid user ID format in token.');
     }
 
-    const user = await this.prismaOltp.user.findUnique({
+    const user = await this.prismaClient.user.findUnique({
       where: { user_id: userIdNum },
       select: { handle: true }, // Only select handle initially
     });
@@ -443,7 +440,7 @@ export class TwoFactorAuthService {
     }
 
     // Fetch primary email separately
-    const primaryEmailRecord = await this.prismaOltp.email.findFirst({
+    const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: userIdNum,
         primary_ind: Constants.primaryEmailFlag,
@@ -503,7 +500,7 @@ export class TwoFactorAuthService {
     await this.cacheManager.del(otpCacheKey);
     this.logger.log(`2FA OTP validated and consumed for user ${userIdString}.`);
 
-    const userForResponse = await this.prismaOltp.user.findUnique({
+    const userForResponse = await this.prismaClient.user.findUnique({
       where: { user_id: parseInt(userIdString, 10) },
       select: { user_id: true, handle: true },
     });
@@ -549,7 +546,7 @@ export class TwoFactorAuthService {
     await this.cacheManager.del(otpCacheKey);
     this.logger.log(`2FA OTP validated and consumed for user ${userIdString}.`);
 
-    const userForResponse = await this.prismaOltp.user.findUnique({
+    const userForResponse = await this.prismaClient.user.findUnique({
       where: { user_id: parseInt(userIdString, 10) },
       select: { user_id: true, handle: true },
     });

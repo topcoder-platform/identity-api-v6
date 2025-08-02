@@ -1,40 +1,40 @@
 import { Module, Global, Provider } from '@nestjs/common';
-import { PrismaClient as PrismaClientCommonOltp } from '@prisma/client-common-oltp';
-import { PrismaClient as PrismaClientAuthorization } from '@prisma/client-authorization';
+import { PrismaClient } from '@prisma/client';
+import { PrismaClient as PrismaClientGroup } from '@prisma/client-group';
 
 // Define injection tokens for clarity
-export const PRISMA_CLIENT_COMMON_OLTP = 'PRISMA_CLIENT_COMMON_OLTP';
-export const PRISMA_CLIENT_AUTHORIZATION = 'PRISMA_CLIENT_AUTHORIZATION';
+export const PRISMA_CLIENT = 'PRISMA_CLIENT';
+export const PRISMA_CLIENT_GROUP = 'PRISMA_CLIENT_GROUP';
 
-// Create providers for each client
-const commonOltpProvider: Provider = {
-  provide: PRISMA_CLIENT_COMMON_OLTP,
+// Create providers for prisma client
+const prismaProvider: Provider = {
+  provide: PRISMA_CLIENT,
   useFactory: () => {
-    const client = new PrismaClientCommonOltp();
+    const client = new PrismaClient();
     // Connect eagerly or handle connection errors if needed
     client
       .$connect()
-      .catch((e) => console.error('Failed to connect to common_oltp DB', e));
+      .catch((e) => console.error('Failed to connect to identity DB', e));
     return client;
   },
 };
 
-const authorizationProvider: Provider = {
-  provide: PRISMA_CLIENT_AUTHORIZATION,
+// Create providers for group prisma client
+const groupProvider: Provider = {
+  provide: PRISMA_CLIENT_GROUP,
   useFactory: () => {
-    const client = new PrismaClientAuthorization();
+    const client = new PrismaClientGroup();
     // Connect eagerly or handle connection errors if needed
     client
       .$connect()
-      .catch((e) => console.error('Failed to connect to authorization DB', e));
-    console.log('Connected to authorization DB');
+      .catch((e) => console.error('Failed to connect to identity DB', e));
     return client;
   },
 };
 
 @Global()
 @Module({
-  providers: [commonOltpProvider, authorizationProvider],
-  exports: [PRISMA_CLIENT_COMMON_OLTP, PRISMA_CLIENT_AUTHORIZATION],
+  providers: [prismaProvider, groupProvider],
+  exports: [PRISMA_CLIENT, PRISMA_CLIENT_GROUP],
 })
 export class PrismaModule {}

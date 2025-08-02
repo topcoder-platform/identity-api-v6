@@ -7,7 +7,7 @@ import {
 } from './user.service';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { ValidationService } from './validation.service';
 import { RoleService } from '../role/role.service';
 import { EventService } from '../../shared/event/event.service';
@@ -27,7 +27,7 @@ import {
   user_achievement as UserAchievementModel,
   achievement_type_lu as AchievementTypeLuModel,
   security_user as SecurityUserModel,
-} from '@prisma/client-common-oltp'; // Ensure all used models are imported
+} from '@prisma/client'; // Ensure all used models are imported
 import {
   CreateUserBodyDto,
   UpdateUserBodyDto,
@@ -36,7 +36,6 @@ import {
 } from '../../dto/user/user.dto';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { Decimal } from '@prisma/client/runtime/library';
-import * as CryptoJS from 'crypto-js';
 import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
@@ -159,24 +158,6 @@ const mockConfigService = {
   ),
 };
 
-// Mock CryptoJS
-jest.mock('crypto-js', () => ({
-  ...jest.requireActual('crypto-js'), // Import and retain default behavior
-  Blowfish: {
-    encrypt: jest.fn(),
-    decrypt: jest.fn(), // If you ever use decrypt
-  },
-  enc: {
-    ...jest.requireActual('crypto-js').enc,
-    Base64: {
-      ...jest.requireActual('crypto-js').enc.Base64,
-      parse: jest.fn(),
-    },
-  },
-  mode: jest.requireActual('crypto-js').mode,
-  pad: jest.requireActual('crypto-js').pad,
-}));
-
 // Mock jsonwebtoken
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn(),
@@ -188,16 +169,27 @@ jest.mock('uuid', () => ({
   v4: jest.fn(),
 }));
 
-// Mock crypto (Node.js built-in)
+// Mock crypto (Node.js built-ino
+let createCipherivError = false;
 const mockUpdate = jest.fn().mockReturnThis();
 const mockDigest = jest.fn();
-jest.mock('crypto', () => ({
-  ...jest.requireActual('crypto'),
-  createHash: jest.fn(() => ({
-    update: mockUpdate,
-    digest: mockDigest,
-  })),
-}));
+jest.mock('crypto', () => {
+  const realCrypto = jest.requireActual('crypto');
+  return {
+    ...realCrypto,
+    createCipheriv: jest.fn((algorithm, key, iv) => {
+      if (createCipherivError) {
+        throw new Error('Crypto Error');
+      }
+      // otherwise delegate to the real implementation
+      return realCrypto.createCipheriv(algorithm, key, iv);
+    }),
+    createHash: jest.fn(() => ({
+      update: mockUpdate,
+      digest: mockDigest,
+    })),
+  };
+});
 
 // --- Helper Functions to Create Mock Models ---
 const createMockUserModel = (
@@ -355,7 +347,7 @@ describe('UserService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
-        { provide: PRISMA_CLIENT_COMMON_OLTP, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
         { provide: ValidationService, useValue: mockValidationService },
         { provide: ValidationService, useValue: mockValidationService }, // mockValidationService is still provided
 
@@ -369,26 +361,13 @@ describe('UserService', () => {
       .compile();
 
     service = module.get<UserService>(UserService);
-    prismaOltp = module.get(PRISMA_CLIENT_COMMON_OLTP);
+    prismaOltp = module.get(PRISMA_CLIENT);
     validationService = module.get(ValidationService);
     roleService = module.get(RoleService);
     cacheManager = module.get(CACHE_MANAGER);
     eventService = module.get(EventService);
     configService = module.get(ConfigService);
-
-    // Mock implementations for external libraries
-    const actualParse = jest.requireActual('crypto-js').enc.Base64.parse;
-    (CryptoJS.enc.Base64.parse as jest.Mock).mockImplementation(
-      (val: string): ReturnType<typeof actualParse> => {
-        return actualParse(val);
-      },
-    );
-    (CryptoJS.Blowfish.encrypt as jest.Mock).mockImplementation(() => ({
-      toString: () => 'encryptedPassword',
-    }));
-    (jwt.sign as jest.Mock).mockReturnValue('mock.jwt.token');
-    (uuidv4 as jest.Mock).mockReturnValue('mock-uuid-v4');
-    mockDigest.mockReturnValue('hashedValue');
+    createCipherivError = false;
   });
 
   it('should be defined', () => {
@@ -641,22 +620,8 @@ describe('UserService', () => {
 
   describe('encodePasswordLegacy', () => {
     it('should correctly encode a password', () => {
-      const mockParse = (
-        CryptoJS.enc.Base64.parse as jest.Mock
-      ).mockReturnValue('parsedKey');
-      const mockEncrypt = (
-        CryptoJS.Blowfish.encrypt as jest.Mock
-      ).mockReturnValue({
-        toString: () => 'encryptedLegacyPassword',
-      });
       const result = service.encodePasswordLegacy('password123');
-      expect(mockParse).toHaveBeenCalledWith('dGVzdEJhc2U2NEtleQ==');
-      expect(mockEncrypt).toHaveBeenCalledWith(
-        'password123',
-        'parsedKey',
-        expect.any(Object),
-      );
-      expect(result).toBe('encryptedLegacyPassword');
+      expect(result).toBe('HO5zzQIVxZYFeP5TLljiMw==');
     });
 
     it('should throw InternalServerErrorException if key is not configured', () => {
@@ -667,9 +632,7 @@ describe('UserService', () => {
     });
 
     it('should throw InternalServerErrorException on encoding error', () => {
-      (CryptoJS.Blowfish.encrypt as jest.Mock).mockImplementation(() => {
-        throw new Error('Crypto Error');
-      });
+      createCipherivError = true;
       expect(() => service.encodePasswordLegacy('password123')).toThrow(
         InternalServerErrorException,
       );

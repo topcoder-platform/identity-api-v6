@@ -5,11 +5,8 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { PRISMA_CLIENT_AUTHORIZATION } from '../../shared/prisma/prisma.module';
-import {
-  PrismaClient as PrismaClientAuthorization,
-  Role,
-} from '@prisma/client-authorization';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { PrismaClient, Role } from '@prisma/client';
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { MemberApiService } from '../../shared/member-api/member-api.service';
 import { MemberInfoResponseDto } from '../../dto/member/member.dto';
@@ -28,8 +25,8 @@ export class RoleService {
   private readonly logger = new Logger(RoleService.name);
 
   constructor(
-    @Inject(PRISMA_CLIENT_AUTHORIZATION)
-    private prismaAuth: PrismaClientAuthorization,
+    @Inject(PRISMA_CLIENT)
+    private prismaClient: PrismaClient,
     private memberApiService: MemberApiService,
   ) {}
 
@@ -62,7 +59,7 @@ export class RoleService {
         }
       : {};
 
-    const roles = await this.prismaAuth.role.findMany({
+    const roles = await this.prismaClient.role.findMany({
       where: whereClause,
     });
 
@@ -76,7 +73,7 @@ export class RoleService {
     this.logger.debug(`Finding role by id: ${roleId}, fields: ${fields}`);
     const includeSubjects = fields?.toLowerCase().includes('subjects');
 
-    const role = await this.prismaAuth.role.findUnique({
+    const role = await this.prismaClient.role.findUnique({
       where: { id: roleId },
       include: {
         roleAssignments: includeSubjects
@@ -124,7 +121,7 @@ export class RoleService {
     this.logger.debug(
       `Creating role: ${JSON.stringify(createRoleDto)} by user ${creatorId}`,
     );
-    const existing = await this.prismaAuth.role.findUnique({
+    const existing = await this.prismaClient.role.findUnique({
       where: { name: createRoleDto.roleName },
     });
     if (existing) {
@@ -133,7 +130,7 @@ export class RoleService {
       );
     }
 
-    const newRole = await this.prismaAuth.role.create({
+    const newRole = await this.prismaClient.role.create({
       data: {
         name: createRoleDto.roleName,
         createdBy: creatorId,
@@ -152,7 +149,7 @@ export class RoleService {
       `Updating role ${roleId}: ${JSON.stringify(updateRoleDto)} by user ${modifierId}`,
     );
 
-    return this.prismaAuth.$transaction(async (tx) => {
+    return this.prismaClient.$transaction(async (tx) => {
       const existingRole = await tx.role.findUnique({
         where: { id: roleId },
       });
@@ -212,18 +209,18 @@ export class RoleService {
 
   async remove(roleId: number): Promise<void> {
     this.logger.debug(`Removing role ${roleId}`);
-    const existingRole = await this.prismaAuth.role.findUnique({
+    const existingRole = await this.prismaClient.role.findUnique({
       where: { id: roleId },
     });
     if (!existingRole) {
       throw new NotFoundException(`Role with ID ${roleId} not found.`);
     }
     try {
-      await this.prismaAuth.roleAssignment.deleteMany({
+      await this.prismaClient.roleAssignment.deleteMany({
         where: { roleId: roleId },
       });
 
-      await this.prismaAuth.role.delete({
+      await this.prismaClient.role.delete({
         where: { id: roleId },
       });
     } catch (error) {
@@ -231,7 +228,7 @@ export class RoleService {
         error.code === 'P2003' ||
         error.code === Constants.prismaNotFoundCode
       ) {
-        const assignments = await this.prismaAuth.roleAssignment.count({
+        const assignments = await this.prismaClient.roleAssignment.count({
           where: { roleId },
         });
         if (assignments > 0) {
@@ -260,7 +257,7 @@ export class RoleService {
     this.logger.debug(
       `Assigning role ${roleId} to subject ${subjectId} by operator ${operatorId}`,
     );
-    const roleExists = await this.prismaAuth.role.count({
+    const roleExists = await this.prismaClient.role.count({
       where: { id: roleId },
     });
     if (!roleExists) {
@@ -268,7 +265,7 @@ export class RoleService {
     }
 
     try {
-      await this.prismaAuth.roleAssignment.create({
+      await this.prismaClient.roleAssignment.create({
         data: {
           roleId: roleId,
           subjectId: subjectId,
@@ -300,7 +297,7 @@ export class RoleService {
     subjectId: number,
   ): Promise<void> {
     this.logger.debug(`Deassigning role ${roleId} from subject ${subjectId}`);
-    const deleteResult = await this.prismaAuth.roleAssignment.deleteMany({
+    const deleteResult = await this.prismaClient.roleAssignment.deleteMany({
       where: {
         roleId: roleId,
         subjectId: subjectId,
@@ -320,7 +317,7 @@ export class RoleService {
     subjectId: number,
   ): Promise<RoleResponseDto | null> {
     this.logger.debug(`Checking if subject ${subjectId} has role ${roleId}`);
-    const assignment = await this.prismaAuth.roleAssignment.findUnique({
+    const assignment = await this.prismaClient.roleAssignment.findUnique({
       where: {
         roleId_subjectId_subjectType: {
           roleId: roleId,
@@ -345,7 +342,7 @@ export class RoleService {
    */
   async findRoleByName(roleName: string): Promise<Role | null> {
     this.logger.debug(`Finding role by name: ${roleName}`);
-    return this.prismaAuth.role.findUnique({
+    return this.prismaClient.role.findUnique({
       where: { name: roleName },
     });
   }

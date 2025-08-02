@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserProfileService } from './user-profile.service';
 import { ConfigService } from '@nestjs/config';
-import { PRISMA_CLIENT_COMMON_OLTP } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { EventService } from '../../shared/event/event.service';
 import {
   NotFoundException,
@@ -15,7 +15,7 @@ import {
   user_social_login as UserSocialLoginModel,
   social_login_provider as SocialLoginProviderModel,
   Prisma,
-} from '@prisma/client-common-oltp';
+} from '@prisma/client';
 import { UserProfileDto } from '../../dto/user/user.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -141,7 +141,7 @@ describe('UserProfileService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserProfileService,
-        { provide: PRISMA_CLIENT_COMMON_OLTP, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
         { provide: EventService, useValue: mockEventService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
@@ -150,7 +150,7 @@ describe('UserProfileService', () => {
       .compile();
 
     service = module.get<UserProfileService>(UserProfileService);
-    prismaOltp = module.get(PRISMA_CLIENT_COMMON_OLTP);
+    prismaOltp = module.get(PRISMA_CLIENT);
     eventService = module.get(EventService);
   });
 

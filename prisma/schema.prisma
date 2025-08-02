@@ -1,14 +1,13 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../../node_modules/@prisma/client-common-oltp" // Relative path from *this file* to root node_modules
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("COMMON_OLTP_DB_URL")
+  url      = env("IDENTITY_DB_URL")
 }
 
-// COMMON_OLTP SCHEMA MODELS
+// IDENTITY SCHEMA MODELS
 // (Introspected from existing database)
 // -----------------------------------------
 
@@ -308,4 +307,54 @@ model user_email_xref {
 
   @@id([user_id, email_id], map: "user_email_xref_pkey") // Define composite primary key
   @@index([email_id], map: "user_email_xref_email_idx")
+}
+
+
+// -----------------------------------------
+// (Migrated from MySQL DDL)
+// -----------------------------------------
+
+model Client {
+  id          Int      @id @default(autoincrement()) @map("id")
+  clientId    String   @unique @map("client_id")
+  name        String
+  redirectUri String?  @map("redirect_uri") @db.VarChar(8192)
+  secret      String?
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0) // Use Timestamp(0) if you need second precision like MySQL datetime
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+
+  @@map("client") // Map model name to table name
+}
+
+model Role {
+  id          Int      @id @default(autoincrement()) @map("id")
+  name        String   @unique @db.VarChar(45)
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0)
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+
+  roleAssignments RoleAssignment[] // Relation field
+
+  @@map("role") // Map model name to table name
+}
+
+model RoleAssignment {
+  id          Int      @id @default(autoincrement()) @map("id")
+  roleId      Int      @map("role_id")
+  subjectId   Int      @map("subject_id")
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0)
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+  subjectType Int      @default(1) @map("subject_type")
+
+  role Role @relation(fields: [roleId], references: [id], map: "role_id") // Relation field
+
+  @@unique([roleId, subjectId, subjectType], map: "role_subject_id_subject_type")
+  @@index([subjectId], map: "subject_id_idx")
+  @@index([roleId], map: "role_id_idx")
+  @@map("role_assignment")
 }

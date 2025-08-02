@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../../node_modules/@prisma/client-group" // Relative path from *this file* to root node_modules
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("GROUP_DB_URL")
+}
+
+// GROUP SCHEMA MODELS
+// (Introspected from existing database)
+// -----------------------------------------
+
+model Group {
+  id           Int      @id @default(autoincrement()) @map("id")
+  name         String   @unique
+  description  String?  @db.VarChar(2048)
+  createdBy    Int?
+  createdAt    DateTime? @db.Timestamp(0)
+  modifiedBy   Int?
+  modifiedAt   DateTime? @db.Timestamp(0)
+  privateGroup Boolean  @default(true) @map("private_group")
+  selfRegister Boolean  @default(false) @map("self_register")
+
+  memberships GroupMembership[] // Relation field
+
+  @@map("group") // Map model name to table name (needed because 'group' can be a reserved word)
+}
+
+model GroupMembership {
+  id             Int      @id @default(autoincrement()) @map("id")
+  groupId        Int      @map("group_id")
+  memberId       Int      @map("member_id")
+  membershipType Int      @default(1) @map("membership_type") // Remove @db.UnsignedInt
+  createdBy      Int?
+  createdAt      DateTime? @db.Timestamp(0)
+  modifiedBy     Int?
+  modifiedAt     DateTime? @db.Timestamp(0)
+
+  group Group @relation(fields: [groupId], references: [id], map: "group_id") // Relation field
+
+  @@unique([groupId, memberId, membershipType], map: "group_member_id")
+  @@map("group_membership")
+}

@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RoleService } from './role.service';
-import { PRISMA_CLIENT_AUTHORIZATION } from '../../shared/prisma/prisma.module';
+import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { MemberApiService } from '../../shared/member-api/member-api.service';
 import { NotFoundException, ConflictException, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client-authorization';
+import { Prisma } from '@prisma/client';
 import { MemberInfoResponseDto } from '../../dto/member/member.dto';
 
 // Test data factory functions
@@ -34,7 +34,7 @@ const createMockRoleAssignment = (overrides: Partial<any> = {}) => ({
 });
 
 // Mock factory functions
-const createMockPrismaAuth = () => ({
+const createMockPrisma = () => ({
   role: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
@@ -50,7 +50,7 @@ const createMockPrismaAuth = () => ({
     count: jest.fn(),
   },
   $transaction: jest.fn().mockImplementation(<T>(callback): Promise<T> => {
-    const result = callback(mockPrismaAuth);
+    const result = callback(mockPrisma);
     return result instanceof Promise ? result : Promise.resolve(result);
   }),
 });
@@ -67,7 +67,7 @@ const createMockLogger = () => ({
 });
 
 // Global mocks
-const mockPrismaAuth = createMockPrismaAuth();
+const mockPrisma = createMockPrisma();
 const mockMemberApiService = createMockMemberApiService();
 const mockLogger = createMockLogger();
 
@@ -77,21 +77,19 @@ describe('RoleService', () => {
   beforeEach(async () => {
     // Reset all mocks
     jest.clearAllMocks();
-    Object.values(mockPrismaAuth.role).forEach((mock) => mock.mockReset());
-    Object.values(mockPrismaAuth.roleAssignment).forEach((mock) =>
+    Object.values(mockPrisma.role).forEach((mock) => mock.mockReset());
+    Object.values(mockPrisma.roleAssignment).forEach((mock) =>
       mock.mockReset(),
     );
-    mockPrismaAuth.$transaction.mockImplementation(
-      <T>(callback): Promise<T> => {
-        const result = callback(mockPrismaAuth);
-        return result instanceof Promise ? result : Promise.resolve(result);
-      },
-    );
+    mockPrisma.$transaction.mockImplementation(<T>(callback): Promise<T> => {
+      const result = callback(mockPrisma);
+      return result instanceof Promise ? result : Promise.resolve(result);
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
-        { provide: PRISMA_CLIENT_AUTHORIZATION, useValue: mockPrismaAuth },
+        { provide: PRISMA_CLIENT, useValue: mockPrisma },
         { provide: MemberApiService, useValue: mockMemberApiService },
         { provide: Logger, useValue: mockLogger },
       ],
@@ -114,31 +112,31 @@ describe('RoleService', () => {
     ];
 
     it('should return all roles without filter', async () => {
-      mockPrismaAuth.role.findMany.mockResolvedValue(mockRoles);
+      mockPrisma.role.findMany.mockResolvedValue(mockRoles);
 
       const result = await service.findAll();
 
       expect(result).toHaveLength(2);
       expect(result[0].roleName).toBe('Admin');
       expect(result[1].roleName).toBe('User');
-      expect(mockPrismaAuth.role.findMany).toHaveBeenCalledWith({ where: {} });
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith({ where: {} });
     });
 
     it('should return roles for a specific subjectId', async () => {
       const subjectId = 123;
-      mockPrismaAuth.role.findMany.mockResolvedValue([mockRoles[1]]);
+      mockPrisma.role.findMany.mockResolvedValue([mockRoles[1]]);
 
       const result = await service.findAll(subjectId);
 
       expect(result).toHaveLength(1);
       expect(result[0].roleName).toBe('User');
-      expect(mockPrismaAuth.role.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith({
         where: { roleAssignments: { some: { subjectId, subjectType: 1 } } },
       });
     });
 
     it('should not include enriched subjects even when fields=subjects', async () => {
-      mockPrismaAuth.role.findMany.mockResolvedValue(mockRoles);
+      mockPrisma.role.findMany.mockResolvedValue(mockRoles);
 
       const result = await service.findAll(undefined);
 
@@ -153,20 +151,20 @@ describe('RoleService', () => {
 
     describe('without enrichment', () => {
       it('should return a role if found', async () => {
-        mockPrismaAuth.role.findUnique.mockResolvedValue(mockRole);
+        mockPrisma.role.findUnique.mockResolvedValue(mockRole);
 
         const result = await service.findOne(roleId);
 
         expect(result?.roleName).toBe('Admin');
         expect(result?.subjects).toBeUndefined();
-        expect(mockPrismaAuth.role.findUnique).toHaveBeenCalledWith({
+        expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({
           where: { id: roleId },
           include: { roleAssignments: false },
         });
       });
 
       it('should return null if role not found', async () => {
-        mockPrismaAuth.role.findUnique.mockResolvedValue(null);
+        mockPrisma.role.findUnique.mockResolvedValue(null);
 
         const result = await service.findOne(99);
 
@@ -183,9 +181,7 @@ describe('RoleService', () => {
       const mockMemberInfo = [createMockMemberInfo({ userId: subjectId })];
 
       it('should include enriched subjects', async () => {
-        mockPrismaAuth.role.findUnique.mockResolvedValue(
-          mockRoleWithAssignments,
-        );
+        mockPrisma.role.findUnique.mockResolvedValue(mockRoleWithAssignments);
         const mockFunc =
           mockMemberApiService.getUserInfoList.mockResolvedValue(
             mockMemberInfo,
@@ -193,7 +189,7 @@ describe('RoleService', () => {
 
         const result = await service.findOne(roleId, 'subjects');
 
-        expect(mockPrismaAuth.role.findUnique).toHaveBeenCalledWith({
+        expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({
           where: { id: roleId },
           include: {
             roleAssignments: {
@@ -208,9 +204,7 @@ describe('RoleService', () => {
 
       it('should handle getUserInfoList failure gracefully', async () => {
         const error = new Error('API service unavailable');
-        mockPrismaAuth.role.findUnique.mockResolvedValue(
-          mockRoleWithAssignments,
-        );
+        mockPrisma.role.findUnique.mockResolvedValue(mockRoleWithAssignments);
         mockMemberApiService.getUserInfoList.mockRejectedValue(error);
 
         const result = await service.findOne(roleId, 'subjects');
@@ -235,29 +229,29 @@ describe('RoleService', () => {
     });
 
     it('should create a new role successfully', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValue(null); // No existing role
-      mockPrismaAuth.role.create.mockResolvedValue(newRole);
+      mockPrisma.role.findUnique.mockResolvedValue(null); // No existing role
+      mockPrisma.role.create.mockResolvedValue(newRole);
 
       const result = await service.create(createDto, creatorId);
 
       expect(result.roleName).toBe('Tester');
       expect(result.id).toBe(3);
-      expect(mockPrismaAuth.role.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({
         where: { name: 'Tester' },
       });
-      expect(mockPrismaAuth.role.create).toHaveBeenCalledWith({
+      expect(mockPrisma.role.create).toHaveBeenCalledWith({
         data: { name: 'Tester', createdBy: creatorId, modifiedBy: creatorId },
       });
     });
 
     it('should throw ConflictException if role name already exists', async () => {
       const existingRole = createMockRole({ name: 'Tester' });
-      mockPrismaAuth.role.findUnique.mockResolvedValue(existingRole);
+      mockPrisma.role.findUnique.mockResolvedValue(existingRole);
 
       await expect(service.create(createDto, creatorId)).rejects.toThrow(
         ConflictException,
       );
-      expect(mockPrismaAuth.role.create).not.toHaveBeenCalled();
+      expect(mockPrisma.role.create).not.toHaveBeenCalled();
     });
   });
 
@@ -272,23 +266,23 @@ describe('RoleService', () => {
     });
 
     it('should update an existing role successfully', async () => {
-      mockPrismaAuth.role.findUnique
+      mockPrisma.role.findUnique
         .mockResolvedValueOnce(existingRole) // First call: check if role exists
         .mockResolvedValueOnce(null); // Second call: check name conflict
-      mockPrismaAuth.role.update.mockResolvedValue(updatedRole);
+      mockPrisma.role.update.mockResolvedValue(updatedRole);
 
       const result = await service.update(roleId, updateDto, modifierId);
 
       expect(result.roleName).toBe('SuperAdmin');
       expect(result.updatedBy).toBe(modifierId);
-      expect(mockPrismaAuth.role.update).toHaveBeenCalledWith({
+      expect(mockPrisma.role.update).toHaveBeenCalledWith({
         where: { id: roleId },
         data: { name: 'SuperAdmin', modifiedBy: modifierId },
       });
     });
 
     it('should throw NotFoundException if role does not exist', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValue(null);
+      mockPrisma.role.findUnique.mockResolvedValue(null);
 
       await expect(service.update(99, updateDto, modifierId)).rejects.toThrow(
         NotFoundException,
@@ -297,7 +291,7 @@ describe('RoleService', () => {
 
     it('should throw ConflictException if updated name already exists', async () => {
       const conflictingRole = createMockRole({ id: 2, name: 'SuperAdmin' });
-      mockPrismaAuth.role.findUnique
+      mockPrisma.role.findUnique
         .mockResolvedValueOnce(existingRole)
         .mockResolvedValueOnce(conflictingRole);
 
@@ -308,12 +302,12 @@ describe('RoleService', () => {
           `Role with name '${updateDto.roleName}' already exists.`,
         ),
       );
-      expect(mockPrismaAuth.role.update).not.toHaveBeenCalled();
+      expect(mockPrisma.role.update).not.toHaveBeenCalled();
     });
 
     it('should handle Prisma P2002 error during update', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValueOnce(existingRole);
-      mockPrismaAuth.role.update.mockRejectedValue(
+      mockPrisma.role.findUnique.mockResolvedValueOnce(existingRole);
+      mockPrisma.role.update.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
           code: 'P2002',
           clientVersion: 'test',
@@ -332,31 +326,31 @@ describe('RoleService', () => {
     const existingRole = createMockRole({ id: roleId, name: 'ToDelete' });
 
     it('should remove a role and its assignments successfully', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValue(existingRole);
-      mockPrismaAuth.roleAssignment.deleteMany.mockResolvedValue({ count: 2 });
-      mockPrismaAuth.role.delete.mockResolvedValue(existingRole);
+      mockPrisma.role.findUnique.mockResolvedValue(existingRole);
+      mockPrisma.roleAssignment.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.role.delete.mockResolvedValue(existingRole);
 
       await expect(service.remove(roleId)).resolves.toBeUndefined();
-      expect(mockPrismaAuth.roleAssignment.deleteMany).toHaveBeenCalledWith({
+      expect(mockPrisma.roleAssignment.deleteMany).toHaveBeenCalledWith({
         where: { roleId },
       });
-      expect(mockPrismaAuth.role.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.role.delete).toHaveBeenCalledWith({
         where: { id: roleId },
       });
     });
 
     it('should throw NotFoundException if role does not exist', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValue(null);
+      mockPrisma.role.findUnique.mockResolvedValue(null);
 
       await expect(service.remove(99)).rejects.toThrow(NotFoundException);
-      expect(mockPrismaAuth.roleAssignment.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.roleAssignment.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException if assignments remain', async () => {
-      mockPrismaAuth.role.findUnique.mockResolvedValue(existingRole);
-      mockPrismaAuth.roleAssignment.deleteMany.mockResolvedValue({ count: 0 });
-      mockPrismaAuth.role.delete.mockRejectedValue({ code: 'P2003' });
-      mockPrismaAuth.roleAssignment.count.mockResolvedValue(1);
+      mockPrisma.role.findUnique.mockResolvedValue(existingRole);
+      mockPrisma.roleAssignment.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.role.delete.mockRejectedValue({ code: 'P2003' });
+      mockPrisma.roleAssignment.count.mockResolvedValue(1);
 
       await expect(service.remove(roleId)).rejects.toThrow(ConflictException);
     });
@@ -368,16 +362,16 @@ describe('RoleService', () => {
     const operatorId = 1;
 
     it('should assign a role to a subject successfully', async () => {
-      mockPrismaAuth.role.count.mockResolvedValue(1);
-      mockPrismaAuth.roleAssignment.create.mockResolvedValue({});
+      mockPrisma.role.count.mockResolvedValue(1);
+      mockPrisma.roleAssignment.create.mockResolvedValue({});
 
       await expect(
         service.assignRoleToSubject(roleId, subjectId, operatorId),
       ).resolves.toBeUndefined();
-      expect(mockPrismaAuth.role.count).toHaveBeenCalledWith({
+      expect(mockPrisma.role.count).toHaveBeenCalledWith({
         where: { id: roleId },
       });
-      expect(mockPrismaAuth.roleAssignment.create).toHaveBeenCalledWith({
+      expect(mockPrisma.roleAssignment.create).toHaveBeenCalledWith({
         data: {
           roleId,
           subjectId,
@@ -389,7 +383,7 @@ describe('RoleService', () => {
     });
 
     it('should throw NotFoundException if role does not exist', async () => {
-      mockPrismaAuth.role.count.mockResolvedValue(0);
+      mockPrisma.role.count.mockResolvedValue(0);
 
       await expect(
         service.assignRoleToSubject(99, subjectId, operatorId),
@@ -397,8 +391,8 @@ describe('RoleService', () => {
     });
 
     it('should throw ConflictException if assignment already exists', async () => {
-      mockPrismaAuth.role.count.mockResolvedValue(1);
-      mockPrismaAuth.roleAssignment.create.mockRejectedValue({ code: 'P2002' });
+      mockPrisma.role.count.mockResolvedValue(1);
+      mockPrisma.roleAssignment.create.mockRejectedValue({ code: 'P2002' });
 
       await expect(
         service.assignRoleToSubject(roleId, subjectId, operatorId),
@@ -411,18 +405,18 @@ describe('RoleService', () => {
     const subjectId = 123;
 
     it('should deassign a role from a subject successfully', async () => {
-      mockPrismaAuth.roleAssignment.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.roleAssignment.deleteMany.mockResolvedValue({ count: 1 });
 
       await expect(
         service.deassignRoleFromSubject(roleId, subjectId),
       ).resolves.toBeUndefined();
-      expect(mockPrismaAuth.roleAssignment.deleteMany).toHaveBeenCalledWith({
+      expect(mockPrisma.roleAssignment.deleteMany).toHaveBeenCalledWith({
         where: { roleId, subjectId, subjectType: 1 },
       });
     });
 
     it('should handle non-existent assignment gracefully', async () => {
-      mockPrismaAuth.roleAssignment.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.roleAssignment.deleteMany.mockResolvedValue({ count: 0 });
 
       await expect(
         service.deassignRoleFromSubject(roleId, subjectId),
@@ -437,14 +431,12 @@ describe('RoleService', () => {
     it('should return role details if subject has the role', async () => {
       const mockRole = createMockRole();
       const mockAssignment = createMockRoleAssignment({ role: mockRole });
-      mockPrismaAuth.roleAssignment.findUnique.mockResolvedValue(
-        mockAssignment,
-      );
+      mockPrisma.roleAssignment.findUnique.mockResolvedValue(mockAssignment);
 
       const result = await service.checkSubjectHasRole(roleId, subjectId);
 
       expect(result?.roleName).toBe('Admin');
-      expect(mockPrismaAuth.roleAssignment.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.roleAssignment.findUnique).toHaveBeenCalledWith({
         where: {
           roleId_subjectId_subjectType: { roleId, subjectId, subjectType: 1 },
         },
@@ -453,7 +445,7 @@ describe('RoleService', () => {
     });
 
     it('should return null if subject does not have the role', async () => {
-      mockPrismaAuth.roleAssignment.findUnique.mockResolvedValue(null);
+      mockPrisma.roleAssignment.findUnique.mockResolvedValue(null);
 
       const result = await service.checkSubjectHasRole(roleId, subjectId);
 
@@ -548,14 +540,14 @@ describe('RoleService', () => {
 
     testCases.forEach(({ name, expected, description }) => {
       it(`should handle ${description}`, async () => {
-        mockPrismaAuth.role.findUnique.mockResolvedValue(expected);
+        mockPrisma.role.findUnique.mockResolvedValue(expected);
 
         const result = await service.findRoleByName(name);
 
         expect(mockLogger.debug).toHaveBeenCalledWith(
           `Finding role by name: ${name}`,
         );
-        expect(mockPrismaAuth.role.findUnique).toHaveBeenCalledWith({
+        expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({
           where: { name },
         });
         expect(result).toEqual(expected);
@@ -564,7 +556,7 @@ describe('RoleService', () => {
 
     it('should propagate database errors', async () => {
       const error = new Error('Database connection failed');
-      mockPrismaAuth.role.findUnique.mockRejectedValue(error);
+      mockPrisma.role.findUnique.mockRejectedValue(error);
 
       await expect(service.findRoleByName('Admin')).rejects.toThrow(error);
     });
