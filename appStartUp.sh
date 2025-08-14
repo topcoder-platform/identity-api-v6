@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-export DATABASE_URL=$(echo -e ${DATABASE_URL})
+export DATABASE_URL=$(echo -e ${IDENTITY_DB_URL})
 
 echo "Database - running migrations."
 if $RESET_DB; then
