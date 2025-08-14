@@ -52,6 +52,25 @@ cp .env.sample .env
 docker-compose up -d
 ```
 3. Setting up Database
+
+Add to migration.sql for initialization:
+
+```
+CREATE SEQUENCE IF NOT EXISTS sequence_email_seq
+    INCREMENT 1
+    START 70100000
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+CREATE SEQUENCE IF NOT EXISTS sequence_user_seq
+    INCREMENT 1
+    START 88770000
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;    
+```
+
 ```bash
 # Replace ~/Downloads/dump_all.custom with the actual path to your dump file. (Download it from forum, and extract from zip) - Use password from DB_PASSWORD of .env file
 # Ensure DB_HOST, DB_PORT, DB_USERNAME, and COMMON_OLTP_DB_NAME match your .env values.
