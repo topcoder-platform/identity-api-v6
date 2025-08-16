@@ -102,15 +102,9 @@ The following table summarizes the environment variables used by the application
 | `NODE_ENV`                 | Application environment (e.g., `development`, `production`)                   | `development`                 |
 | `PORT`                     | Port the application listens on                                             | `3000`                        |
 |                            | **Database (PostgreSQL - Identity)**                                     |                               |
-| `DB_HOST`                  | Hostname for the main PostgreSQL database                                   | `127.0.0.1`                   |
-| `DB_PORT`                  | Port for the main PostgreSQL database                                       | `5432`                        |
-| `GROUP_DB_HOST`            | Hostname for the group PostgreSQL database                                   | `127.0.0.1`                   |
-| `GROUP_DB_PORT`            | Port for the group PostgreSQL database                                       | `5431`                        |
-| `DB_USERNAME`              | Username for the main PostgreSQL database                                   | `topcoderuser`                |
-| `DB_PASSWORD`              | Password for the main PostgreSQL database                                   | `randompassword`              |
-| `IDENTITY_DB_NAME`      | Name of the main PostgreSQL database                                        | `identity`              |
+| `IDENTITY_DB_URL`      | URL of the main PostgreSQL database                                        | `postgresql://postgres:identitypassword@localhost:5432/identity`              |
 |                            | **Database (PostgreSQL - Group)**                                   |                               |
-| `GROUP_DB_NAME`    | Name of the group PostgreSQL database                             | `group`            |
+| `GROUP_DB_URL`    | URL of the group PostgreSQL database                             | `postgresql://postgres:identitypassword@localhost:5431/group`            |
 |                            | **Redis Cache**                                                             |                               |
 | `REDIS_HOST`               | Hostname for the Redis cache instance                                       | `127.0.0.1`                   |
 | `REDIS_PORT`               | Port for the Redis cache instance                                           | `6380`                        |
