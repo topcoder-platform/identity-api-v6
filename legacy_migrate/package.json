@@ -1,0 +1,20 @@
+{
+  "name": "identity-migration",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "generate": "prisma generate --schema=prisma/target.schema.prisma && prisma generate --schema=prisma/source-auth.schema.prisma && prisma generate --schema=prisma/source-identity.schema.prisma",
+    "migrate": "node -r ts-node/register src/migrate.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "latest",
+    "decimal.js": "^10.4.3",
+    "dotenv": "^16.4.5",
+    "ts-node": "^10.9.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "prisma": "latest",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/source-auth"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("SOURCE_AUTH_MYSQL_URL")
+}
+
+model Client {
+  id          Int       @id @default(autoincrement()) @map("id")
+  clientId    String    @unique @map("client_id")
+  name        String
+  redirectUri String?   @map("redirect_uri") @db.VarChar(8192)
+  secret      String?
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0)
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+
+  @@map("client")
+}
+
+model Role {
+  id          Int       @id @default(autoincrement()) @map("id")
+  name        String    @unique @db.VarChar(45)
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0)
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+
+  @@map("role")
+}
+
+model RoleAssignment {
+  id          Int       @id @default(autoincrement()) @map("id")
+  roleId      Int       @map("role_id")
+  subjectId   Int       @map("subject_id")
+  createdBy   Int?
+  createdAt   DateTime? @db.Timestamp(0)
+  modifiedBy  Int?
+  modifiedAt  DateTime? @db.Timestamp(0)
+  subjectType Int       @default(1) @map("subject_type")
+
+  @@unique([roleId, subjectId, subjectType], map: "role_subject_id_subject_type")
+  @@index([subjectId], map: "subject_id_idx")
+  @@index([roleId], map: "role_id_idx")
+  @@map("role_assignment")
+}
