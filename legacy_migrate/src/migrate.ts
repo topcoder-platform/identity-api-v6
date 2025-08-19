@@ -1,6 +1,9 @@
 /* eslint-disable no-console */
 import 'dotenv/config';
 
+const fs = require('fs');
+const path = require('path');
+
 // === CommonJS-friendly requires for generated Prisma clients
 const { PrismaClient: TargetPrisma } = require('../generated/target');
 const { PrismaClient: SourceAuthPrisma } = require('../generated/source-auth');
@@ -17,6 +20,19 @@ const sourceIdentity = new SourceIdentityPrisma();
 
 // ---- Tunables
 const BATCH_SIZE = 1000;
+
+
+// ensure ./logs exists
+function ensureLogDir() {
+  const dir = path.resolve(process.cwd(), 'logs');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function appendNdjson(filename: string, record: any) {
+  const dir = ensureLogDir();
+  fs.appendFileSync(path.join(dir, filename), JSON.stringify(record) + '\n', 'utf8');
+}
 
 // ===== AUTH (MySQL) → TARGET =====
 
@@ -584,8 +600,9 @@ async function migrateUsers() {
 }
 
 async function migrateEmail() {
-  console.log('→ email');
-  let skip = 0, total = 0;
+  console.log('→ email (skip rows whose user_id is missing in target.user, log them)');
+  let skip = 0, total = 0, skipped = 0;
+
   while (true) {
     const batch: Rows<typeof sourceIdentity.email.findMany> =
       await sourceIdentity.email.findMany({
@@ -593,42 +610,95 @@ async function migrateEmail() {
       });
     if (batch.length === 0) break;
 
-    await target.$transaction(
-      batch.map((e: any) =>
-        target.email.upsert({
-          where: { email_id: e.email_id },
-          create: {
-            email_id: e.email_id,
-            user_id: e.user_id ?? null,
-            email_type_id: e.email_type_id ?? null,
-            address: e.address ?? null,
-            create_date: e.create_date ?? null,
-            modify_date: e.modify_date ?? null,
-            primary_ind: e.primary_ind ?? null,
-            status_id: e.status_id ?? null,
-          },
-          update: {
-            user_id: e.user_id ?? null,
-            email_type_id: e.email_type_id ?? null,
-            address: e.address ?? null,
-            modify_date: e.modify_date ?? null,
-            primary_ind: e.primary_ind ?? null,
-            status_id: e.status_id ?? null,
-          },
-        })
-      ),
-      { timeout: 120_000 }
-    );
+    // Build a unique list of non-null user_ids from this batch
+    const userIdsRaw = batch
+      .map((e: any) => e.user_id)
+      .filter((v: any) => v !== null && v !== undefined);
 
-    total += batch.length; skip += batch.length;
-    console.log(`  … ${total}`);
+    // Short-circuit if none
+    let existingUserIdSet = new Set<string>();
+    if (userIdsRaw.length > 0) {
+      // Prisma Decimal values stringify safely; comparing as strings is robust across sources
+      const userIdsUnique = Array.from(
+        new Set(userIdsRaw.map((v: any) => (typeof v?.toString === 'function' ? v.toString() : String(v))))
+      );
+
+      const existingUsers = await target.user.findMany({
+        where: { user_id: { in: userIdsUnique as any[] } },
+        select: { user_id: true },
+      });
+
+      existingUserIdSet = new Set(
+        existingUsers.map((u: any) => (typeof u.user_id?.toString === 'function' ? u.user_id.toString() : String(u.user_id)))
+      );
+    }
+
+    // Partition valid vs. invalid email rows
+    const valid: any[] = [];
+    for (const e of batch as any[]) {
+      if (e.user_id == null) {
+        // null user is allowed by your schema — keep it
+        valid.push(e);
+      } else {
+        const key = typeof e.user_id?.toString === 'function' ? e.user_id.toString() : String(e.user_id);
+        if (existingUserIdSet.has(key)) {
+          valid.push(e);
+        } else {
+          skipped++;
+          appendNdjson('missing-email-users.ndjson', {
+            reason: 'email.user_id not found in target.user',
+            email_id: e.email_id,
+            address: e.address ?? null,
+            user_id: e.user_id,
+            email_type_id: e.email_type_id ?? null,
+            status_id: e.status_id ?? null,
+          });
+        }
+      }
+    }
+
+    // Upsert only the valid rows
+    if (valid.length > 0) {
+      await target.$transaction(
+        valid.map((e: any) =>
+          target.email.upsert({
+            where: { email_id: e.email_id },
+            create: {
+              email_id: e.email_id,
+              user_id: e.user_id ?? null,
+              email_type_id: e.email_type_id ?? null,
+              address: e.address ?? null,
+              create_date: e.create_date ?? null,
+              modify_date: e.modify_date ?? null,
+              primary_ind: e.primary_ind ?? null,
+              status_id: e.status_id ?? null,
+            },
+            update: {
+              user_id: e.user_id ?? null,
+              email_type_id: e.email_type_id ?? null,
+              address: e.address ?? null,
+              modify_date: e.modify_date ?? null,
+              primary_ind: e.primary_ind ?? null,
+              status_id: e.status_id ?? null,
+            },
+          })
+        ),
+        { timeout: 120_000 }
+      );
+    }
+
+    total += valid.length;
+    skip += batch.length;
+    console.log(`  … imported=${total} (skipped=${skipped} this run)`);
   }
-  console.log(`✓ email: ${total}`);
+
+  console.log(`✓ email: imported=${total}, skipped=${skipped}. See logs/missing-email-users.ndjson`);
 }
 
 async function migrateUserEmailXref() {
-  console.log('→ user_email_xref');
-  let skip = 0, total = 0;
+  console.log('→ user_email_xref (skip rows whose user/email missing, log them)');
+  let skip = 0, total = 0, skipped = 0;
+
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_email_xref.findMany> =
       await sourceIdentity.user_email_xref.findMany({
@@ -636,32 +706,82 @@ async function migrateUserEmailXref() {
       });
     if (batch.length === 0) break;
 
-    await target.$transaction(
-      batch.map((x: any) =>
-        target.user_email_xref.upsert({
-          where: { user_id_email_id: { user_id: x.user_id, email_id: x.email_id } },
-          create: {
-            user_id: x.user_id,
-            email_id: x.email_id,
-            is_primary: Boolean(x.is_primary),
-            status_id: x.status_id,
-            create_date: x.create_date ?? null,
-            modify_date: x.modify_date ?? null,
-          },
-          update: {
-            is_primary: Boolean(x.is_primary),
-            status_id: x.status_id,
-            modify_date: x.modify_date ?? null,
-          },
-        })
-      ),
-      { timeout: 120_000 }
-    );
+    // Collect parents to validate existence
+    const userIds = Array.from(new Set((batch as any[])
+      .map(x => x.user_id)
+      .filter((v: any) => v !== null && v !== undefined)
+      .map((v: any) => (typeof v?.toString === 'function' ? v.toString() : String(v)))
+    ));
 
-    total += batch.length; skip += batch.length;
-    console.log(`  … ${total}`);
+    const emailIds = Array.from(new Set((batch as any[])
+      .map(x => x.email_id)
+      .filter((v: any) => v !== null && v !== undefined)
+      .map((v: any) => (typeof v?.toString === 'function' ? v.toString() : String(v)))
+    ));
+
+    const [usersFound, emailsFound] = await Promise.all([
+      userIds.length
+        ? target.user.findMany({ where: { user_id: { in: userIds as any[] } }, select: { user_id: true } })
+        : Promise.resolve([]),
+      emailIds.length
+        ? target.email.findMany({ where: { email_id: { in: emailIds as any[] } }, select: { email_id: true } })
+        : Promise.resolve([]),
+    ]);
+
+    const userSet = new Set(usersFound.map((u: any) => (typeof u.user_id?.toString === 'function' ? u.user_id.toString() : String(u.user_id))));
+    const emailSet = new Set(emailsFound.map((e: any) => (typeof e.email_id?.toString === 'function' ? e.email_id.toString() : String(e.email_id))));
+
+    const valid: any[] = [];
+    for (const x of batch as any[]) {
+      const uKey = typeof x.user_id?.toString === 'function' ? x.user_id.toString() : String(x.user_id);
+      const eKey = typeof x.email_id?.toString === 'function' ? x.email_id.toString() : String(x.email_id);
+      const hasUser = userSet.has(uKey);
+      const hasEmail = emailSet.has(eKey);
+
+      if (hasUser && hasEmail) {
+        valid.push(x);
+      } else {
+        skipped++;
+        appendNdjson('bad-user-email-xref.ndjson', {
+          reason: !hasUser && !hasEmail ? 'both user and email missing' : !hasUser ? 'user missing' : 'email missing',
+          user_id: x.user_id,
+          email_id: x.email_id,
+          is_primary: x.is_primary,
+          status_id: x.status_id,
+        });
+      }
+    }
+
+    if (valid.length > 0) {
+      await target.$transaction(
+        valid.map((x: any) =>
+          target.user_email_xref.upsert({
+            where: { user_id_email_id: { user_id: x.user_id, email_id: x.email_id } },
+            create: {
+              user_id: x.user_id,
+              email_id: x.email_id,
+              is_primary: Boolean(x.is_primary),
+              status_id: x.status_id,
+              create_date: x.create_date ?? null,
+              modify_date: x.modify_date ?? null,
+            },
+            update: {
+              is_primary: Boolean(x.is_primary),
+              status_id: x.status_id,
+              modify_date: x.modify_date ?? null,
+            },
+          })
+        ),
+        { timeout: 120_000 }
+      );
+    }
+
+    total += valid.length;
+    skip += batch.length;
+    console.log(`  … imported=${total} (skipped=${skipped} this run)`);
   }
-  console.log(`✓ user_email_xref: ${total}`);
+
+  console.log(`✓ user_email_xref: imported=${total}, skipped=${skipped}. See logs/bad-user-email-xref.ndjson`);
 }
 
 async function migrateUserSocialLogin() {
@@ -890,27 +1010,27 @@ async function migrateUserStatus() {
 async function main() {
   console.log('Starting migration…');
 
-  // 1) Auth (MySQL) → target
-  await migrateRoles();
-  await migrateClients();
-  await migrateRoleAssignments();
+  // // 1) Auth (MySQL) → target
+  // await migrateRoles();
+  // await migrateClients();
+  // await migrateRoleAssignments();
 
-  // 2) Identity lookups/providers first (FK-safe order)
-  await migrateAchievementTypeLu();
-  await migrateEmailStatusLu();
-  await migrateEmailTypeLu();
-  await migrateUserStatusLu();
-  await migrateUserStatusTypeLu();
-  await migrateSecurityStatusLu();
-  await migrateCountry();
-  await migrateInvalidHandles();
-  await migrateSocialLoginProvider();
-  await migrateSsoLoginProvider();
+  // // 2) Identity lookups/providers first (FK-safe order)
+  // await migrateAchievementTypeLu();
+  // await migrateEmailStatusLu();
+  // await migrateEmailTypeLu();
+  // await migrateUserStatusLu();
+  // await migrateUserStatusTypeLu();
+  // await migrateSecurityStatusLu();
+  // await migrateCountry();
+  // await migrateInvalidHandles();
+  // await migrateSocialLoginProvider();
+  // await migrateSsoLoginProvider();
 
-  // 3) Core entities
-  await migrateUsers();
-  await migrateSecurityUser();
-  await migrateSecurityGroups();
+  // // 3) Core entities
+  // await migrateUsers();
+  // await migrateSecurityUser();
+  // await migrateSecurityGroups();
 
   // 4) Email + xref
   await migrateEmail();
