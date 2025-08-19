@@ -1,0 +1,1374 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/source-identity"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("SOURCE_IDENTITY_PG_URL")
+}
+
+model user {
+  user_id                    Decimal                      @id(map: "u175_45") @db.Decimal(10, 0)
+  first_name                 String?                      @db.VarChar(64)
+  last_name                  String?                      @db.VarChar(64)
+  create_date                DateTime?                    @default(now()) @db.Timestamp(6)
+  modify_date                DateTime?                    @default(now()) @db.Timestamp(6)
+  handle                     String                       @db.VarChar(50)
+  last_login                 DateTime?                    @db.Timestamp(6)
+  status                     String                       @db.VarChar(3)
+  activation_code            String?                      @db.VarChar(32)
+  middle_name                String?                      @db.VarChar(64)
+  handle_lower               String?                      @db.VarChar(50)
+  timezone_id                Decimal?                     @db.Decimal(5, 0)
+  last_site_hit_date         DateTime?                    @db.Timestamp(6)
+  name_in_another_language   String?                      @db.VarChar(64)
+  password                   String?                      @db.VarChar(16)
+  open_id                    String?                      @db.VarChar(200)
+  reg_source                 String?                      @db.VarChar(20)
+  utm_source                 String?                      @db.VarChar(50)
+  utm_medium                 String?                      @db.VarChar(50)
+  utm_campaign               String?                      @db.VarChar(50)
+  contact                    contact[]                    @ignore
+  corona_event               corona_event[]
+  demographic_response       demographic_response[]       @ignore
+  dice_connection            dice_connection?
+  email_request              email_request[]
+  event_registration         event_registration[]
+  gov_id_document            gov_id_document[]
+  member_image               member_image[]
+  password_recovery          password_recovery[]
+  professor                  professor?
+  secret_question            secret_question?
+  timezone_lu                timezone_lu?                 @relation(fields: [timezone_id], references: [timezone_id], onDelete: NoAction, onUpdate: NoAction, map: "user_timezonelu_fk")
+  user_2fa                   user_2fa?
+  user_achievement           user_achievement[]           @ignore
+  user_event                 user_event[]
+  user_note_xref             user_note_xref[]
+  user_notify_xref           user_notify_xref[]
+  user_otp_email             user_otp_email[]
+  user_preference            user_preference[]
+  user_school                user_school[]
+  user_social_login          user_social_login[]
+  user_sso_login             user_sso_login[]
+  user_status                user_status[]
+  user_terms_of_use_ban_xref user_terms_of_use_ban_xref[]
+  user_terms_of_use_xref     user_terms_of_use_xref[]
+  vm_account_user            vm_account_user[]
+
+  @@index([activation_code], map: "user_activ_code_idx")
+  @@index([handle])
+  @@index([handle_lower], map: "user_lower_handle_idx")
+  @@index([open_id])
+  @@index([status])
+}
+
+model email {
+  user_id         Decimal?         @db.Decimal(10, 0)
+  email_id        Decimal          @id(map: "u110_23") @db.Decimal(10, 0)
+  email_type_id   Decimal?         @db.Decimal(5, 0)
+  address         String?          @db.VarChar(100)
+  create_date     DateTime?        @default(now()) @db.Timestamp(6)
+  modify_date     DateTime?        @default(now()) @db.Timestamp(6)
+  primary_ind     Decimal?         @db.Decimal(1, 0)
+  status_id       Decimal?         @db.Decimal(3, 0)
+  email_status_lu email_status_lu? @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailstatuslu_fk")
+  email_type_lu   email_type_lu?   @relation(fields: [email_type_id], references: [email_type_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailtypelu_fk")
+
+  @@index([address])
+  @@index([user_id, primary_ind], map: "email_user_id_idx")
+}
+
+model access_token {
+  access_token_id             Decimal                       @id(map: "pk_access_token") @db.Decimal(12, 0)
+  token_type                  String                        @db.VarChar(20)
+  token_key                   String                        @db.VarChar(200)
+  grant_type                  String                        @db.VarChar(20)
+  issued_at                   DateTime                      @db.Timestamp(6)
+  lifetime                    Decimal                       @db.Decimal(12, 0)
+  client_id                   String                        @db.VarChar(45)
+  user_login_name             String                        @db.VarChar(45)
+  access_token_has_permission access_token_has_permission[]
+}
+
+model access_token_has_permission {
+  access_token_access_token_id Decimal          @db.Decimal(12, 0)
+  permission_permission_id     Decimal          @db.Decimal(12, 0)
+  oauth_permission             oauth_permission @relation(fields: [permission_permission_id], references: [permission_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_access_token_has_permission_1")
+  access_token                 access_token     @relation(fields: [access_token_access_token_id], references: [access_token_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_access_token_has_permission_2")
+
+  @@id([access_token_access_token_id, permission_permission_id], map: "pk_access_token_has_permission")
+}
+
+model achievement_type_lu {
+  achievement_type_id   Decimal            @id(map: "achv_type_lu_pkey") @db.Decimal(5, 0)
+  achievement_type_desc String             @db.VarChar(64)
+  user_achievement      user_achievement[] @ignore
+}
+
+model address {
+  address_id      Decimal   @id(map: "u107_20") @db.Decimal(10, 0)
+  address_type_id Decimal?  @db.Decimal(5, 0)
+  address1        String?   @db.VarChar(254)
+  address2        String?   @db.VarChar(254)
+  city            String?   @db.VarChar(64)
+  state_code      String?   @db.Char(2)
+  zip             String?   @db.VarChar(15)
+  country_code    String?   @db.Char(3)
+  create_date     DateTime? @default(now()) @db.Timestamp(6)
+  modify_date     DateTime? @default(now()) @db.Timestamp(6)
+  address3        String?   @db.VarChar(254)
+  province        String?   @db.VarChar(64)
+}
+
+model address_type_lu {
+  address_type_id   Decimal   @id(map: "u108_21") @db.Decimal(5, 0)
+  address_type_desc String?   @db.VarChar(100)
+  create_date       DateTime? @default(now()) @db.Timestamp(6)
+  modify_date       DateTime? @default(now()) @db.Timestamp(6)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model audit_user {
+  user_id           Decimal?  @db.Decimal(10, 0)
+  column_name       String?   @db.VarChar(30)
+  old_value         String?   @db.VarChar(254)
+  new_value         String?   @db.VarChar(254)
+  timestamp         DateTime? @default(now()) @db.Timestamp(6)
+  reflected_to_ldap Boolean   @default(false)
+
+  @@index([user_id], map: "audituser_userid_indx")
+  @@ignore
+}
+
+model authorization_code_grant {
+  authorization_code_grant_id             Decimal                                   @id(map: "pk_authorization_code_grant") @db.Decimal(12, 0)
+  redirect_uri                            String                                    @db.VarChar(100)
+  code                                    String                                    @db.VarChar(100)
+  issued_at                               DateTime                                  @db.Timestamp(6)
+  lifetime                                Decimal                                   @db.Decimal(12, 0)
+  client_id                               String                                    @db.VarChar(45)
+  user_login_name                         String                                    @db.VarChar(45)
+  authorization_code_grant_has_permission authorization_code_grant_has_permission[]
+}
+
+model authorization_code_grant_has_permission {
+  code_grant_id            Decimal                  @db.Decimal(12, 0)
+  permission_permission_id Decimal                  @db.Decimal(12, 0)
+  oauth_permission         oauth_permission         @relation(fields: [permission_permission_id], references: [permission_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_authorization_code_grant_has_permission_1")
+  authorization_code_grant authorization_code_grant @relation(fields: [code_grant_id], references: [authorization_code_grant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_authorization_code_grant_has_permission_2")
+
+  @@id([permission_permission_id, code_grant_id], map: "pk_authorization_code_grant_has_permission")
+}
+
+model bounce_type_lu {
+  bounce_type      String  @id @db.VarChar(10)
+  bounce_type_desc String? @db.VarChar(100)
+}
+
+model calendar {
+  calendar_id     Decimal   @id @db.Decimal(10, 0)
+  year            Decimal?  @db.Decimal(4, 0)
+  month_numeric   Decimal?  @db.Decimal(2, 0)
+  month_alpha     String?   @db.VarChar(10)
+  day_of_month    Decimal?  @db.Decimal(2, 0)
+  day_of_week     Decimal?  @db.Decimal(1, 0)
+  week_day        String?   @db.VarChar(15)
+  year_month      String?   @db.VarChar(7)
+  week_of_year    Decimal?  @db.Decimal(2, 0)
+  day_of_year     Decimal?  @db.Decimal(3, 0)
+  holiday         String?   @db.Char(1)
+  weekend         String?   @db.Char(1)
+  date            DateTime? @db.Date
+  week_year       Decimal?  @db.Decimal(4, 0)
+  quarter_of_year Decimal?  @db.Decimal(1, 0)
+
+  @@index([date])
+}
+
+model client_terms_mapping {
+  client_terms_mapping_id Decimal      @id @db.Decimal(10, 0)
+  client_project_id       Decimal      @db.Decimal(10, 0)
+  terms_of_use_id         Decimal      @db.Decimal(10, 0)
+  resource_role_id        Decimal?     @db.Decimal(10, 0)
+  create_date             DateTime?    @default(now()) @db.Timestamp(6)
+  modify_date             DateTime?    @default(now()) @db.Timestamp(6)
+  terms_of_use            terms_of_use @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "client_terms_mapping_terms_fk")
+}
+
+model company {
+  company_id                Decimal                     @id(map: "u171_139") @db.Decimal(10, 0)
+  company_name              String?                     @db.VarChar(100)
+  primary_contact_id        Decimal?                    @db.Decimal(10, 0)
+  create_date               DateTime?                   @default(now()) @db.Timestamp(6)
+  modify_date               DateTime?                   @default(now()) @db.Timestamp(6)
+  timezone_id               Decimal?                    @default(143) @db.Decimal(5, 0)
+  timezone_lu               timezone_lu?                @relation(fields: [timezone_id], references: [timezone_id], onDelete: NoAction, onUpdate: NoAction, map: "company_timezone_fk")
+  company_terms_of_use_xref company_terms_of_use_xref[]
+  contact                   contact[]                   @ignore
+}
+
+model company_datasource_xref {
+  datasource_id Decimal   @db.Decimal(10, 0)
+  company_id    Decimal   @db.Decimal(10, 0)
+  create_date   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@id([company_id, datasource_id], map: "company_datasource_pkey")
+}
+
+model company_terms_of_use_xref {
+  company_id      Decimal   @db.Decimal(10, 0)
+  terms_of_use_id Decimal   @db.Decimal(5, 0)
+  create_date     DateTime? @default(now()) @db.Timestamp(6)
+  modify_date     DateTime? @default(now()) @db.Timestamp(6)
+  company         company   @relation(fields: [company_id], references: [company_id], onDelete: NoAction, onUpdate: NoAction, map: "companytermsofuse_company_fk")
+
+  @@id([company_id, terms_of_use_id], map: "company_terms_of_use_pk")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model contact {
+  contact_id  Decimal   @db.Decimal(10, 0)
+  company_id  Decimal   @db.Decimal(10, 0)
+  title       String?   @db.VarChar(100)
+  create_date DateTime? @default(now()) @db.Timestamp(6)
+  modify_date DateTime? @default(now()) @db.Timestamp(6)
+  company     company   @relation(fields: [company_id], references: [company_id], onDelete: NoAction, onUpdate: NoAction, map: "contact_company_fk")
+  user        user      @relation(fields: [contact_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "contact_user_fk")
+
+  @@ignore
+}
+
+model contest_eligibility {
+  contest_eligibility_id    Decimal                    @id @db.Decimal(10, 0)
+  contest_id                Decimal                    @db.Decimal(10, 0)
+  is_studio                 Int                        @db.SmallInt
+  group_contest_eligibility group_contest_eligibility?
+
+  @@index([contest_id], map: "contest_elig_idx1")
+}
+
+model continent {
+  continent_id   Decimal @id @db.Decimal(2, 0)
+  continent_name String? @db.VarChar(20)
+}
+
+model corona_event {
+  corona_event_id        Int               @id(map: "corona_event_prkey") @default(autoincrement())
+  corona_event_type_id   Decimal           @db.Decimal(3, 0)
+  user_id                Decimal           @db.Decimal(10, 0)
+  scanned_ind            Decimal           @default(0) @db.Decimal(1, 0)
+  corona_event_timestamp DateTime?         @default(now()) @db.Timestamp(6)
+  corona_event_type      corona_event_type @relation(fields: [corona_event_type_id], references: [corona_event_type_id], onDelete: NoAction, onUpdate: NoAction, map: "corona_event_eventtype_fk")
+  user                   user              @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "corona_event_user_fk")
+}
+
+model corona_event_type {
+  corona_event_type_id   Decimal        @id @db.Decimal(3, 0)
+  corona_event_type_name String?        @db.VarChar(100)
+  corona_event           corona_event[]
+}
+
+model country {
+  country_code       String            @id @db.VarChar(3)
+  country_name       String            @db.VarChar(40)
+  modify_date        DateTime?         @default(now()) @db.Timestamp(6)
+  participating      Decimal?          @db.Decimal(1, 0)
+  default_taxform_id Decimal?          @db.Decimal(10, 0)
+  longitude          Decimal?          @db.Decimal(10, 7)
+  latitude           Decimal?          @db.Decimal(10, 7)
+  region             String?           @db.VarChar(64)
+  iso_name           String?           @db.VarChar(128)
+  iso_alpha2_code    String?           @db.VarChar(2)
+  iso_alpha3_code    String?           @db.VarChar(3)
+  gov_id_document    gov_id_document[]
+}
+
+model datasource_lu {
+  datasource_id      Decimal            @id(map: "u130_61") @db.Decimal(10, 0)
+  datasource_name    String             @db.VarChar(100)
+  datasource_desc    String             @db.VarChar(100)
+  datasource_type_id Decimal            @db.Decimal(10, 0)
+  create_date        DateTime?          @default(now()) @db.Timestamp(6)
+  modify_date        DateTime?          @default(now()) @db.Timestamp(6)
+  datasource_type_lu datasource_type_lu @relation(fields: [datasource_type_id], references: [datasource_type_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_datasource_type")
+}
+
+model datasource_type_lu {
+  datasource_type_desc String          @db.VarChar(100)
+  datasource_type_id   Decimal         @id(map: "u131_66") @db.Decimal(10, 0)
+  create_date          DateTime?       @default(now()) @db.Timestamp(6)
+  modify_date          DateTime?       @default(now()) @db.Timestamp(6)
+  datasource_lu        datasource_lu[]
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model db_growth {
+  dbase       String?   @db.VarChar(25)
+  table_name  String?   @db.VarChar(50)
+  table_size  Int?
+  num_extents Int?
+  create_date DateTime? @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+model demographic_answer {
+  demographic_answer_id   Decimal                @id @db.Decimal(10, 0)
+  demographic_question_id Decimal?               @db.Decimal(10, 0)
+  demographic_answer_text String?                @db.VarChar(255)
+  sort                    Decimal?               @db.Decimal(10, 0)
+  status                  String?                @db.VarChar(1)
+  demographic_question    demographic_question?  @relation(fields: [demographic_question_id], references: [demographic_question_id], onDelete: NoAction, onUpdate: NoAction, map: "demoanswer_demoquestion_fk")
+  demographic_response    demographic_response[] @ignore
+
+  @@index([demographic_question_id, demographic_answer_id], map: "demographicquesans_idx")
+}
+
+model demographic_assignment {
+  demographic_question_id Decimal              @db.Decimal(10, 0)
+  coder_type_id           Decimal              @db.Decimal(3, 0)
+  registration_type_id    Decimal              @db.Decimal(3, 0)
+  sort                    Decimal?             @db.Decimal(10, 0)
+  status                  String?              @db.VarChar(1)
+  is_required             Decimal?             @default(1) @db.Decimal(1, 0)
+  demographic_question    demographic_question @relation(fields: [demographic_question_id], references: [demographic_question_id], onDelete: NoAction, onUpdate: NoAction, map: "demoassign_demoquestion_fk")
+
+  @@id([demographic_question_id, coder_type_id, registration_type_id])
+}
+
+model demographic_question {
+  demographic_question_id   Decimal                  @id @db.Decimal(10, 0)
+  demographic_question_text String?                  @db.VarChar(255)
+  selectable                String?                  @db.VarChar(1)
+  demographic_question_desc String?                  @db.VarChar(255)
+  demographic_answer        demographic_answer[]
+  demographic_assignment    demographic_assignment[]
+  demographic_response      demographic_response[]   @ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model demographic_response {
+  user_id                 Decimal?              @db.Decimal(10, 0)
+  demographic_answer_id   Decimal?              @db.Decimal(10, 0)
+  demographic_response    String?               @db.VarChar(255)
+  demographic_question_id Decimal?              @db.Decimal(10, 0)
+  create_date             DateTime?             @default(now()) @db.Timestamp(6)
+  modify_date             DateTime?             @default(now()) @db.Timestamp(6)
+  demographic_answer      demographic_answer?   @relation(fields: [demographic_answer_id], references: [demographic_answer_id], onDelete: NoAction, onUpdate: NoAction, map: "demoresponse_demoanswer_fk")
+  demographic_question    demographic_question? @relation(fields: [demographic_question_id], references: [demographic_question_id], onDelete: NoAction, onUpdate: NoAction, map: "demoresponse_demoquestion_fk")
+  user                    user?                 @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "demoresponse_user_fk")
+
+  @@index([demographic_question_id, demographic_answer_id, user_id], map: "demographic_response_idx1")
+  @@ignore
+}
+
+model dice_connection {
+  id             Int       @id(map: "dice_connection_pk") @default(autoincrement())
+  user_id        Decimal   @unique @db.Decimal(10, 0)
+  connection     String?   @db.VarChar(50)
+  accepted       Boolean   @default(false)
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+  short_url      String?   @db.VarChar(100)
+  con_created_at DateTime? @db.Timestamp(6)
+  user           user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([connection])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model dual {
+  value Int?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model email_bounce_log {
+  log_id        Int       @default(autoincrement())
+  to_address    String?   @db.VarChar(254)
+  from_address  String?   @db.VarChar(254)
+  subject       String?   @db.VarChar(254)
+  bounce_type   String?   @db.VarChar(50)
+  processed_ind Decimal?  @default(0) @db.Decimal(1, 0)
+  create_date   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+model email_request {
+  request_id   Int      @id(map: "pk_email_request")
+  user_id      Decimal  @db.Decimal(10, 0)
+  email        String   @db.VarChar(100)
+  random_key   Int
+  expired_at   DateTime @db.Timestamp(6)
+  request_type Int
+  user         user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "emailrequest_user_fk")
+}
+
+model email_status_lu {
+  status_id   Decimal   @id(map: "email_status_lu_pk") @db.Decimal(3, 0)
+  status_desc String?   @db.VarChar(100)
+  create_date DateTime? @default(now()) @db.Timestamp(6)
+  modify_date DateTime? @default(now()) @db.Timestamp(6)
+  email       email[]
+}
+
+model email_type_lu {
+  email_type_id   Decimal   @id(map: "email_type_lu_pk") @db.Decimal(5, 0)
+  email_type_desc String?   @db.VarChar(100)
+  create_date     DateTime? @default(now()) @db.Timestamp(6)
+  modify_date     DateTime? @default(now()) @db.Timestamp(6)
+  email           email[]
+}
+
+model event {
+  event_id           Decimal              @id(map: "event_prkey") @db.Decimal(10, 0)
+  event_type_id      Decimal?             @db.Decimal(3, 0)
+  event_desc         String?              @db.VarChar(100)
+  start_registration DateTime?            @db.Timestamp(6)
+  end_registration   DateTime?            @db.Timestamp(6)
+  terms_of_use_id    Decimal?             @db.Decimal(10, 0)
+  survey_id          Decimal?             @db.Decimal(10, 0)
+  event_short_desc   String?              @db.VarChar(100)
+  modify_date        DateTime?            @default(now()) @db.Timestamp(6)
+  parent_event_id    Decimal?             @db.Decimal(10, 0)
+  event_type_lu      event_type_lu?       @relation(fields: [event_type_id], references: [event_type_id], onDelete: NoAction, onUpdate: NoAction, map: "event_eventtype_fk")
+  event              event?               @relation("eventToevent", fields: [parent_event_id], references: [event_id], onDelete: NoAction, onUpdate: NoAction, map: "event_parent_id_fk")
+  other_event        event[]              @relation("eventToevent")
+  terms_of_use       terms_of_use?        @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "event_terms_fk")
+  event_registration event_registration[]
+}
+
+model event_lu {
+  event_id          Decimal      @id(map: "event_pkey") @db.Decimal(3, 0)
+  event_description String?      @db.VarChar(100)
+  event_handler     String?      @db.VarChar(100)
+  user_event        user_event[]
+}
+
+model event_registration {
+  event_id     Decimal   @db.Decimal(10, 0)
+  user_id      Decimal   @db.Decimal(10, 0)
+  eligible_ind Decimal?  @db.Decimal(1, 0)
+  notes        String?   @db.VarChar(255)
+  create_date  DateTime? @default(now()) @db.Timestamp(6)
+  modify_date  DateTime? @default(now()) @db.Timestamp(6)
+  event        event     @relation(fields: [event_id], references: [event_id], onDelete: NoAction, onUpdate: NoAction, map: "eventreg_event_fk")
+  user         user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "eventreg_user_fk")
+
+  @@id([user_id, event_id], map: "eventregistration_pkey")
+}
+
+model event_type_lu {
+  event_type_id   Decimal @id(map: "event_type_pkey") @db.Decimal(3, 0)
+  event_type_desc String? @db.VarChar(100)
+  event           event[]
+}
+
+model gov_id_document {
+  gov_id_document_id Int       @id(map: "goviddocument_pkey") @default(autoincrement())
+  user_id            Decimal   @db.Decimal(10, 0)
+  country_code       String    @db.VarChar(3)
+  id_number          String    @db.VarChar(64)
+  received_date      DateTime? @db.Timestamp(6)
+  expire_date        DateTime? @db.Timestamp(6)
+  country            country   @relation(fields: [country_code], references: [country_code], onDelete: NoAction, onUpdate: NoAction, map: "goviddocument_country_fk")
+  user               user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "goviddocument_user_fk")
+}
+
+model group_contest_eligibility {
+  contest_eligibility_id Decimal             @id @db.Decimal(10, 0)
+  group_id               Decimal             @db.Decimal(10, 0)
+  contest_eligibility    contest_eligibility @relation(fields: [contest_eligibility_id], references: [contest_eligibility_id], onDelete: NoAction, onUpdate: NoAction, map: "contest_eligibility_fk")
+}
+
+model group_role_xref {
+  group_role_id      Decimal             @id(map: "pk_group_role_xref") @db.Decimal(12, 0)
+  group_id           Decimal?            @db.Decimal(12, 0)
+  role_id            Decimal?            @db.Decimal(12, 0)
+  create_user_id     Decimal?            @db.Decimal(12, 0)
+  security_status_id Decimal?            @db.Decimal(3, 0)
+  security_groups    security_groups?    @relation(fields: [group_id], references: [group_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grp_role_xref1")
+  security_roles     security_roles?     @relation(fields: [role_id], references: [role_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grp_role_xref2")
+  security_status_lu security_status_lu? @relation(fields: [security_status_id], references: [security_status_id], onDelete: NoAction, onUpdate: NoAction, map: "grouprolexref_status_fk")
+
+  @@unique([group_id, role_id], map: "group_role_xref_i2")
+}
+
+model http_uri {
+  http_uri_id                   Decimal                         @id(map: "pk_http_uri") @db.Decimal(12, 0)
+  path                          String                          @db.VarChar(100)
+  oauth_permission_has_http_uri oauth_permission_has_http_uri[]
+}
+
+model http_verb {
+  http_verb_id                   Decimal                          @id(map: "pk_http_verb") @db.Decimal(12, 0)
+  name                           String                           @db.VarChar(45)
+  oauth_permission_has_http_verb oauth_permission_has_http_verb[]
+}
+
+model id_sequences {
+  name             String  @id @db.VarChar(254)
+  next_block_start Decimal @db.Decimal(12, 0)
+  block_size       Decimal @db.Decimal(10, 0)
+  exhausted        Decimal @default(0) @db.Decimal(1, 0)
+}
+
+model invalid_handles {
+  invalid_handle_id Int    @id(map: "pk_invalid_hand556")
+  invalid_handle    String @db.VarChar(20)
+}
+
+model key_generation {
+  user_def   String  @id(map: "key_generation_pk") @db.Char(18)
+  high_value Decimal @db.Decimal(13, 0)
+}
+
+model member_image {
+  member_image_id BigInt      @id @default(autoincrement())
+  member_id       Decimal     @db.Decimal(10, 0)
+  image_id        BigInt
+  removed         Boolean
+  created_by      String      @db.VarChar(50)
+  created_date    DateTime    @db.Timestamp(6)
+  updated_by      String      @db.VarChar(50)
+  updated_date    DateTime    @db.Timestamp(6)
+  photo_image     photo_image @relation(fields: [image_id], references: [image_id], onDelete: NoAction, onUpdate: NoAction, map: "member_image_photo_fk")
+  user            user        @relation(fields: [member_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "member_image_user_fk")
+}
+
+model note {
+  note_id        Decimal          @id(map: "note_pk") @db.Decimal(10, 0)
+  text           String?
+  submitted_by   Decimal          @db.Decimal(10, 0)
+  note_type_id   Decimal          @db.Decimal(3, 0)
+  modify_date    DateTime?        @default(now()) @db.Timestamp(6)
+  create_date    DateTime?        @default(now()) @db.Timestamp(6)
+  note_type_lu   note_type_lu     @relation(fields: [note_type_id], references: [note_type_id], onDelete: NoAction, onUpdate: NoAction, map: "note_note_type_lu_fk")
+  user_note_xref user_note_xref[]
+}
+
+model note_type_lu {
+  note_type_id   Decimal   @id(map: "note_type_lu_pk") @db.Decimal(3, 0)
+  note_type_desc String?   @db.VarChar(100)
+  create_date    DateTime? @default(now()) @db.Timestamp(6)
+  modify_date    DateTime? @default(now()) @db.Timestamp(6)
+  note           note[]
+}
+
+model notify_lu {
+  notify_id                     Decimal                         @id(map: "notify_lu_pk") @db.Decimal(5, 0)
+  name                          String?                         @db.VarChar(255)
+  status                        String?                         @db.VarChar(3)
+  sort                          Decimal?                        @db.Decimal(5, 0)
+  notify_type_id                Decimal?                        @db.Decimal(5, 0)
+  notify_type_lu                notify_type_lu?                 @relation(fields: [notify_type_id], references: [notify_type_id], onDelete: NoAction, onUpdate: NoAction, map: "notify_notifytype_fk")
+  registration_type_notify_xref registration_type_notify_xref[]
+  user_notify_xref              user_notify_xref[]
+}
+
+model notify_type_lu {
+  notify_type_id         Decimal     @id(map: "notifytype_pk") @db.Decimal(5, 0)
+  notify_type_desc       String      @db.VarChar(64)
+  notify_type_sort_order Decimal?    @db.Decimal(5, 0)
+  notify_lu              notify_lu[]
+}
+
+model oauth_permission {
+  permission_id                           Decimal                                   @id(map: "pk_permission") @db.Decimal(12, 0)
+  name                                    String                                    @db.VarChar(45)
+  description                             String                                    @db.VarChar(200)
+  default                                 String                                    @db.Char(1)
+  access_token_has_permission             access_token_has_permission[]
+  authorization_code_grant_has_permission authorization_code_grant_has_permission[]
+  oauth_permission_has_http_uri           oauth_permission_has_http_uri[]
+  oauth_permission_has_http_verb          oauth_permission_has_http_verb[]
+}
+
+model oauth_permission_has_http_uri {
+  permission_permission_id Decimal          @db.Decimal(12, 0)
+  http_uri_http_uri_id     Decimal          @db.Decimal(12, 0)
+  oauth_permission         oauth_permission @relation(fields: [permission_permission_id], references: [permission_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_has_http_uri_1")
+  http_uri                 http_uri         @relation(fields: [http_uri_http_uri_id], references: [http_uri_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_has_http_uri_2")
+
+  @@id([permission_permission_id, http_uri_http_uri_id], map: "pk_permission_has_http_uri")
+}
+
+model oauth_permission_has_http_verb {
+  permission_permission_id Decimal          @db.Decimal(12, 0)
+  http_verb_http_verb_id   Decimal          @db.Decimal(12, 0)
+  oauth_permission         oauth_permission @relation(fields: [permission_permission_id], references: [permission_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_has_http_verb_1")
+  http_verb                http_verb        @relation(fields: [http_verb_http_verb_id], references: [http_verb_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_has_http_verb_2")
+
+  @@id([permission_permission_id, http_verb_http_verb_id], map: "pk_permission_has_http_verb")
+}
+
+model page_tracker {
+  tracking_id         Int                 @id(map: "pk_page_tracker") @unique(map: "page_tracker_i2") @default(autoincrement())
+  user_id             String              @db.VarChar(50)
+  action_id           Decimal             @db.Decimal(12, 0)
+  action_time         DateTime            @default(now()) @db.Timestamp(6)
+  next_page_url       String?             @db.VarChar(250)
+  source              String?             @db.VarChar(250)
+  page_tracker_action page_tracker_action @relation(fields: [action_id], references: [action_id], onDelete: NoAction, onUpdate: NoAction, map: "action_fk")
+}
+
+model page_tracker_action {
+  action_id          Decimal        @id(map: "pk_page_tracker_action") @unique(map: "page_tracker_action_i2") @db.Decimal(12, 0)
+  action_name        String         @db.VarChar(50)
+  action_description String?        @db.VarChar(250)
+  page_tracker       page_tracker[]
+}
+
+model password_recovery {
+  password_recovery_id Decimal  @id @db.Decimal(10, 0)
+  user_id              Decimal  @db.Decimal(10, 0)
+  recovery_address     String?  @db.VarChar(100)
+  expire_date          DateTime @db.Timestamp(6)
+  used_ind             Decimal? @db.Decimal(1, 0)
+  random_key           Decimal? @db.Decimal(20, 0)
+  user                 user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "password_recovery_user_fk")
+}
+
+model password_reset_token {
+  user_id       Int      @id(map: "pk_password_reset_token")
+  token         String   @db.VarChar(10)
+  expired_at    DateTime @db.Timestamp(6)
+  email_type_id Int      @default(1)
+}
+
+model permission_code {
+  code            String          @id(map: "pk_permission_code") @db.VarChar(100)
+  group_id        Decimal         @db.Decimal(12, 0)
+  next_page       String          @db.VarChar(100)
+  security_groups security_groups @relation(fields: [group_id], references: [group_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_code_security_groups")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model pgifx_sync_audit {
+  seq_id        Int       @default(autoincrement())
+  payloadseqid  String?   @unique(map: "payloadseqid_unique") @db.VarChar
+  processid     Int?
+  tablename     String?   @db.VarChar(64)
+  uniquecolumn  String?   @db.VarChar(64)
+  dboperation   String?   @db.VarChar(32)
+  syncstatus    String?   @db.VarChar(64)
+  retrycount    String?   @db.VarChar(64)
+  consumer_err  String?   @db.VarChar
+  producer_err  String?   @db.VarChar
+  payload       String?   @db.VarChar
+  auditdatetime DateTime? @db.Timestamp(6)
+  topicname     String?   @db.VarChar(64)
+
+  @@ignore
+}
+
+model pgifx_tbl_channel_mapping {
+  tabid       Int       @default(autoincrement())
+  tablename   String    @db.VarChar(64)
+  schemaname  String    @db.VarChar(64)
+  channel     String    @default("dev_db_notifications") @db.VarChar(64)
+  topic       String    @default("dev.db.postgres.sync") @db.VarChar(64)
+  create_date DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([tablename, schemaname])
+}
+
+model phone {
+  user_id       Decimal?       @db.Decimal(10, 0)
+  phone_id      Decimal        @id(map: "u112_25") @db.Decimal(10, 0)
+  phone_type_id Decimal?       @db.Decimal(5, 0)
+  phone_number  String?        @db.VarChar(64)
+  create_date   DateTime?      @default(now()) @db.Timestamp(6)
+  modify_date   DateTime?      @default(now()) @db.Timestamp(6)
+  primary_ind   Decimal?       @db.Decimal(1, 0)
+  phone_type_lu phone_type_lu? @relation(fields: [phone_type_id], references: [phone_type_id], onDelete: NoAction, onUpdate: NoAction, map: "phone_phonetypelu_fk")
+
+  @@index([user_id, primary_ind], map: "phone_user_id_idx")
+}
+
+model phone_type_lu {
+  phone_type_id   Decimal   @id(map: "u109_22") @db.Decimal(5, 0)
+  phone_type_desc String?   @db.VarChar(100)
+  create_date     DateTime? @default(now()) @db.Timestamp(6)
+  modify_date     DateTime? @default(now()) @db.Timestamp(6)
+  phone           phone[]
+}
+
+model photo_image {
+  image_id     BigInt         @id @default(autoincrement())
+  file_name    String         @db.VarChar(50)
+  member_image member_image[]
+}
+
+model preference_group_lu {
+  preference_group_id   Decimal         @id(map: "preferencegroup_pk") @db.Decimal(5, 0)
+  preference_group_desc String          @db.VarChar(64)
+  sort_order            Decimal?        @db.Decimal(5, 0)
+  preference_lu         preference_lu[]
+}
+
+model preference_lu {
+  preference_id                     Decimal                             @id(map: "preference_pk") @db.Decimal(5, 0)
+  preference_name                   String                              @db.VarChar(64)
+  preference_desc                   String?                             @db.VarChar(200)
+  preference_group_id               Decimal                             @db.Decimal(5, 0)
+  preference_type_id                Decimal?                            @db.Decimal(5, 0)
+  sort_order                        Decimal?                            @db.Decimal(5, 0)
+  preference_group_lu               preference_group_lu                 @relation(fields: [preference_group_id], references: [preference_group_id], onDelete: NoAction, onUpdate: NoAction, map: "preference_preference_group_fk")
+  preference_type_lu                preference_type_lu?                 @relation(fields: [preference_type_id], references: [preference_type_id], onDelete: NoAction, onUpdate: NoAction, map: "preference_preferencetype_fk")
+  preference_value                  preference_value[]
+  registration_type_preference_xref registration_type_preference_xref[]
+  user_preference                   user_preference[]
+}
+
+model preference_type_lu {
+  preference_type_id Decimal         @id(map: "preferencetype_pk") @db.Decimal(5, 0)
+  desc               String          @db.VarChar(128)
+  preference_lu      preference_lu[]
+}
+
+model preference_value {
+  preference_value_id Decimal           @id(map: "preferencevalue_pk") @db.Decimal(5, 0)
+  preference_id       Decimal           @db.Decimal(5, 0)
+  value               String?           @db.VarChar(64)
+  desc                String?           @db.VarChar(128)
+  sort_order          Decimal?          @db.Decimal(5, 0)
+  preference_lu       preference_lu     @relation(fields: [preference_id], references: [preference_id], onDelete: NoAction, onUpdate: NoAction, map: "preferencevalue_preference_fk")
+  user_preference     user_preference[]
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model producer_audit_dd {
+  seqid         Int       @default(autoincrement())
+  payloadseqid  String?   @unique @db.VarChar
+  auditdatetime DateTime? @db.Timestamp(6)
+  channelname   String?   @db.VarChar(64)
+  tablename     String?   @db.VarChar(64)
+  dboperation   String?   @db.VarChar(32)
+  payload       Json?     @db.Json
+  uniquecolumn  String?   @db.VarChar(64)
+  topicname     String?   @db.VarChar(64)
+  processid     Int?
+
+  @@index([auditdatetime])
+  @@ignore
+}
+
+model professor {
+  user_id             Decimal             @id(map: "pk_professor") @db.Decimal(10, 0)
+  status_id           Decimal             @db.Decimal(3, 0)
+  create_date         DateTime?           @default(now()) @db.Timestamp(6)
+  professor_status_lu professor_status_lu @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_professor_professorstatus")
+  user                user                @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_professor_user")
+}
+
+model professor_status_lu {
+  status_id   Decimal     @id(map: "pk_professorstatus") @db.Decimal(3, 0)
+  description String      @db.VarChar(30)
+  professor   professor[]
+}
+
+model project_role_terms_of_use_xref {
+  project_id       Int
+  resource_role_id Int
+  terms_of_use_id  Decimal      @db.Decimal(10, 0)
+  create_date      DateTime?    @default(now()) @db.Timestamp(6)
+  modify_date      DateTime?    @default(now()) @db.Timestamp(6)
+  sort_order       Decimal      @default(1) @db.Decimal(1, 0)
+  group_ind        Int          @default(0)
+  terms_of_use     terms_of_use @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "project_role_terms_terms_fk")
+
+  @@id([project_id, resource_role_id, terms_of_use_id, group_ind], map: "pk_project_role_terms_of_use_xref")
+}
+
+model registration_type_lu {
+  registration_type_id              Decimal                             @id(map: "registrationtypelu_pkey") @db.Decimal(3, 0)
+  registration_type_name            String?                             @db.VarChar(200)
+  registration_type_desc            String?                             @db.VarChar
+  active_ind                        Decimal?                            @default(1) @db.Decimal(1, 0)
+  security_group_id                 Decimal?                            @db.Decimal(12, 0)
+  sort                              Decimal?                            @db.Decimal(3, 0)
+  security_groups                   security_groups?                    @relation(fields: [security_group_id], references: [group_id], onDelete: NoAction, onUpdate: NoAction, map: "regtype_securitygroup_fkey")
+  registration_type_notify_xref     registration_type_notify_xref[]
+  registration_type_preference_xref registration_type_preference_xref[]
+}
+
+model registration_type_notify_xref {
+  registration_type_id Decimal              @db.Decimal(3, 0)
+  notify_id            Decimal              @db.Decimal(5, 0)
+  registration_type_lu registration_type_lu @relation(fields: [registration_type_id], references: [registration_type_id], onDelete: NoAction, onUpdate: NoAction, map: "regtypexref_notify_fk")
+  notify_lu            notify_lu            @relation(fields: [notify_id], references: [notify_id], onDelete: NoAction, onUpdate: NoAction, map: "regtypexref_notifylu_fk")
+
+  @@id([registration_type_id, notify_id], map: "regtypenotifyxref_pk")
+}
+
+model registration_type_preference_xref {
+  registration_type_id Decimal              @db.Decimal(3, 0)
+  preference_id        Decimal              @db.Decimal(5, 0)
+  registration_type_lu registration_type_lu @relation(fields: [registration_type_id], references: [registration_type_id], onDelete: NoAction, onUpdate: NoAction, map: "regtypexref_preference_fk")
+  preference_lu        preference_lu        @relation(fields: [preference_id], references: [preference_id], onDelete: NoAction, onUpdate: NoAction, map: "regtypexref_preferencelu_fk")
+
+  @@id([registration_type_id, preference_id], map: "regtypepreferencexref_pk")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model request {
+  user_id    Decimal?  @db.Decimal(10, 0)
+  session_id String?   @db.Char(50)
+  url        String?   @db.VarChar(254)
+  timestamp  DateTime? @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
+
+model school {
+  school_id      Decimal         @id @db.Decimal(10, 0)
+  sort_letter    String?         @db.Char(1)
+  city           String?         @db.VarChar(50)
+  state_code     String?         @db.VarChar(2)
+  country_code   String?         @db.VarChar(3)
+  user_id        Decimal         @db.Decimal(10, 0)
+  name           String          @db.VarChar(100)
+  modify_date    DateTime?       @default(now()) @db.Timestamp(6)
+  short_name     String?         @db.VarChar(20)
+  school_type_id Decimal?        @db.Decimal(3, 0)
+  address_id     Decimal?        @db.Decimal(10, 0)
+  viewable       Decimal?        @default(1) @db.Decimal(1, 0)
+  create_date    DateTime?       @default(now()) @db.Timestamp(6)
+  school_type_lu school_type_lu? @relation(fields: [school_type_id], references: [school_type_id], onDelete: NoAction, onUpdate: NoAction, map: "school_schooltype_fk")
+  user_school    user_school[]
+}
+
+model school_association_type_lu {
+  school_association_type_id   Decimal       @id(map: "school_association_type_pkey") @db.Decimal(3, 0)
+  school_association_type_desc String?       @db.VarChar(50)
+  user_school                  user_school[]
+}
+
+model school_type_lu {
+  school_type_id   Decimal  @id(map: "schooltypelu_pk") @db.Decimal(3, 0)
+  school_type_desc String?  @db.VarChar(100)
+  school           school[]
+}
+
+model secret_question {
+  user_id  Decimal @id @db.Decimal(10, 0)
+  question String  @db.VarChar(254)
+  response String  @db.VarChar(254)
+  user     user    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "secret_question_user_fk")
+}
+
+model security_groups {
+  group_id             Decimal                @id(map: "pk_security_groups") @db.Decimal(12, 0)
+  description          String                 @db.VarChar(254)
+  challenge_group_ind  Int                    @default(0) @db.SmallInt
+  create_user_id       Decimal?               @db.Decimal(12, 0)
+  group_role_xref      group_role_xref[]
+  permission_code      permission_code[]
+  registration_type_lu registration_type_lu[]
+  user_group_xref      user_group_xref[]
+}
+
+model security_perms {
+  role_id            Decimal             @db.Decimal(12, 0)
+  permission         String              @db.VarChar(254)
+  create_user_id     Decimal?            @db.Decimal(12, 0)
+  security_status_id Decimal?            @db.Decimal(3, 0)
+  security_roles     security_roles      @relation(fields: [role_id], references: [role_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_security_perm")
+  security_status_lu security_status_lu? @relation(fields: [security_status_id], references: [security_status_id], onDelete: NoAction, onUpdate: NoAction, map: "securityperms_status_fk")
+
+  @@id([role_id, permission], map: "pk_security_perms")
+}
+
+model security_roles {
+  role_id         Decimal           @id(map: "pk_security_roles") @db.Decimal(12, 0)
+  description     String            @db.VarChar(254)
+  create_user_id  Decimal?          @db.Decimal(12, 0)
+  group_role_xref group_role_xref[]
+  security_perms  security_perms[]
+  user_role_xref  user_role_xref[]
+}
+
+model security_status_lu {
+  security_status_id Decimal           @id(map: "securitystatuslu_pkey") @db.Decimal(3, 0)
+  status_desc        String?           @db.VarChar(200)
+  group_role_xref    group_role_xref[]
+  security_perms     security_perms[]
+  user_group_xref    user_group_xref[]
+  user_role_xref     user_role_xref[]
+}
+
+model security_user {
+  login_id        Decimal           @id(map: "pk_security_user") @db.Decimal(12, 0)
+  user_id         String            @unique(map: "security_user_i2") @db.VarChar(50)
+  password        String            @db.VarChar(300)
+  create_user_id  Decimal?          @db.Decimal(12, 0)
+  modify_date     DateTime?         @db.Timestamp(6)
+  user_group_xref user_group_xref[]
+  user_role_xref  user_role_xref[]
+}
+
+model sequence_object {
+  name          String   @id @db.VarChar(25)
+  id            Decimal? @db.Decimal(3, 0)
+  current_value Decimal? @db.Decimal(12, 0)
+
+  @@index([id], map: "sequence_object_idx1")
+}
+
+model social_login_provider {
+  social_login_provider_id Decimal             @id(map: "social_provider_prkey") @db.Decimal(10, 0)
+  name                     String?             @db.VarChar(50)
+  user_social_login        user_social_login[]
+}
+
+model sso_login_provider {
+  sso_login_provider_id   Decimal          @id(map: "sso_provider_prkey") @db.Decimal(10, 0)
+  name                    String?          @db.VarChar(50)
+  type                    String           @db.VarChar(50)
+  identify_email_enabled  Boolean          @default(true)
+  identify_handle_enabled Boolean          @default(true)
+  user_sso_login          user_sso_login[]
+}
+
+model state {
+  state_code          String    @id @db.VarChar(2)
+  state_name          String    @db.VarChar(35)
+  region_code         String?   @db.VarChar(3)
+  modify_date         DateTime? @default(now()) @db.Timestamp(6)
+  demographic_decline Decimal?  @db.Decimal(1, 0)
+}
+
+model sync_test_id {
+  uniqid      Int       @id
+  description String?   @db.VarChar(200)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model terms_of_use {
+  terms_of_use_id                                                                          Decimal                              @id(map: "u114_27") @db.Decimal(10, 0)
+  terms_text                                                                               String?
+  terms_of_use_type_id                                                                     Decimal                              @db.Decimal(5, 0)
+  create_date                                                                              DateTime?                            @default(now()) @db.Timestamp(6)
+  modify_date                                                                              DateTime?                            @default(now()) @db.Timestamp(6)
+  title                                                                                    String                               @db.VarChar(50)
+  url                                                                                      String?                              @db.VarChar(100)
+  terms_of_use_agreeability_type_id                                                        Decimal                              @default(3) @db.Decimal(5, 0)
+  client_terms_mapping                                                                     client_terms_mapping[]
+  event                                                                                    event[]
+  project_role_terms_of_use_xref                                                           project_role_terms_of_use_xref[]
+  terms_of_use_agreeability_type_lu                                                        terms_of_use_agreeability_type_lu    @relation(fields: [terms_of_use_agreeability_type_id], references: [terms_of_use_agreeability_type_id], onDelete: NoAction, onUpdate: NoAction, map: "terms_of_use_terms_of_use_agreeability_type_fk")
+  terms_of_use_type                                                                        terms_of_use_type                    @relation(fields: [terms_of_use_type_id], references: [terms_of_use_type_id], onDelete: NoAction, onUpdate: NoAction, map: "termsofuse_termsofusetype_fk")
+  terms_of_use_dependency_terms_of_use_dependency_dependency_terms_of_use_idToterms_of_use terms_of_use_dependency[]            @relation("terms_of_use_dependency_dependency_terms_of_use_idToterms_of_use")
+  terms_of_use_dependency_terms_of_use_dependency_dependent_terms_of_use_idToterms_of_use  terms_of_use_dependency[]            @relation("terms_of_use_dependency_dependent_terms_of_use_idToterms_of_use")
+  terms_of_use_docusign_template_xref                                                      terms_of_use_docusign_template_xref?
+  user_terms_of_use_ban_xref                                                               user_terms_of_use_ban_xref[]
+  user_terms_of_use_xref                                                                   user_terms_of_use_xref[]
+}
+
+model terms_of_use_agreeability_type_lu {
+  terms_of_use_agreeability_type_id Decimal        @id(map: "terms_of_use_agreeability_type_lu_pk") @db.Decimal(5, 0)
+  name                              String         @db.VarChar(64)
+  description                       String         @db.VarChar(100)
+  terms_of_use                      terms_of_use[]
+}
+
+model terms_of_use_dependency {
+  dependency_terms_of_use_id                                                    Decimal      @db.Decimal(10, 0)
+  dependent_terms_of_use_id                                                     Decimal      @db.Decimal(10, 0)
+  terms_of_use_terms_of_use_dependency_dependency_terms_of_use_idToterms_of_use terms_of_use @relation("terms_of_use_dependency_dependency_terms_of_use_idToterms_of_use", fields: [dependency_terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "terms_of_use_dependency_fk")
+  terms_of_use_terms_of_use_dependency_dependent_terms_of_use_idToterms_of_use  terms_of_use @relation("terms_of_use_dependency_dependent_terms_of_use_idToterms_of_use", fields: [dependent_terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "terms_of_use_dependent_fk")
+
+  @@id([dependency_terms_of_use_id, dependent_terms_of_use_id], map: "terms_of_use_dependency_pk")
+}
+
+model terms_of_use_docusign_template_xref {
+  terms_of_use_id      Decimal      @id(map: "terms_of_use_docusign_template_xref_pk") @db.Decimal(10, 0)
+  docusign_template_id String       @db.VarChar(64)
+  terms_of_use         terms_of_use @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "terms_of_use_docusign_template_xref_terms_of_use_fk")
+}
+
+model terms_of_use_type {
+  terms_of_use_type_id   Decimal        @id(map: "u115_28") @db.Decimal(5, 0)
+  terms_of_use_type_desc String?        @db.VarChar(100)
+  create_date            DateTime?      @default(now()) @db.Timestamp(6)
+  modify_date            DateTime?      @default(now()) @db.Timestamp(6)
+  terms_of_use           terms_of_use[]
+}
+
+model timezone_lu {
+  timezone_id   Decimal   @id(map: "timezone_lu_pk") @db.Decimal(5, 0)
+  timezone_desc String?   @db.VarChar(100)
+  create_date   DateTime? @default(now()) @db.Timestamp(6)
+  company       company[]
+  user          user[]
+}
+
+model user_2fa {
+  id           Int      @id(map: "user_2fa_pk") @default(autoincrement())
+  user_id      Decimal  @unique @db.Decimal(10, 0)
+  mfa_enabled  Boolean  @default(false)
+  dice_enabled Boolean  @default(false)
+  created_by   Decimal  @db.Decimal(10, 0)
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+  modified_by  Decimal  @db.Decimal(10, 0)
+  modified_at  DateTime @default(now()) @db.Timestamp(6)
+  user         user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model user_achievement {
+  user_id             Decimal?            @db.Decimal(10, 0)
+  achievement_date    DateTime            @db.Date
+  achievement_type_id Decimal             @db.Decimal(5, 0)
+  description         String?             @db.VarChar(255)
+  create_date         DateTime?           @default(now()) @db.Timestamp(6)
+  achievement_type_lu achievement_type_lu @relation(fields: [achievement_type_id], references: [achievement_type_id], onDelete: NoAction, onUpdate: NoAction, map: "achv_type_fk")
+  user                user?               @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "achv_user_fk")
+
+  @@ignore
+}
+
+model user_address_xref {
+  user_id    Decimal @db.Decimal(10, 0)
+  address_id Decimal @db.Decimal(10, 0)
+
+  @@id([user_id, address_id], map: "u111_24")
+}
+
+model user_event {
+  user_event_id        Int                   @id(map: "userevent_pkey") @default(autoincrement())
+  user_id              Decimal?              @db.Decimal(10, 0)
+  status_id            Decimal?              @db.Decimal(3, 0)
+  event_id             Decimal?              @db.Decimal(3, 0)
+  event_date           DateTime?             @default(now()) @db.Timestamp(6)
+  event_lu             event_lu?             @relation(fields: [event_id], references: [event_id], onDelete: NoAction, onUpdate: NoAction, map: "userevent_eventlu_fk")
+  user                 user?                 @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "userevent_user_fk")
+  user_event_status_lu user_event_status_lu? @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "userevent_usereventstatuslu_fk")
+}
+
+model user_event_status_lu {
+  status_id   Decimal      @id(map: "usereventstatuslu_pkey") @db.Decimal(3, 0)
+  status_desc String?      @db.VarChar(100)
+  user_event  user_event[]
+}
+
+model user_group_xref {
+  user_group_id      Decimal             @id(map: "pk_user_group_xref") @db.Decimal(12, 0)
+  login_id           Decimal?            @db.Decimal(12, 0)
+  group_id           Decimal?            @db.Decimal(12, 0)
+  create_user_id     Decimal?            @db.Decimal(12, 0)
+  security_status_id Decimal?            @db.Decimal(3, 0)
+  create_date        DateTime?           @default(now()) @db.Timestamp(6)
+  security_user      security_user?      @relation(fields: [login_id], references: [login_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_grp_xref1")
+  security_groups    security_groups?    @relation(fields: [group_id], references: [group_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_grp_xref2")
+  security_status_lu security_status_lu? @relation(fields: [security_status_id], references: [security_status_id], onDelete: NoAction, onUpdate: NoAction, map: "usergroupxref_status_fk")
+
+  @@unique([login_id, group_id], map: "user_grp_xref_i2")
+}
+
+model user_note_xref {
+  user_id     Decimal   @db.Decimal(10, 0)
+  note_id     Decimal   @db.Decimal(10, 0)
+  modify_date DateTime? @default(now()) @db.Timestamp(6)
+  create_date DateTime? @default(now()) @db.Timestamp(6)
+  note        note      @relation(fields: [note_id], references: [note_id], onDelete: NoAction, onUpdate: NoAction, map: "user_note_xref_note")
+  user        user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_note_xref_user_fk")
+
+  @@id([user_id, note_id], map: "user_note_xref_pk")
+}
+
+model user_notify_xref {
+  user_id   Decimal   @db.Decimal(10, 0)
+  notify_id Decimal   @db.Decimal(5, 0)
+  notify_lu notify_lu @relation(fields: [notify_id], references: [notify_id], onDelete: NoAction, onUpdate: NoAction, map: "usernotifyxref_notifylu_fk")
+  user      user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "usernotifyxref_user_fk")
+
+  @@id([user_id, notify_id], map: "usernotifyxref_pk")
+}
+
+model user_otp_email {
+  id         Int      @id(map: "user_otp_email_pk") @default(autoincrement())
+  user_id    Decimal  @db.Decimal(10, 0)
+  mode       Int      @db.SmallInt
+  otp        String   @db.VarChar(6)
+  expire_at  DateTime @db.Timestamp(6)
+  resend     Boolean  @default(false)
+  fail_count Int      @default(0) @db.SmallInt
+  user       user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([user_id, mode])
+}
+
+model user_preference {
+  user_id             Decimal           @db.Decimal(10, 0)
+  preference_id       Decimal           @db.Decimal(5, 0)
+  value               String?           @db.VarChar(254)
+  preference_value_id Decimal?          @db.Decimal(5, 0)
+  create_date         DateTime?         @default(now()) @db.Timestamp(6)
+  modify_date         DateTime?         @db.Timestamp(6)
+  preference_lu       preference_lu     @relation(fields: [preference_id], references: [preference_id], onDelete: NoAction, onUpdate: NoAction, map: "userpreference_preference_fk")
+  preference_value    preference_value? @relation(fields: [preference_value_id], references: [preference_value_id], onDelete: NoAction, onUpdate: NoAction, map: "userpreference_preferencevalue_fk")
+  user                user              @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "userpreference_user_fk")
+
+  @@id([user_id, preference_id], map: "userpreference_pk")
+}
+
+model user_role_xref {
+  user_role_id       Decimal             @id(map: "pk_user_role_xref") @db.Decimal(12, 0)
+  login_id           Decimal?            @db.Decimal(12, 0)
+  role_id            Decimal?            @db.Decimal(12, 0)
+  create_user_id     Decimal?            @db.Decimal(12, 0)
+  security_status_id Decimal?            @db.Decimal(3, 0)
+  security_user      security_user?      @relation(fields: [login_id], references: [login_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_role_xref1")
+  security_roles     security_roles?     @relation(fields: [role_id], references: [role_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_role_xref2")
+  security_status_lu security_status_lu? @relation(fields: [security_status_id], references: [security_status_id], onDelete: NoAction, onUpdate: NoAction, map: "userrolexref_status_fk")
+
+  @@unique([login_id, role_id], map: "user_role_xref_i2")
+}
+
+model user_school {
+  user_school_id             Decimal                    @id(map: "user_school_pk") @db.Decimal(10, 0)
+  user_id                    Decimal                    @db.Decimal(10, 0)
+  school_id                  Decimal                    @db.Decimal(10, 0)
+  school_association_type_id Decimal                    @db.Decimal(3, 0)
+  primary_ind                Boolean
+  modify_date                DateTime?                  @default(now()) @db.Timestamp(6)
+  create_date                DateTime?                  @default(now()) @db.Timestamp(6)
+  school                     school                     @relation(fields: [school_id], references: [school_id], onDelete: NoAction, onUpdate: NoAction, map: "user_school_school_fk")
+  school_association_type_lu school_association_type_lu @relation(fields: [school_association_type_id], references: [school_association_type_id], onDelete: NoAction, onUpdate: NoAction, map: "userschool_schoolassociationtype_fk")
+  user                       user                       @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "userschool_user_fk")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model user_security_key {
+  user_id              Decimal @db.Decimal(10, 0)
+  security_key         String  @db.VarChar(1024)
+  security_key_type_id Int     @db.SmallInt
+
+  @@ignore
+}
+
+model user_social_login {
+  social_user_id           String?               @db.VarChar(254)
+  user_id                  Decimal               @db.Decimal(10, 0)
+  social_login_provider_id Decimal               @db.Decimal(10, 0)
+  social_user_name         String                @db.VarChar(100)
+  social_email             String?               @db.VarChar(100)
+  social_email_verified    Boolean?
+  create_date              DateTime?             @default(now()) @db.Timestamp(6)
+  modify_date              DateTime?             @db.Timestamp(6)
+  social_login_provider    social_login_provider @relation(fields: [social_login_provider_id], references: [social_login_provider_id], onDelete: NoAction, onUpdate: NoAction, map: "user_social_provider_fk")
+  user                     user                  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_social_user_fk")
+
+  @@id([user_id, social_login_provider_id], map: "user_social_prkey")
+}
+
+model user_sso_login {
+  user_id            Decimal            @db.Decimal(10, 0)
+  sso_user_id        String             @db.VarChar(100)
+  sso_user_name      String?            @db.VarChar(100)
+  provider_id        Decimal            @db.Decimal(10, 0)
+  email              String?            @db.VarChar(100)
+  sso_login_provider sso_login_provider @relation(fields: [provider_id], references: [sso_login_provider_id], onDelete: NoAction, onUpdate: NoAction, map: "user_sso_login_provider_fk")
+  user               user               @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_sso_login_user_fk")
+
+  @@id([user_id, provider_id], map: "user_sso_prkey")
+  @@index([sso_user_id, provider_id], map: "idx_user_social_login_sso_user_id_provider_id")
+}
+
+model user_status {
+  user_id             Decimal             @db.Decimal(10, 0)
+  user_status_type_id Decimal             @db.Decimal(3, 0)
+  user_status_id      Decimal?            @db.Decimal(5, 0)
+  user                user                @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "userstatus_user_fk")
+  user_status_lu      user_status_lu?     @relation(fields: [user_status_id], references: [user_status_id], onDelete: NoAction, onUpdate: NoAction, map: "userstatus_userstatuslu_fk")
+  user_status_type_lu user_status_type_lu @relation(fields: [user_status_type_id], references: [user_status_type_id], onDelete: NoAction, onUpdate: NoAction, map: "userstatus_userstatustype_fk")
+
+  @@id([user_id, user_status_type_id], map: "userstatus_pk")
+}
+
+model user_status_lu {
+  user_status_id Decimal       @id(map: "u113_26") @db.Decimal(5, 0)
+  description    String?       @db.VarChar(100)
+  user_status    user_status[]
+}
+
+model user_status_type_lu {
+  user_status_type_id Decimal       @id(map: "userstatustypelu_pk") @db.Decimal(3, 0)
+  description         String?       @db.VarChar(100)
+  user_status         user_status[]
+}
+
+model user_terms_of_use_ban_xref {
+  user_id         Decimal      @db.Decimal(10, 0)
+  terms_of_use_id Decimal      @db.Decimal(10, 0)
+  create_date     DateTime?    @default(now()) @db.Timestamp(6)
+  terms_of_use    terms_of_use @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "usertermsofusebanxref_termsofuse_fk")
+  user            user         @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "usertermsofusebanxref_user_fk")
+
+  @@id([user_id, terms_of_use_id], map: "user_terms_of_use_ban_xref_pk")
+}
+
+model user_terms_of_use_xref {
+  user_id         Decimal      @db.Decimal(10, 0)
+  terms_of_use_id Decimal      @db.Decimal(10, 0)
+  create_date     DateTime?    @default(now()) @db.Timestamp(6)
+  modify_date     DateTime?    @default(now()) @db.Timestamp(6)
+  terms_of_use    terms_of_use @relation(fields: [terms_of_use_id], references: [terms_of_use_id], onDelete: NoAction, onUpdate: NoAction, map: "userterms_terms_fk")
+  user            user         @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "usertermsofusexref_user_fk")
+
+  @@id([user_id, terms_of_use_id], map: "u116_29")
+}
+
+model vm_account {
+  vm_account_id           Decimal           @id @db.Decimal(10, 0)
+  aws_access_key_id       String            @db.VarChar(50)
+  aws_security_access_key String            @db.VarChar(100)
+  create_date             DateTime          @db.Timestamp(6)
+  modify_date             DateTime          @db.Timestamp(6)
+  account_name            String?           @db.VarChar(50)
+  vm_account_user         vm_account_user[]
+  vm_image                vm_image[]
+}
+
+model vm_account_user {
+  vm_account_user_id Decimal       @id @db.Decimal(10, 0)
+  vm_account_id      Decimal       @db.Decimal(10, 0)
+  user_id            Decimal       @db.Decimal(10, 0)
+  create_date        DateTime      @db.Timestamp(6)
+  modify_date        DateTime      @db.Timestamp(6)
+  user               user          @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_account_user_user_fk")
+  vm_account         vm_account    @relation(fields: [vm_account_id], references: [vm_account_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_account_user_vm_account_fk")
+  vm_instance        vm_instance[]
+}
+
+model vm_availability_zone {
+  vm_availability_zone_id Decimal    @id @db.Decimal(10, 0)
+  name                    String     @db.VarChar(50)
+  create_date             DateTime   @db.Timestamp(6)
+  modify_date             DateTime   @db.Timestamp(6)
+  vm_image                vm_image[]
+}
+
+model vm_contest_type {
+  vm_contest_type_id Decimal       @id @db.Decimal(10, 0)
+  name               String        @db.VarChar(50)
+  create_date        DateTime      @db.Timestamp(6)
+  modify_date        DateTime      @db.Timestamp(6)
+  vm_instance        vm_instance[]
+}
+
+model vm_image {
+  vm_image_id             Decimal               @id @db.Decimal(10, 0)
+  vm_image_tc_name        String                @db.VarChar(50)
+  aws_image_id            String                @db.VarChar(50)
+  vm_security_group_id    Decimal?              @db.Decimal(10, 0)
+  vm_instance_type_id     Decimal?              @db.Decimal(10, 0)
+  vm_availability_zone_id Decimal?              @db.Decimal(10, 0)
+  vm_key_pair_id          Decimal?              @db.Decimal(10, 0)
+  vm_account_id           Decimal?              @db.Decimal(10, 0)
+  create_date             DateTime              @db.Timestamp(6)
+  modify_date             DateTime              @db.Timestamp(6)
+  vm_provider_id          Decimal               @db.Decimal(10, 0)
+  vm_availability_zone    vm_availability_zone? @relation(fields: [vm_availability_zone_id], references: [vm_availability_zone_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_availability_zone_fk")
+  vm_instance_type        vm_instance_type?     @relation(fields: [vm_instance_type_id], references: [vm_instance_type_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_instance_type_fk")
+  vm_key_pair             vm_key_pair?          @relation(fields: [vm_key_pair_id], references: [vm_key_pair_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_key_pair_fk")
+  vm_security_group       vm_security_group?    @relation(fields: [vm_security_group_id], references: [vm_security_group_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_security_groups_fk")
+  vm_account              vm_account?           @relation(fields: [vm_account_id], references: [vm_account_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_vm_accout_fk")
+  vm_provider             vm_provider           @relation(fields: [vm_provider_id], references: [vm_provider_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_provider_fk")
+  vm_image_user_data      vm_image_user_data[]
+  vm_instance             vm_instance[]
+}
+
+model vm_image_user_data {
+  vm_image_id     Decimal      @db.Decimal(10, 0)
+  vm_user_data_id Decimal      @db.Decimal(10, 0)
+  vm_user_data    vm_user_data @relation(fields: [vm_user_data_id], references: [vm_user_data_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_user_data_user_data_fk")
+  vm_image        vm_image     @relation(fields: [vm_image_id], references: [vm_image_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_image_user_data_vm_image_fk")
+
+  @@id([vm_image_id, vm_user_data_id])
+}
+
+model vm_instance {
+  vm_instance_id     Decimal         @id @db.Decimal(10, 0)
+  aws_instance_id    String          @db.VarChar(50)
+  create_date        DateTime        @db.Timestamp(6)
+  modify_date        DateTime        @db.Timestamp(6)
+  vm_image_id        Decimal         @db.Decimal(10, 0)
+  tc_member_handle   String          @db.VarChar(50)
+  svn_branch         String          @db.VarChar(200)
+  contest_id         Decimal         @db.Decimal(10, 0)
+  contest_name       String?         @db.VarChar(254)
+  vm_contest_type_id Decimal         @db.Decimal(10, 0)
+  is_terminated      Boolean         @default(false)
+  public_ip          String?         @db.VarChar(16)
+  vm_usage_id        Decimal         @db.Decimal(10, 0)
+  vm_creation_time   DateTime        @db.Timestamp(6)
+  vm_account_user_id Decimal         @db.Decimal(10, 0)
+  vm_account_user    vm_account_user @relation(fields: [vm_account_user_id], references: [vm_account_user_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_instance_account_user_fk")
+  vm_contest_type    vm_contest_type @relation(fields: [vm_contest_type_id], references: [vm_contest_type_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_instance_contest_type_fk")
+  vm_image           vm_image        @relation(fields: [vm_image_id], references: [vm_image_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_instance_image_fk")
+  vm_usage           vm_usage        @relation(fields: [vm_usage_id], references: [vm_usage_id], onDelete: NoAction, onUpdate: NoAction, map: "vm_instance_usage_fk")
+}
+
+model vm_instance_audit {
+  vm_instance_audit_id Decimal  @id @db.Decimal(10, 0)
+  vm_instance_id       Decimal  @db.Decimal(10, 0)
+  create_date          DateTime @db.Timestamp(6)
+  modify_date          DateTime @db.Timestamp(6)
+  action               String   @db.VarChar(50)
+  user_id              Decimal? @db.Decimal(10, 0)
+}
+
+model vm_instance_type {
+  vm_instance_type_id Decimal    @id @db.Decimal(10, 0)
+  name                String     @db.VarChar(50)
+  create_date         DateTime   @db.Timestamp(6)
+  modify_date         DateTime   @db.Timestamp(6)
+  vm_image            vm_image[]
+}
+
+model vm_key_pair {
+  vm_key_pair_id Decimal    @id @db.Decimal(10, 0)
+  name           String     @db.VarChar(50)
+  create_date    DateTime   @db.Timestamp(6)
+  modify_date    DateTime   @db.Timestamp(6)
+  vm_image       vm_image[]
+}
+
+model vm_provider {
+  vm_provider_id Decimal    @id @db.Decimal(10, 0)
+  name           String     @db.VarChar(50)
+  create_date    DateTime   @db.Timestamp(6)
+  modify_date    DateTime   @db.Timestamp(6)
+  vm_image       vm_image[]
+}
+
+model vm_security_group {
+  vm_security_group_id Decimal    @id @db.Decimal(10, 0)
+  name                 String     @db.VarChar(50)
+  create_date          DateTime   @db.Timestamp(6)
+  modify_date          DateTime   @db.Timestamp(6)
+  vm_image             vm_image[]
+}
+
+model vm_usage {
+  vm_usage_id Decimal       @id @db.Decimal(10, 0)
+  name        String        @db.VarChar(50)
+  create_date DateTime      @db.Timestamp(6)
+  modify_date DateTime      @db.Timestamp(6)
+  vm_instance vm_instance[]
+}
+
+model vm_user_data {
+  vm_user_data_id    Decimal              @id @db.Decimal(10, 0)
+  key                String               @db.VarChar(50)
+  value              String?              @db.VarChar(200)
+  create_date        DateTime             @db.Timestamp(6)
+  modify_date        DateTime             @db.Timestamp(6)
+  encrypted          String               @db.Char(1)
+  vm_image_user_data vm_image_user_data[]
+}

@@ -33,6 +33,7 @@ async function migrateRoles() {
         target.role.upsert({
           where: { name: r.name },
           create: {
+            id: r.id,
             name: r.name,
             createdBy: r.createdBy ?? null,
             createdAt: r.createdAt ?? null,
@@ -106,13 +107,14 @@ async function migrateRoleAssignments() {
       batch.map((ra: any) =>
         target.roleAssignment.upsert({
           where: {
-            roleId_subjectId_subjectType: {
+              roleId_subjectId_subjectType: {
               roleId: ra.roleId,
               subjectId: ra.subjectId,
               subjectType: ra.subjectType ?? 1,
             },
           },
           create: {
+            id: ra.id,
             roleId: ra.roleId,
             subjectId: ra.subjectId,
             subjectType: ra.subjectType ?? 1,
