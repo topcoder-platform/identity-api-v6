@@ -1026,13 +1026,12 @@ export class AuthFlowService {
       family_name: userRecord.last_name || '' || undefined,
       nickname: userHandle,
       picture: null,
-      'https://topcoder.com/claims/userId': userId,
-      'https://topcoder.com/claims/handle': userHandle,
-      'https://topcoder.com/claims/roles': roles,
-      'https://topcoder.com/claims/status': userRecord.status,
-      'https://topcoder.com/claims/mfa_enabled':
+      handle: userHandle,
+      roles: roles,
+      status: userRecord.status,
+      mfa_enabled:
         userRecord.user_2fa?.mfa_enabled ?? false,
-      'https://topcoder.com/claims/dice_enabled':
+      dice_enabled:
         userRecord.user_2fa?.dice_enabled ?? false,
       last_login: userRecord.last_login?.toISOString(),
       created_at: userRecord.create_date?.toISOString(),
