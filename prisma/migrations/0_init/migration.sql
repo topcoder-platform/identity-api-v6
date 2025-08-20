@@ -11,7 +11,6 @@ CREATE SEQUENCE IF NOT EXISTS sequence_user_seq
     MINVALUE 1
     MAXVALUE 9223372036854775807
     CACHE 1;
-
 -- CreateTable
 CREATE TABLE "achievement_type_lu" (
     "achievement_type_id" DECIMAL(5,0) NOT NULL,
@@ -454,3 +453,4 @@ ALTER TABLE "user_email_xref" ADD CONSTRAINT "user_email_xref_status_id_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "role_assignment" ADD CONSTRAINT "role_id" FOREIGN KEY ("role_id") REFERENCES "role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
