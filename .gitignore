@@ -127,7 +127,6 @@ out
 
 # Prisma
 prisma/generated
-prisma/migrations/*/*.sql
 
 # IDE files
 .idea
