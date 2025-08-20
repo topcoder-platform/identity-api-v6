@@ -3511,7 +3511,7 @@
 				"exec": [
 					"// Auto-set variables from environment or previous responses",
 					"if (!pm.collectionVariables.get('baseUrl')) {",
-					"    pm.collectionVariables.set('baseUrl', 'http://localhost:3000/v3');",
+					"    pm.collectionVariables.set('baseUrl', 'http://localhost:3000/v6');",
 					"}",
 					"",
 					"// You can add logic here to automatically refresh tokens",
@@ -3536,7 +3536,7 @@
 	"variable": [
 		{
 			"key": "baseUrl",
-			"value": "http://localhost:3000/v3",
+			"value": "http://localhost:3000/v6",
 			"type": "string"
 		},
 		{

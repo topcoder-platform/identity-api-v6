@@ -87,7 +87,7 @@ pnpm run start:dev
 --------------------------------------
 
 1. Import the Postman collection file (`doc/identity-api-v6-postman-collection.json`) into Postman.
-2. Update the `baseUrl` variable in the Postman collection to point to your local application URL (e.g., `http://localhost:3000/v3`).
+2. Update the `baseUrl` variable in the Postman collection to point to your local application URL (e.g., `http://localhost:3000/v6`).
 3. Run the API requests in the Postman collection one by one, from top to bottom to verify that the application is working correctly.
 4. After you run the `users/Authentication/Session Related/Auth0 Change Password` request, locate the OTP in the application logs(something like `New activation OTP **025450** generated and cached for user 40159253 (key: USER_ACTIVATION_OTP:40159253)`), copy it, and replace the OTP in the body of the `users/Authentication/Session Related/Activate User` request.
 5. After you run the `users/Profile Updates/Send Otp for check` request, locate the OTP in the application logs(something like `New activation OTP **025450** generated and cached for user 40159253 (key: USER_2FA_OTP:40159253)`), copy it, and replace the OTP in the body of the `users/Profile Updates/Check Otp` request.

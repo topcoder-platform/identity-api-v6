@@ -223,7 +223,7 @@ export class AuthFlowService {
               // Add other data fields specific to the welcome template if needed
             },
             from: { email: fromEmail },
-            version: 'v3',
+            version: 'v6',
             sendgrid_template_id: welcomeTemplateId,
             recipients: [primaryEmailAddress],
           };
@@ -355,7 +355,7 @@ export class AuthFlowService {
         const activationEmailPayload = {
           data: { handle: user.handle, code: newOtp },
           from: { email: fromEmail },
-          version: 'v3',
+          version: 'v6',
           sendgrid_template_id: sendgridTemplateId,
           recipients: [primaryEmail], // The user's primary email
         };
@@ -740,7 +740,7 @@ export class AuthFlowService {
           'noreply@topcoder-dev.com', // Retaining from previous logic
         // Any other fields that were part of MailRepresentation.data
       },
-      version: 'v3', // Retaining from previous logic, was part of MailRepresentation
+      version: 'v6', // Retaining from previous logic, was part of MailRepresentation
       // Optional fields from MailRepresentation, if applicable
       cc: [],
       bcc: [],

@@ -41,12 +41,12 @@
 					"raw": "{\n    \"param\": {\n        \"roleName\": \"TestRole_{{$randomWord}}\"\n    }\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles",
+					"raw": "{{baseUrl}}/v6/roles",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles"
 					]
 				}
@@ -75,12 +75,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles",
+					"raw": "{{baseUrl}}/v6/roles",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles"
 					]
 				}
@@ -109,12 +109,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/1",
+					"raw": "{{baseUrl}}/v6/roles/1",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"1"
 					]
@@ -152,12 +152,12 @@
 					"raw": "{\n    \"param\": {\n        \"roleName\": \"role {{$randomWord}}\"\n    }\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/{{createdRoleId}}",
+					"raw": "{{baseUrl}}/v6/roles/{{createdRoleId}}",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"{{createdRoleId}}"
 					]
@@ -191,12 +191,12 @@
 					"raw": ""
 				},
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/{{createdRoleId}}",
+					"raw": "{{baseUrl}}/v6/roles/{{createdRoleId}}",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"{{createdRoleId}}"
 					]
@@ -234,12 +234,12 @@
 					"raw": ""
 				},
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/40/assign?filter=subjectID=100",
+					"raw": "{{baseUrl}}/v6/roles/40/assign?filter=subjectID=100",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"40",
 						"assign"
@@ -279,12 +279,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/40/hasrole?filter=subjectID=100",
+					"raw": "{{baseUrl}}/v6/roles/40/hasrole?filter=subjectID=100",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"40",
 						"hasrole"
@@ -321,12 +321,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/40/deassign?filter=subjectID=100",
+					"raw": "{{baseUrl}}/v6/roles/40/deassign?filter=subjectID=100",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"40",
 						"deassign"
@@ -363,12 +363,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles/105?fields=subjects",
+					"raw": "{{baseUrl}}/v6/roles/105?fields=subjects",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles",
 						"105"
 					],
@@ -404,12 +404,12 @@
 					}
 				],
 				"url": {
-					"raw": "{{baseUrl}}/v3/roles?filter=subjectID=100",
+					"raw": "{{baseUrl}}/v6/roles?filter=subjectID=100",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"v3",
+						"v6",
 						"roles"
 					],
 					"query": [

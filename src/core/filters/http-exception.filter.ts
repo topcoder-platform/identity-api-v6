@@ -47,7 +47,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const errorResponse = {
       id: uuidv4(), // Generate unique request ID
-      version: 'v3', // TODO: Make this configurable or derive from request?
+      version: 'v6', // TODO: Make this configurable or derive from request?
       result: {
         success: false,
         status: status,

@@ -102,8 +102,8 @@ export class AuthorizationService {
 
     const returlUrl =
       `https://${domain}/authorize?client_id=${clientId}` +
-      `&redirect_uri=${protocol}://${redirectUri}/v3/authorizations?redirectUrl=${redirectUrl}` +
-      `&audience=${protocol}://${redirectUri}/v3&scope=openid profile offline_access` +
+      `&redirect_uri=${protocol}://${redirectUri}/v6/authorizations?redirectUrl=${redirectUrl}` +
+      `&audience=${protocol}://${redirectUri}/v6&scope=openid profile offline_access` +
       `&response_type=code&state=${state}` +
       `&prompt=none`;
     // set response
@@ -135,8 +135,8 @@ export class AuthorizationService {
       }
       const resultUrl =
         `https://${domain}/authorize?client_id=${clientId}` +
-        `&redirect_uri=${protocol}://${redirectUri}/v3/authorizations?redirectUrl=${dto.redirectUrl}` +
-        `&audience=${protocol}://${redirectUri}/v3&scope=openid profile offline_access` +
+        `&redirect_uri=${protocol}://${redirectUri}/v6/authorizations?redirectUrl=${dto.redirectUrl}` +
+        `&audience=${protocol}://${redirectUri}/v6&scope=openid profile offline_access` +
         `&response_type=code&state=${dto.state}`;
       res.redirect(resultUrl);
       return;

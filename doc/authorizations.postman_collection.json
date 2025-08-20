@@ -27,14 +27,14 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations/login",
+					"raw": "http://localhost:3000/v6/authorizations/login",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations",
 						"login"
 					]
@@ -65,14 +65,14 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations?redirectUrl=https%3A%2F%2Fwww.topcoder.com&error=login_required&error_description=Login%20required&state=NkxDdTduQmN2RUF4",
+					"raw": "http://localhost:3000/v6/authorizations?redirectUrl=https%3A%2F%2Fwww.topcoder.com&error=login_required&error_description=Login%20required&state=NkxDdTduQmN2RUF4",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations"
 					],
 					"query": [
@@ -135,14 +135,14 @@
 					]
 				},
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations",
+					"raw": "http://localhost:3000/v6/authorizations",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations"
 					]
 				}
@@ -172,14 +172,14 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations/validateClient?clientId=8be46512-728f-4543-bf0d-1183d0e8ac4b&redirectUrl=http://127.0.0.1:3000/oauth",
+					"raw": "http://localhost:3000/v6/authorizations/validateClient?clientId=8be46512-728f-4543-bf0d-1183d0e8ac4b&redirectUrl=http://127.0.0.1:3000/oauth",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations",
 						"validateClient"
 					],
@@ -219,7 +219,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXV3flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXv6flpkUeNh9p28BCNHbgnPcK-ZTj1c",
 							"type": "string"
 						}
 					]
@@ -227,14 +227,14 @@
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations",
+					"raw": "http://localhost:3000/v6/authorizations",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations"
 					]
 				}
@@ -263,7 +263,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXV3flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXv6flpkUeNh9p28BCNHbgnPcK-ZTj1c",
 							"type": "string"
 						}
 					]
@@ -271,14 +271,14 @@
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/v3/authorizations/1",
+					"raw": "http://localhost:3000/v6/authorizations/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"v3",
+						"v6",
 						"authorizations",
 						"1"
 					]

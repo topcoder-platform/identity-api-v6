@@ -28,7 +28,7 @@ async function bootstrap() {
   app.enableCors();
 
   // Set global prefix
-  app.setGlobalPrefix('v3');
+  app.setGlobalPrefix('v6');
 
   // Apply global validation pipe
   app.useGlobalPipes(
@@ -57,7 +57,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
   logger.log(`Application listening on port ${port}`);
-  logger.log(`API available at http://localhost:${port}/v3`);
+  logger.log(`API available at http://localhost:${port}/v6`);
 }
 
 bootstrap()

@@ -22,7 +22,7 @@ export function createBaseResponse<T extends object>(
       metadata: null,
       content: filterFieldsNested(data, fields),
     },
-    version: 'v3',
+    version: 'v6',
   };
 }
 
@@ -37,7 +37,7 @@ export function createErrorResponse(
       metadata: null,
       content: { error: message },
     },
-    version: 'v3',
+    version: 'v6',
   };
 }
 

@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "9de0f63a-8f51-4fee-bb21-8ac4eaca5d7c",
-		"name": "Topcoder - Identity v3 - Users",
-		"description": "Postman collection for the v3 Identity User Service.",
+		"name": "Topcoder - Identity v6 - Users",
+		"description": "Postman collection for the v6 Identity User Service.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "28573934"
 	},
@@ -43,12 +43,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users?limit=10&offset=0",
+							"raw": "{{host}}/v6/users?limit=10&offset=0",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users"
 							],
 							"query": [
@@ -126,12 +126,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users",
+							"raw": "{{host}}/v6/users",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users"
 							]
 						},
@@ -172,12 +172,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}"
 							]
@@ -228,12 +228,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}"
 							]
@@ -270,12 +270,12 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}"
 							]
@@ -332,12 +332,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/SSOUserLogin",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"SSOUserLogin"
@@ -375,12 +375,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogins",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/SSOUserLogins",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"SSOUserLogins"
@@ -432,12 +432,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/SSOUserLogin",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"SSOUserLogin"
@@ -475,12 +475,12 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/SSOUserLogin?provider=okta-customer&ssoUserId={{newlyRegisteredUserId}}",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/SSOUserLogin?provider=okta-customer&ssoUserId={{newlyRegisteredUserId}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"SSOUserLogin"
@@ -548,12 +548,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/profiles",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"profiles"
@@ -591,12 +591,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/profiles",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"profiles"
@@ -634,12 +634,12 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/profiles/github",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/profiles/github",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"profiles",
@@ -694,12 +694,12 @@
 							]
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/login",
+							"raw": "{{host}}/v6/users/login",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"login"
 							]
@@ -747,12 +747,12 @@
 							]
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/roles",
+							"raw": "{{host}}/v6/users/roles",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"roles"
 							]
@@ -814,12 +814,12 @@
 							]
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/changePassword",
+							"raw": "{{host}}/v6/users/changePassword",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"changePassword"
 							]
@@ -859,12 +859,12 @@
 							}
 						],
 						"url": {
-							"raw": "{{host}}/v3/users/resetToken?handle={{randomUser}}&resetPasswordUrlPrefix={{ui_reset_password_url_prefix}}&email={{userEmail}}",
+							"raw": "{{host}}/v6/users/resetToken?handle={{randomUser}}&resetPasswordUrlPrefix={{ui_reset_password_url_prefix}}&email={{userEmail}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"resetToken"
 							],
@@ -934,12 +934,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/resetPassword",
+							"raw": "{{host}}/v6/users/resetPassword",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"resetPassword"
 							]
@@ -980,12 +980,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/activate",
+							"raw": "{{host}}/v6/users/activate",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"activate"
 							]
@@ -1026,12 +1026,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/resendActivationEmail",
+							"raw": "{{host}}/v6/users/resendActivationEmail",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"resendActivationEmail"
 							]
@@ -1104,12 +1104,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/handle",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/handle",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"handle"
@@ -1175,12 +1175,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/email",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"email"
@@ -1227,12 +1227,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/oneTimeToken",
+							"raw": "{{host}}/v6/users/oneTimeToken",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"oneTimeToken"
 							]
@@ -1283,12 +1283,12 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/email/{{newEmail}}",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/email/{{newEmail}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"email",
@@ -1341,12 +1341,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/status",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/status",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"status"
@@ -1398,12 +1398,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/updatePrimaryRole",
+							"raw": "{{host}}/v6/users/updatePrimaryRole",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"updatePrimaryRole"
 							]
@@ -1439,12 +1439,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/validateHandle?handle=randomhandle",
+							"raw": "{{host}}/v6/users/validateHandle?handle=randomhandle",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"validateHandle"
 							],
@@ -1477,12 +1477,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/validateEmail?email=random23423@email.com",
+							"raw": "{{host}}/v6/users/validateEmail?email=random23423@email.com",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"validateEmail"
 							],
@@ -1515,12 +1515,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/validateSocial?socialUserId=123random&socialProvider=github",
+							"raw": "{{host}}/v6/users/validateSocial?socialUserId=123random&socialProvider=github",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"validateSocial"
 							],
@@ -1573,12 +1573,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/2fa",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"2fa"
@@ -1630,12 +1630,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/2fa",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/2fa",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"2fa"
@@ -1682,12 +1682,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/sendOtp",
+							"raw": "{{host}}/v6/users/sendOtp",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"sendOtp"
 							]
@@ -1727,12 +1727,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{host}}/v3/users/resendOtpEmail",
+							"raw": "{{host}}/v6/users/resendOtpEmail",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"resendOtpEmail"
 							]
@@ -1775,12 +1775,12 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{host}}/v3/users/{{newlyRegisteredUserId}}/achievements",
+							"raw": "{{host}}/v6/users/{{newlyRegisteredUserId}}/achievements",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
-								"v3",
+								"v6",
 								"users",
 								"{{newlyRegisteredUserId}}",
 								"achievements"

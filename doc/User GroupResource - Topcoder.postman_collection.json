@@ -813,7 +813,7 @@
 		},
 		{
 			"key": "version",
-			"value": "v3",
+			"value": "v6",
 			"type": "string"
 		}
 	]

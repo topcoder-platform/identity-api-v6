@@ -383,7 +383,7 @@ export class TwoFactorAuthService {
           durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
         },
         from: { email: fromEmail },
-        version: 'v3',
+        version: 'v6',
         sendgrid_template_id: sendgridTemplateId,
         recipients: [primaryEmail], // The original email used for registration
       });
@@ -483,7 +483,7 @@ export class TwoFactorAuthService {
           durationMinutes: TFA_OTP_EXPIRY_SECONDS / 60,
         },
         from: { email: fromEmail },
-        version: 'v3',
+        version: 'v6',
         sendgrid_template_id: sendgridTemplateId,
         recipients: [primaryEmail], // The original email used for registration
       });
