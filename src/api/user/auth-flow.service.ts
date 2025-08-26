@@ -1,4 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import { isBefore, addMinutes } from 'date-fns';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { Cache } from 'cache-manager'; // Import Cache type
@@ -26,6 +27,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { Decimal } from '@prisma/client/runtime/library'; // Import Decimal
 import { Constants } from '../../core/constant/constants';
+import { MemberStatus } from 'src/dto/member';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
@@ -33,6 +35,7 @@ const ONE_TIME_TOKEN_JWT_AUDIENCE = 'onetime_email_update';
 const ONE_TIME_TOKEN_CACHE_PREFIX_JTI = 'USED_JTI_OTT';
 const PASSWORD_RESET_TOKEN_CACHE_PREFIX = 'PWD_RESET_TOKEN';
 const PASSWORD_RESET_TOKEN_LENGTH = 6; // Or longer for more security, Java used 6 alphanumeric
+const OTP_ACTIVATION_MODE = 1;
 
 @Injectable()
 export class AuthFlowService {
@@ -40,6 +43,7 @@ export class AuthFlowService {
   private readonly jwtSecret: string;
   private readonly resetTokenExpirySeconds: number;
   private readonly activationResendExpirySeconds: number;
+  private readonly activationCodeExpirationMinutes: number;
   private readonly oneTimeTokenExpirySeconds: number;
   private readonly legacyBlowfishKey: string; // For legacy password decryption
 
@@ -57,6 +61,7 @@ export class AuthFlowService {
     this.resetTokenExpirySeconds = 30 * 60; // Example: 30 mins
     this.activationResendExpirySeconds = 1 * 60 * 60; // Example: 1 hour
     this.oneTimeTokenExpirySeconds = 10 * 60; // Example: 10 mins
+    this.activationCodeExpirationMinutes = 24 * 60; // 1 day
     this.legacyBlowfishKey = this.configService.get<string>(
       'LEGACY_BLOWFISH_KEY',
     )!;
@@ -140,11 +145,11 @@ export class AuthFlowService {
       this.logger.error(`User not found for activation: ${userId}`);
       throw new NotFoundException('User not found.');
     }
-    if (user.status === 'A') {
+    if (user.status == MemberStatus.ACTIVE) {
       this.logger.log(`User ${userId} is already active.`);
       return { message: 'User is already active.', user: user };
     }
-    if (user.status !== 'U') {
+    if (user.status != MemberStatus.UNVERIFIED) {
       this.logger.warn(
         `User ${userId} has an unexpected status '${user.status}' for activation.`,
       );
@@ -305,10 +310,10 @@ export class AuthFlowService {
     }
     const primaryEmail = primaryEmailRecord.address;
 
-    if (user.status === 'A') {
+    if (user.status == MemberStatus.ACTIVE) {
       return { message: 'Account is already activated.' };
     }
-    if (user.status !== 'U') {
+    if (user.status != MemberStatus.UNVERIFIED) {
       throw new ForbiddenException(
         `User account status (${user.status}) does not allow resending activation.`,
       );
@@ -403,7 +408,7 @@ export class AuthFlowService {
       throw new NotFoundException('User not found.');
     }
 
-    if (user.status !== 'A') {
+    if (user.status != MemberStatus.ACTIVE) {
       this.logger.warn(
         `generateOneTimeToken: User ${user.handle} (ID: ${userId}) is not active (status: ${user.status}).`,
       );
@@ -884,6 +889,11 @@ export class AuthFlowService {
         modify_date: true;
         last_login: true;
         user_2fa: true; // Keep 2FA info
+        reg_source: true;
+        utm_source: true;
+        utm_medium: true;
+        utm_campaign: true;
+        activation_code: true;
       };
     }>;
 
@@ -915,6 +925,11 @@ export class AuthFlowService {
             modify_date: true,
             last_login: true,
             user_2fa: true,
+            reg_source: true,
+            utm_source: true,
+            utm_medium: true,
+            utm_campaign: true,
+            activation_code: true,
           },
         });
         if (userRecord) {
@@ -935,6 +950,11 @@ export class AuthFlowService {
           modify_date: true,
           last_login: true,
           user_2fa: true,
+          reg_source: true,
+          utm_source: true,
+          utm_medium: true,
+          utm_campaign: true,
+          activation_code: true,
         },
       });
       if (userRecord) {
@@ -963,13 +983,15 @@ export class AuthFlowService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
-    if (userRecord.status !== 'A' && userRecord.status !== 'U') {
+    if (
+      userRecord.status != MemberStatus.ACTIVE &&
+      userRecord.status != MemberStatus.UNVERIFIED
+    ) {
       this.logger.warn(
         `Auth0 Custom DB: Account for ${handleOrEmail} (ID: ${userId}) is deactivated (status: ${userRecord.status}).`,
       );
       throw new UnauthorizedException('Account is deactivated.');
     }
-
     // 2. Fetch Encrypted Password from security_user using the handle
     const securityUserRecord = await this.prismaClient.security_user.findUnique(
       {
@@ -1011,31 +1033,39 @@ export class AuthFlowService {
     );
 
     // Fetch roles (as before)
-    const roleEntities = await this.roleService.findAll(userId);
-    const roles = roleEntities.map((r) => r.roleName);
+    const roles = await this.roleService.findAll(userId);
 
     // Construct the profile object for Auth0 (same structure as before)
     const auth0Profile = {
-      user_id: userId.toString(),
+      id: userId.toString(),
       email: primaryEmail?.toLowerCase(),
-      email_verified: emailVerified,
-      name:
-        `${userRecord.first_name || ''} ${userRecord.last_name || ''}`.trim() ||
-        primaryEmail,
-      given_name: userRecord.first_name || '' || undefined,
-      family_name: userRecord.last_name || '' || undefined,
-      nickname: userHandle,
-      picture: null,
+      emailActive: emailVerified,
+      firstName: userRecord.first_name || '' || undefined,
+      lastName: userRecord.last_name || '' || undefined,
       handle: userHandle,
       roles: roles,
       status: userRecord.status,
-      mfa_enabled:
-        userRecord.user_2fa?.mfa_enabled ?? false,
-      dice_enabled:
-        userRecord.user_2fa?.dice_enabled ?? false,
+      mfaEnabled: userRecord.user_2fa?.mfa_enabled ?? false,
+      diceEnabled: userRecord.user_2fa?.dice_enabled ?? false,
       last_login: userRecord.last_login?.toISOString(),
-      created_at: userRecord.create_date?.toISOString(),
-      updated_at: userRecord.modify_date?.toISOString(),
+      createdAt: userRecord.create_date?.toISOString(),
+      modifiedAt: userRecord.modify_date?.toISOString(),
+      regSource: userRecord.reg_source,
+      utmSource: userRecord.utm_source,
+      utmMedium: userRecord.utm_medium,
+      utmCampaign: userRecord.utm_campaign,
+      active: userRecord.status == MemberStatus.ACTIVE,
+      country: null, // FIXME where to map
+      profile: null,
+      profiles: null,
+      credential: {
+        activationCode: userRecord.activation_code,
+        resetToken: null,
+        resendToken: null,
+        activationBlocked: null,
+        canResend: null,
+        hasPassword: true, // at this point, we are sure user has password (and been validated)
+      },
     };
 
     this.logger.log(
@@ -1056,6 +1086,17 @@ export class AuthFlowService {
         user_id: true;
         handle: true;
         status: true;
+        first_name: true;
+        last_name: true;
+        reg_source: true;
+        last_login: true;
+        user_2fa: true; // Keep 2FA info
+        utm_source: true;
+        utm_medium: true;
+        utm_campaign: true;
+        create_date: true;
+        modify_date: true;
+        activation_code: true;
       };
     }> | null = null;
     let userIdNumber: number | null = null;
@@ -1075,6 +1116,17 @@ export class AuthFlowService {
             user_id: true,
             handle: true,
             status: true,
+            first_name: true,
+            last_name: true,
+            reg_source: true,
+            last_login: true,
+            user_2fa: true,
+            utm_source: true,
+            utm_medium: true,
+            utm_campaign: true,
+            create_date: true,
+            modify_date: true,
+            activation_code: true,
           },
         });
       }
@@ -1086,6 +1138,17 @@ export class AuthFlowService {
           user_id: true,
           handle: true,
           status: true,
+          first_name: true,
+          last_name: true,
+          reg_source: true,
+          last_login: true,
+          user_2fa: true,
+          utm_source: true,
+          utm_medium: true,
+          utm_campaign: true,
+          create_date: true,
+          modify_date: true,
+          activation_code: true,
         },
       });
       if (user) {
@@ -1108,30 +1171,102 @@ export class AuthFlowService {
     const primaryEmail = primaryEmailRecord?.address;
     const emailVerified = primaryEmailRecord?.status_id.toNumber() === 1;
 
-    // Generate SSO token (ensure userService method exists and works)
-    const tcssoToken = await this.userService.generateSSOToken(userIdNumber);
+    // check credentials
+    const securityUserRecord = await this.prismaClient.security_user.findUnique(
+      {
+        where: { user_id: user.handle }, // Java logic uses handle as security_user.user_id
+        select: { password: true },
+      },
+    );
+
+    // reg source, similar to java code, set directly with ssoToken
+    const token = await this.userService.generateSSOToken(userIdNumber);
 
     const response: any = {
-      userId: user.user_id.toString(),
+      id: user.user_id.toString(),
       handle: user.handle,
+      firstName: user.first_name,
+      lastName: user.last_name,
       email: primaryEmail,
-      roles: roles.map((r) => r.roleName),
-      emailVerified: emailVerified, // Use status from email table
-      tcsso: tcssoToken,
+      roles: roles, // return as full role objects
+      emailActive: emailVerified, // Use status from email table
       status: user.status,
+      regSource: token,
+      mfaEnabled: user.user_2fa?.mfa_enabled ?? false,
+      diceEnabled: user.user_2fa?.dice_enabled ?? false,
+      last_login: user.last_login?.toISOString(),
+      createdAt: user.create_date?.toISOString(),
+      modifiedAt: user.modify_date?.toISOString(),
+      utmSource: user.utm_source,
+      utmMedium: user.utm_medium,
+      utmCampaign: user.utm_campaign,
+      active: user.status == MemberStatus.ACTIVE,
+      country: '', // FIXME where to map
+      profile: null,
+      profiles: null,
+      credential: {
+        activationCode: user.activation_code,
+        resetToken: null, // not used here
+        resendToken: null, // default, if status 'U', gets updated below
+        activationBlocked: null,
+        canResend: null, // default, if status 'U', gets updated below
+        hasPassword:
+          securityUserRecord && securityUserRecord.password ? true : false,
+      },
     };
 
-    if (user.status === 'U') {
+    if (user.status == MemberStatus.UNVERIFIED) {
+      // activation logic
+      const activation = await this.prismaClient.user_otp_email.findFirst({
+        where: { user_id: user.user_id, mode: OTP_ACTIVATION_MODE },
+        select: {
+          id: true,
+          mode: true,
+          otp: true,
+          fail_count: true,
+          expire_at: true,
+          resend: true,
+        },
+      });
+
+      if (activation) {
+        if (
+          activation.fail_count >= 3 ||
+          isBefore(activation.expire_at, new Date())
+        ) {
+          response.credential.activationBlocked = true;
+          return response; // return response here like in java
+        } else if (!activation.resend) {
+          response.credential.canResend = true;
+        }
+      } else {
+        response.credential.canResend = true;
+
+        const newOtp = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
+        const expiresAt = addMinutes(
+          new Date(),
+          this.activationCodeExpirationMinutes,
+        );
+        // if activation is not found, then need to insert one
+        await this.userService.insertUserOtp(
+          userIdNumber,
+          OTP_ACTIVATION_MODE,
+          newOtp,
+          false,
+          0,
+          expiresAt,
+        );
+      }
+      // set resend token. similar to java code, line 874 of UserResource.java
       const payload = {
         sub: user.user_id.toString(),
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       };
-      response.resendToken = jwt.sign(payload, this.jwtSecret, {
+      response.credential.resendToken = jwt.sign(payload, this.jwtSecret, {
         expiresIn: `${this.activationResendExpirySeconds}s`,
       });
-      response.canResendActivation = true;
       this.logger.log(
-        `Auth0 Roles: User ${user.handle} is unverified. Added resendToken.`,
+        `Auth0 Roles: User ${user.handle} is unverified. Added credential details.`,
       );
     }
 

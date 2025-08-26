@@ -1553,4 +1553,50 @@ export class UserService {
 
   // async getDetailedProfile(userId: number) { ... } // for address, etc.
   // async updateDetailedProfile(userId: number, profileDetailsDto, authUser: AuthenticatedUser) { ... }
+
+  /**
+   * Insert User OTP similar to java.
+   * @param userId User Id
+   * @param mode Mode. If otpActivationMode or otp2faMode
+   * @param otp The OTP
+   * @param resend If allowed to resend
+   * @param failCount Failure counts
+   * @param expireAt Expires at
+   */
+  async insertUserOtp(
+    userId: number,
+    mode: number,
+    otp: string,
+    resend: boolean,
+    failCount: number,
+    expireAt: Date,
+  ): Promise<void> {
+    try {
+      await this.prismaClient.user_otp_email.create({
+        data: {
+          user_id: userId,
+          mode: mode,
+          otp: otp,
+          resend: resend,
+          fail_count: failCount,
+          expire_at: expireAt,
+        },
+      });
+    } catch (error) {
+      if (error.code === Constants.prismaUniqueConflictcode) {
+        this.logger.warn(
+          `Attempt to create otp for user ${userId} which already exists in mode ${mode}.`,
+        );
+        throw new ConflictException(
+          `OTP email already exist for user ${userId} in mode ${mode}.`,
+        );
+      } else {
+        this.logger.error(
+          `Failed to create otp for user ${userId} in mode ${mode}: ${error.message}`,
+          error.stack,
+        );
+        throw error;
+      }
+    }
+  }
 }

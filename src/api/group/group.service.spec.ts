@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GroupService } from './group.service';
-import { PRISMA_CLIENT, PRISMA_CLIENT_GROUP } from '../../shared/prisma/prisma.module';
+import {
+  PRISMA_CLIENT,
+  PRISMA_CLIENT_GROUP,
+} from '../../shared/prisma/prisma.module';
 import {
   NotFoundException,
   ConflictException,
