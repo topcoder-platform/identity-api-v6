@@ -34,15 +34,17 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
       'no-restricted-syntax': [
         'off',
         {
-          selector: "MemberExpression[object.name='process'][property.name='env']",
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
           message: 'Use ENV_CONFIG instead of process.env',
         },
       ],
       // ignore unbound function for jest tests
-      '@typescript-eslint/unbound-method': 'off'
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 );

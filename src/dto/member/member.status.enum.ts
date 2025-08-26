@@ -1,0 +1,10 @@
+export enum MemberStatus {
+  UNVERIFIED = 'U',
+  ACTIVE = 'A',
+  INACTIVE = 'I',
+  INACTIVE_USER_REQUEST = '4',
+  INACTIVE_DUPLICATE_ACCOUNT = '5',
+  INACTIVE_IRREGULAR_ACCOUNT = '6',
+  PENDING = 'P',
+  UNKNOWN = '',
+}
