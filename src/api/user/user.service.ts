@@ -1395,8 +1395,14 @@ export class UserService {
       // Match Java's approach - same exception type for both cases
       throw new BadRequestException("userId doesn't exist."); // Exact Java message
     }
+    const securityUserRecord = await this.prismaClient.security_user.findUnique(
+      {
+        where: { user_id: user.handle }, 
+        select: { password: true },
+      },
+    );
 
-    const encodedPassword = user.password;
+    const encodedPassword = securityUserRecord.password;
     const status = user.status;
 
     // Delegate to another method like Java does
@@ -1407,18 +1413,33 @@ export class UserService {
     );
   }
 
+    /**
+   * Generate an SSO token compatible with the v3 Java implementation.
+   */
   private generateSSOTokenWithCredentials(
-    userId: number,
+    userId: number,          
     password: string,
     status: string,
   ): string {
-    // Your existing token generation logic here
     const salt = this.getSSOTokenSalt();
-    const plainText = `${salt}${userId}${password}${status}`;
-    const hash = crypto
-      .createHash('sha256')
-      .update(plainText, 'utf-8')
-      .digest('hex');
+    console.log("SALT:", salt);
+    if (!salt) {
+      throw new Error("Failed to generate SSO token. Invalid configuration.");
+    }
+
+    console.log(`SALT: ${salt} userId: ${userId} encrypted password: ${password} status: ${status}`)
+    // Java concatenates strings then gets UTF-8 bytes
+    const plain = Buffer.from(String(salt) + String(userId) + password + status, "utf8");
+
+    // SHA-256 digest as raw bytes
+    const raw = crypto.createHash("sha256").update(plain).digest(); // Buffer
+
+    // Replicate Java's hex conversion: no zero-padding per byte
+    let hash = "";
+    for (const byte of raw.values()) {
+      hash += ((byte & 0xff) as number).toString(16); // no padStart(2, "0")
+    }
+
     return `${userId}|${hash}`;
   }
 
