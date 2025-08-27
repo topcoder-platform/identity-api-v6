@@ -620,7 +620,7 @@ export class UserService {
         const activationEmailPayload = {
           data: { handle: newUser.handle, code: otpForActivation },
           from: { email: fromEmail },
-          version: 'v6',
+          version: 'v3',
           sendgrid_template_id: sendgridTemplateId,
           recipients: [email], // The original email used for registration
         };
