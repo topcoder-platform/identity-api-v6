@@ -149,9 +149,10 @@ export class MemberApiService {
       const batchIds = uniqueUserIds.slice(i, i + batchSize);
 
       // Construct query string by repeating the key
-      const queryString = batchIds.length > 1 ? batchIds
-        .map((id) => `userIds=${encodeURIComponent(id)}`)
-        .join('&') : `userId=${encodeURIComponent(batchIds[0])}`;
+      const queryString =
+        batchIds.length > 1
+          ? batchIds.map((id) => `userIds=${encodeURIComponent(id)}`).join('&')
+          : `userId=${encodeURIComponent(batchIds[0])}`;
       const apiUrl = `${this.MEMBER_API_URL}?fields=handle,email,userId&${queryString}`;
 
       // Log base URL and count for the current batch
