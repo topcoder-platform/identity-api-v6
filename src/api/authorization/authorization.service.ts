@@ -653,7 +653,7 @@ export class AuthorizationService {
       email: '',
       handle: '',
       roles: [],
-      country:'',
+      country: '',
       iss: issuer,
       iat: currentSeconds,
       exp: expSeconds,

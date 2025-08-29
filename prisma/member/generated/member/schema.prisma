@@ -1,0 +1,59 @@
+generator memberClient {
+  provider = "prisma-client-js"
+  output   = "./generated/member"
+}
+
+datasource memberdb {
+  provider = "postgresql"
+  url      = env("MEMBER_DB_URL")
+}
+
+enum MemberStatus {
+  UNVERIFIED
+  ACTIVE
+  INACTIVE_USER_REQUEST
+  INACTIVE_DUPLICATE_ACCOUNT
+  INACTIVE_IRREGULAR_ACCOUNT
+  UNKNOWN
+}
+
+model member {
+  userId                  BigInt        @id
+  handle                  String
+  handleLower             String        @unique
+  email                   String        @unique
+  verified                Boolean?
+  skillScore              Float?
+  memberRatingId          BigInt?
+  firstName               String?
+  lastName                String?
+  description             String?
+  otherLangName           String?
+  status                  MemberStatus?
+  newEmail                String?
+  emailVerifyToken        String?
+  emailVerifyTokenDate    DateTime?
+  newEmailVerifyToken     String?
+  newEmailVerifyTokenDate DateTime?
+
+  country                  String?
+  homeCountryCode          String?
+  competitionCountryCode   String?
+  photoURL                 String?
+  tracks                   String[]
+  loginCount               Int?
+  lastLoginDate            DateTime?
+  availableForGigs         Boolean?
+  skillScoreDeduction      Float?
+  namesAndHandleAppearance String?
+  aggregatedSkills         Json?
+  enteredSkills            Json?
+
+  createdAt DateTime  @default(now())
+  createdBy String
+  updatedAt DateTime? @updatedAt
+  updatedBy String?
+
+  @@index([handleLower])
+  @@index([email])
+}

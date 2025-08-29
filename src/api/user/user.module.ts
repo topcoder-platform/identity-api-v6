@@ -12,6 +12,7 @@ import { ValidationService } from './validation.service';
 import { RoleModule } from '../role/role.module';
 import { EventModule } from '../../shared/event/event.module';
 import { SlackModule } from '../../shared/slack/slack.module';
+import { MemberPrismaModule } from '../../shared/member-prisma/member-prisma.module';
 // Assuming NotificationService and CacheService are global or provided elsewhere
 
 @Module({
@@ -20,8 +21,9 @@ import { SlackModule } from '../../shared/slack/slack.module';
     ConfigModule, // For accessing environment variables
     HttpModule, // For making external HTTP calls
     forwardRef(() => RoleModule), // RoleService needed for roles
-    EventModule, // For publishing events (via NotificationService?)
+    EventModule, 
     SlackModule,
+    MemberPrismaModule
     // forwardRef(() => AuthorizationModule) // Might be needed if Auth flows depend on AuthorizationService
   ],
   controllers: [UserController],

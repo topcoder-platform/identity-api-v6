@@ -125,6 +125,8 @@ dist
 build
 out
 
+source
+
 # Prisma
 prisma/generated
 

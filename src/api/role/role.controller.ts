@@ -73,7 +73,8 @@ export class RoleController {
         filterParts[0].toLowerCase() === 'subjectid'
       ) {
         const parsedId = parseInt(filterParts[1], 10);
-        if (!isNaN(parsedId)) {
+        // subject id should be > 0 as in v3 java code
+        if (!isNaN(parsedId) && parsedId > 0) {
           subjectId = parsedId;
         } else {
           throw new BadRequestException(

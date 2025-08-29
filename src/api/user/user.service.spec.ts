@@ -40,6 +40,7 @@ import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
+import { MemberPrismaService } from 'src/shared/member-prisma/member-prisma.service';
 
 // Null logger to suppress NestJS application logs during tests
 const nullLogger = {
@@ -386,6 +387,7 @@ describe('UserService', () => {
         cacheManager as any,
         eventService,
         configService as any,
+        MemberPrismaService as any,
       );
       expect(loggerLogSpy).toHaveBeenCalledWith('LEGACY_BLOWFISH_KEY loaded.');
       expect((newService as any).legacyBlowfishKey).toBe(
@@ -404,6 +406,7 @@ describe('UserService', () => {
         cacheManager as any,
         eventService,
         configService as any,
+        MemberPrismaService as any,
       );
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -426,6 +429,7 @@ describe('UserService', () => {
         cacheManager as any,
         eventService,
         configService as any,
+        MemberPrismaService as any,
       );
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -446,6 +450,7 @@ describe('UserService', () => {
         cacheManager as any,
         eventService,
         configService as any,
+        MemberPrismaService as any,
       );
       expect((newService as any).legacyBlowfishKey).toBe('not-base64!');
     });

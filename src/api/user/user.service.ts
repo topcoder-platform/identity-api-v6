@@ -34,6 +34,7 @@ import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from '../../core/constant/constants';
+import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -70,6 +71,7 @@ export class UserService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly eventService: EventService,
     private readonly configService: ConfigService,
+    private readonly memberPrisma: MemberPrismaService,
     // Inject other services
   ) {
     // Changed: Store the Base64 key directly, validate it's set
@@ -528,7 +530,27 @@ export class UserService {
             `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
         }
-
+        // Create the member record
+        try {
+          await this.memberPrisma.member.create({
+            data: {
+              userId: Number(nextUserId),
+              handle: handle,
+              handleLower: handle.toLowerCase(),
+              email,
+              tracks: [],
+              createdBy: String(nextUserId),
+              firstName: firstName ?? null,
+              lastName: lastName ?? null,
+              status: 'UNVERIFIED',
+            },
+          });
+        } catch (err) {
+          this.logger.error(
+            { err },
+            `Failed to create member record for new user ${String(nextUserId)} / ${handle}`,
+          );
+        }
         return createdUser;
       });
     } catch (error) {
@@ -1397,7 +1419,7 @@ export class UserService {
     }
     const securityUserRecord = await this.prismaClient.security_user.findUnique(
       {
-        where: { user_id: user.handle }, 
+        where: { user_id: user.handle },
         select: { password: true },
       },
     );
@@ -1413,31 +1435,36 @@ export class UserService {
     );
   }
 
-    /**
+  /**
    * Generate an SSO token compatible with the v3 Java implementation.
    */
   private generateSSOTokenWithCredentials(
-    userId: number,          
+    userId: number,
     password: string,
     status: string,
   ): string {
     const salt = this.getSSOTokenSalt();
-    console.log("SALT:", salt);
+    console.log('SALT:', salt);
     if (!salt) {
-      throw new Error("Failed to generate SSO token. Invalid configuration.");
+      throw new Error('Failed to generate SSO token. Invalid configuration.');
     }
 
-    console.log(`SALT: ${salt} userId: ${userId} encrypted password: ${password} status: ${status}`)
+    console.log(
+      `SALT: ${salt} userId: ${userId} encrypted password: ${password} status: ${status}`,
+    );
     // Java concatenates strings then gets UTF-8 bytes
-    const plain = Buffer.from(String(salt) + String(userId) + password + status, "utf8");
+    const plain = Buffer.from(
+      String(salt) + String(userId) + password + status,
+      'utf8',
+    );
 
     // SHA-256 digest as raw bytes
-    const raw = crypto.createHash("sha256").update(plain).digest(); // Buffer
+    const raw = crypto.createHash('sha256').update(plain).digest(); // Buffer
 
     // Replicate Java's hex conversion: no zero-padding per byte
-    let hash = "";
+    let hash = '';
     for (const byte of raw.values()) {
-      hash += ((byte & 0xff) as number).toString(16); // no padStart(2, "0")
+      hash += (byte & 0xff).toString(16); // no padStart(2, "0")
     }
 
     return `${userId}|${hash}`;

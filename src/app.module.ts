@@ -7,6 +7,7 @@ import { RoleModule } from './api/role/role.module';
 import { AuthModule } from './core/auth/auth.module';
 import { UserModule } from './api/user/user.module';
 import { GroupModule } from './api/group/group.module';
+import { MemberPrismaModule } from './shared/member-prisma/member-prisma.module';
 import { AuthorizationModule } from './api/authorization/authorization.module';
 
 @Module({
@@ -34,10 +35,11 @@ import { AuthorizationModule } from './api/authorization/authorization.module';
     // SharedModule,
     // --> Add API modules here <--
     // UserModule,
+    MemberPrismaModule,
     RoleModule,
     UserModule,
     GroupModule,
-    AuthorizationModule,
+    AuthorizationModule
   ],
   controllers: [], // No root controller
   providers: [], // No root service
