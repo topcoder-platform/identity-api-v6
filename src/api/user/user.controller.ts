@@ -920,48 +920,6 @@ export class UserController {
     );
   }
 
-  /**
-   * Retrieves all external profiles (SSO, social, etc.) for a user.
-   * Accessible by admins or the user themselves.
-   *
-   * @param userId - The numeric ID of the user.
-   * @param req - The request object containing authentication information.
-   * @returns A list of UserProfileDto objects representing the user's external profiles.
-   * @throws UnauthorizedException if the user is not authenticated.
-   * @throws ForbiddenException if the user is not an admin and not accessing their own profiles.
-   * @throws NotFoundException if the user is not found.
-   */
-  @Get(':userId/profiles')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({
-    summary:
-      'Get all external profiles (SSO, social, etc.) for a user (Admin or self).',
-    description: 'If not admin, only allowed for own userId.',
-  })
-  @ApiParam({ name: 'userId', description: 'Numeric User ID', type: Number })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of external profiles',
-    type: [DTOs.UserProfileDto],
-  })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Internal server error.',
-  })
-  async getAllExternalProfiles(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Req() req: Request,
-  ): Promise<DTOs.UserProfileDto[]> {
-    const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, userId.toString()); // Call as method
-    this.logger.log(
-      `${authUser.isAdmin ? 'Admin' : 'User'} ${authUser.userId} getting all profiles for user: ${userId}`,
-    );
-    return this.userProfileService.findAllUserProfiles(userId);
-  }
 
   /**
    * Deletes all external profiles for a user under a specific provider. Accessible only by admins.

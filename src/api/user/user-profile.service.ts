@@ -203,6 +203,7 @@ export class UserProfileService {
         data: {
           email: profileDto.email, // Updateable fields
           sso_user_name: profileDto.name,
+          sso_user_id: profileDto.userId,
           // modified_by: operatorId,    // Add if schema supports
         },
         include: { sso_login_provider: true }, // Added include to ensure data for mapSsoLoginToDto
