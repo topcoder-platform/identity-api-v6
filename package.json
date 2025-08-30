@@ -20,6 +20,8 @@
     "prisma:generate:member": "prisma generate --schema=./prisma/member/schema.prisma",
     "prisma:generate": "npm run prisma:generate:identity && npm run prisma:generate:group && npm run prisma:generate:member",
     "prisma:migrate:identity": "prisma migrate dev --schema=./prisma/schema.prisma",
+    "prisma:migrate:group": "prisma migrate dev --schema=./prisma/group/schema.prisma",
+    "prisma:migrate:member": "prisma migrate dev --schema=./prisma/member/schema.prisma",
     "prisma:deploy": "prisma migrate deploy  --schema=./prisma/schema.prisma",
     "prisma:pull": "prisma db pull",
     "prisma:studio": "prisma studio --port 5555",

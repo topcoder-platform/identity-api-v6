@@ -23,7 +23,7 @@ import { Constants } from '../../core/constant/constants';
 
 // --- Base & Nested DTOs ---
 
-class CredentialDto {
+export class CredentialDto {
   @IsString()
   @IsOptional()
   @MinLength(8) // Example validation

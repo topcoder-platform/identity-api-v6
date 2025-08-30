@@ -176,7 +176,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/home/jmgasper/Documents/Git/identity-api-v6/prisma/member/generated/member",
+      "value": "/Users/zhijie/Documents/tc/tc/identity_service/identity-api-v6/prisma/member/generated/member",
       "fromEnvVar": null
     },
     "config": {
@@ -185,16 +185,16 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "debian-openssl-1.1.x",
+        "value": "darwin",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/home/jmgasper/Documents/Git/identity-api-v6/prisma/member/schema.prisma",
+    "sourceFilePath": "/Users/zhijie/Documents/tc/tc/identity_service/identity-api-v6/prisma/member/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": "../../../../.env",
+    "rootEnvPath": null,
     "schemaEnvPath": "../../../../.env"
   },
   "relativePath": "../..",
@@ -204,12 +204,11 @@ const config = {
     "memberdb"
   ],
   "activeProvider": "postgresql",
-  "postinstall": false,
   "inlineDatasources": {
     "memberdb": {
       "url": {
         "fromEnvVar": "MEMBER_DB_URL",
-        "value": null
+        "value": "postgresql://postgres:identitypassword@localhost:5432/member"
       }
     }
   },

@@ -42,4 +42,8 @@ export const Constants = {
   // prisma error code
   prismaUniqueConflictcode: 'P2002',
   prismaNotFoundCode: 'P2025',
+
+  MAX_LENGTH_PASSWORD: 64,
+
+  MIN_LENGTH_PASSWORD: 8,
 };

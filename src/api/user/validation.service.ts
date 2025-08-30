@@ -14,6 +14,7 @@ import {
   ProviderDetails,
   ProviderId,
 } from '../../core/constant/provider-type.enum';
+import { Constants } from '../../core/constant/constants';
 
 // Basic email regex, can be refined
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -108,7 +109,35 @@ export class ValidationService {
     this.logger.log(`Email '${email}' is valid and available.`);
     return { valid: true };
   }
-  //////////////////////////////////////////////////////////////
+
+  validatePassword(password: string): DTOs.ValidationResponseDto {
+    // Mandatory
+    if (!password) throw new BadRequestException('Password is required.');
+
+    // Range check
+    if (
+      password.length < Constants.MIN_LENGTH_PASSWORD ||
+      password.length > Constants.MAX_LENGTH_PASSWORD
+    ) {
+      throw new BadRequestException(
+        `Length of password in character should be between ${Constants.MIN_LENGTH_PASSWORD} and ${Constants.MAX_LENGTH_PASSWORD}`,
+      );
+    }
+
+    // Check if it has a letter.
+    if (!/[A-Za-z]/.test(password)) {
+      throw new BadRequestException('Password must have at least a letter');
+    }
+
+    // Check if it has punctuation symbol
+    if (!/\\p{P}/.test(password) && !/\d/.test(password)) {
+      throw new BadRequestException(
+        'Password must have at least a symbol or number',
+      );
+    }
+
+    return { valid: true };
+  }
 
   /**
    * Checks if a specific social identity (provider + social_user_id) is already linked

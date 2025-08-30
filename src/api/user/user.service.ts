@@ -22,6 +22,7 @@ import {
   UpdateUserBodyDto,
   UserSearchQueryDto,
   AchievementDto,
+  CredentialDto,
 } from '../../dto/user/user.dto';
 import { ValidationService } from './validation.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -672,52 +673,99 @@ export class UserService {
     updateUserDto: UpdateUserBodyDto,
   ): Promise<UserModel> {
     const userId = parseInt(userIdString, 10);
-    if (isNaN(userId)) {
+    if (isNaN(userId) || userId <= 0) {
       throw new BadRequestException('Invalid user ID format.');
     }
     this.logger.log(`Updating basic info for user ID: ${userId}`);
     const userParams = updateUserDto.param; // Access nested param object
-    // Only update fields present in the DTO
-    const dataToUpdate: Prisma.userUpdateInput = {};
-    if (userParams.firstName) dataToUpdate.first_name = userParams.firstName;
-    if (userParams.lastName) dataToUpdate.last_name = userParams.lastName;
-    // Add other updatable basic fields (country, timezone etc.)
 
-    if (Object.keys(dataToUpdate).length === 0) {
-      this.logger.warn(
-        `Update basic info called for user ${userId} with no data.`,
-      );
-      // Or throw BadRequestException
-      const currentUser = await this.findUserById(userId);
-      if (!currentUser)
-        throw new NotFoundException(`User with ID ${userId} not found.`);
-      return currentUser; // Return current user if no changes
+    const cred: CredentialDto = userParams.credential;
+    // validate password if it's specified.
+    if (cred != null && cred.password != null)
+      this.validationService.validatePassword(cred.password);
+
+    const existingUser = await this.findUserById(userId);
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID ${userId} not found.`);
     }
 
-    try {
-      const updatedUser = await this.prismaClient.user.update({
+    // Can't update handle, email, isActive
+    if (userParams.handle != null && userParams.handle != existingUser.handle)
+      throw new BadRequestException("Handle can't be updated");
+    if (userParams.status != null && userParams.status != existingUser.status)
+      throw new BadRequestException("Status can't be updated");
+
+    if (
+      userParams.email != null &&
+      userParams.email != (existingUser as any).primaryEmailAddress
+    )
+      throw new BadRequestException("Email address can't be updated");
+
+    let securityUserRecord = null;
+    // validate password if it's specified.
+    if (cred != null && cred.password != null) {
+      // currentPassword is required and must match with registered password
+      if (cred.currentPassword == null)
+        throw new BadRequestException('Current Password is required');
+
+      securityUserRecord = await this.prismaClient.security_user.findUnique({
+        where: { login_id: userId },
+        select: {
+          password: true,
+        },
+      });
+      if (
+        !securityUserRecord ||
+        securityUserRecord.password !=
+          this.encodePasswordLegacy(cred.currentPassword)
+      )
+        throw new BadRequestException('Current password is not correct');
+    }
+
+    // Only update fields present in the DTO
+    const dataToUpdate: Prisma.userUpdateInput = {};
+    if (userParams.firstName)
+      existingUser.first_name = dataToUpdate.first_name = userParams.firstName;
+    if (userParams.lastName)
+      existingUser.last_name = dataToUpdate.last_name = userParams.lastName;
+    if (userParams.regSource)
+      existingUser.reg_source = dataToUpdate.reg_source = userParams.regSource;
+    if (userParams.utmSource)
+      existingUser.utm_source = dataToUpdate.utm_source = userParams.utmSource;
+    if (userParams.utmMedium)
+      existingUser.utm_medium = dataToUpdate.utm_medium = userParams.utmMedium;
+    if (userParams.utmCampaign)
+      existingUser.utm_campaign = dataToUpdate.utm_campaign =
+        userParams.utmCampaign;
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return existingUser; // Return current user if no changes
+    }
+
+    await this.prismaClient.$transaction(async (prisma) => {
+      const userInTx = await this.prismaClient.user.update({
         where: { user_id: userId },
         data: dataToUpdate,
       });
       this.logger.log(`Successfully updated basic info for user ${userId}`);
-      return updatedUser;
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === Constants.prismaNotFoundCode
-      ) {
-        throw new NotFoundException(
-          `User with ID ${userId} not found for update.`,
-        );
+
+      // update password
+      if (cred != null && cred.password != null) {
+        this.logger.debug(`"updating password: ${userInTx.handle}`);
+        existingUser.password = cred.password;
+
+        if (securityUserRecord) {
+          await prisma.security_user.update({
+            where: { login_id: userId },
+            data: { password: this.encodePasswordLegacy(cred.password) },
+          });
+        }
       }
-      this.logger.error(
-        `Error updating basic info for user ${userId}: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Failed to update user information.',
-      );
-    }
+
+      return userInTx;
+    });
+
+    return existingUser;
   }
 
   // --- Utility to convert snake_case keys to camelCase ---
