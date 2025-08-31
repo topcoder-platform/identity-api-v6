@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Decimal } from '@prisma/client/runtime/library'; // Import Decimal
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from 'src/dto/member';
+import { ValidationService } from './validation.service';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
@@ -56,6 +57,7 @@ export class AuthFlowService {
     private readonly userService: UserService,
     private readonly eventService: EventService,
     private readonly roleService: RoleService,
+    private readonly validationService: ValidationService,
   ) {
     this.jwtSecret = this.configService.get<string>('JWT_SECRET')!;
     this.resetTokenExpirySeconds = 30 * 60; // Example: 30 mins
@@ -1285,7 +1287,9 @@ export class AuthFlowService {
       throw new BadRequestException('Email and new password are required.');
     }
 
-    const user = await this.userService.findUserByEmailOrHandle(email); // Ensure this finds by primary email effectively
+    this.validationService.validatePassword(newPasswordPlain);
+
+    const user = await this.userService.findUserByEmail(email); // Ensure this finds by primary email effectively
     if (!user) {
       this.logger.warn(
         `Auth0 Action: User with email ${email} not found for password change.`,
@@ -1300,12 +1304,6 @@ export class AuthFlowService {
       );
       throw new ForbiddenException(
         'Password change is not allowed for SSO-linked accounts.',
-      );
-    }
-
-    if (newPasswordPlain.length < 8) {
-      throw new BadRequestException(
-        'New password must be at least 8 characters long.',
       );
     }
 

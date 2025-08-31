@@ -264,6 +264,83 @@ export class UserService {
     return userWithEmail;
   }
 
+  async findUserByEmail(email: string): Promise<
+    | (UserModel & {
+        user_sso_login: (UserSsoLoginModel & {
+          sso_login_provider: SsoLoginProviderModel;
+        })[];
+      } & { primaryEmail?: { address: string; status_id: Decimal | null } }) // Add primary email info structure
+    | null
+  > {
+    this.logger.debug(`Finding user by email: ${email}`);
+    if (!email) {
+      throw new BadRequestException('Email cannot be empty.');
+    }
+
+    let userId: number | null = null;
+    let user:
+      | (UserModel & {
+          user_sso_login: (UserSsoLoginModel & {
+            sso_login_provider: SsoLoginProviderModel;
+          })[];
+        })
+      | null = null;
+    let primaryEmailRecord = null;
+
+    const emailRecords = await this.prismaClient.email.findMany({
+      where: {
+        address: email.toLowerCase(),
+        primary_ind: Constants.primaryEmailFlag,
+        email_type_id: Constants.standardEmailType,
+      },
+      select: { user_id: true, address: true, status_id: true },
+    });
+
+    if (emailRecords) {
+      for (let i = 0; i < emailRecords.length; i++) {
+        if (emailRecords[i].address == email) {
+          primaryEmailRecord = emailRecords[i];
+          userId = emailRecords[i].user_id as unknown as number;
+          break;
+        }
+      }
+    } else {
+      this.logger.debug(`No primary email record found for address: ${email}`);
+      // Do not throw, allow fallback to handle search or return null later
+    }
+
+    // 2. Find user by userId (if found via email)
+    if (userId) {
+      user = await this.prismaClient.user.findUnique({
+        where: { user_id: userId },
+        include: {
+          user_sso_login: { include: { sso_login_provider: true } },
+        },
+      });
+    }
+
+    if (!user) {
+      this.logger.debug(
+        `User with email '${email}' not found by findUserByEmail.`,
+      );
+      return null;
+    }
+
+    // 3. Fetch primary email details separately and attach
+    // Attach primary email info to the returned user object
+    const userWithEmail = user as typeof user & {
+      primaryEmail?: { address: string; status_id: Decimal | null };
+    };
+    if (primaryEmailRecord) {
+      userWithEmail.primaryEmail = {
+        address: primaryEmailRecord.address,
+        status_id: primaryEmailRecord.status_id,
+      };
+    }
+
+    return userWithEmail;
+  }
+
   private generateNumericOtp(length: number): string {
     let otp = '';
     const otpChars = '0123456789';
@@ -798,12 +875,9 @@ export class UserService {
     this.logger.log(
       `Attempting to update handle for user ID: ${userId} to ${newHandle}, by admin: ${authUser.userId}`,
     );
-    if (!newHandle) {
-      throw new BadRequestException('New handle cannot be empty.');
-    }
 
     // Validate format and uniqueness (ValidationService throws on failure)
-    await this.validationService.validateHandle(newHandle);
+    await this.validationService.validateHandle(newHandle, userId);
 
     // Fetch the user to ensure they exist and get the old handle
     const existingUser = await this.prismaClient.user.findUnique({
@@ -841,13 +915,8 @@ export class UserService {
           );
 
           // Now update the security_user table.
-          // The 'user_id' column in 'security_user' stores the handle.
-          // We need to find the record by the old handle and update it to the new handle.
-          // The 'login_id' in 'security_user' stores the numeric user_id from the 'user' table.
-
-          // First, check if a security_user record exists with the old handle
           const securityUserRecord = await prisma.security_user.findUnique({
-            where: { user_id: oldHandle }, // user_id in security_user is the handle
+            where: { login_id: userId },
           });
 
           if (securityUserRecord) {
@@ -856,7 +925,7 @@ export class UserService {
             // If another user already has newHandle in security_user.user_id, this would fail.
             // This should ideally be caught by the initial validateHandle if security_user.user_id mirrors user.handle.
             await prisma.security_user.update({
-              where: { user_id: oldHandle },
+              where: { login_id: userId },
               data: { user_id: newHandle },
             });
             this.logger.log(
@@ -932,14 +1001,8 @@ export class UserService {
     );
 
     // Validate new email
-    if (!newEmail) {
-      throw new BadRequestException('New email cannot be empty.');
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-      throw new BadRequestException('Invalid email format.');
-    }
-
-    await this.checkEmailAvailabilityForUser(newEmail, userId);
+    await this.validationService.validateEmail(newEmail, userId);
+    // await this.checkEmailAvailabilityForUser(newEmail, userId);
     const updatedUserInTx = await this.prismaClient.$transaction(async (tx) => {
       // Find the user first
       const userInDB = await tx.user.findUnique({
@@ -955,6 +1018,7 @@ export class UserService {
         where: {
           user_id: userId,
           primary_ind: Constants.primaryEmailFlag,
+          email_type_id: Constants.standardEmailType,
         },
       });
 
@@ -994,7 +1058,7 @@ export class UserService {
         where: { email_id: currentPrimaryEmailRecord.email_id },
         data: {
           address: newEmail.toLowerCase(),
-          status_id: new Decimal(2), // Set to unverified status
+          // status_id: new Decimal(2), // Set to unverified status
           modify_date: new Date(),
         },
       });
@@ -1019,6 +1083,8 @@ export class UserService {
       return updatedUser;
     });
 
+    // v3 java does not genereate otp and send the email
+    /**
     // Generate OTP and resend token for email verification using the updated email record
     const updatedEmailRecord = await this.prismaClient.email.findFirst({
       where: {
@@ -1075,7 +1141,7 @@ export class UserService {
         );
       }
     }
-
+    **/
     // Publish user updated event
     try {
       const eventAttributes = this.toCamelCase(updatedUserInTx);

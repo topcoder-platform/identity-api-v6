@@ -17,7 +17,8 @@ import {
 import { Constants } from '../../core/constant/constants';
 
 // Basic email regex, can be refined
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX =
+  /^[+_A-Za-z0-9-]+(\.[+_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,}$)/;
 // Basic handle regex: 3-64 chars, alphanumeric, and specific special characters _ . - ` [ ] { }
 const HANDLE_REGEX = /^[a-zA-Z0-9\-[\]_.`{}]{3,64}$/;
 // TODO: Add list of reserved handles if necessary
@@ -50,7 +51,10 @@ export class ValidationService {
     private readonly prismaClient: PrismaClient,
   ) {}
 
-  async validateHandle(handle: string): Promise<DTOs.ValidationResponseDto> {
+  async validateHandle(
+    handle: string,
+    userId: number = null,
+  ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
     if (!handle) {
       throw new BadRequestException('Handle cannot be empty.');
@@ -68,7 +72,10 @@ export class ValidationService {
       where: { handle_lower: handle.toLowerCase() },
     });
 
-    if (existingUser) {
+    if (
+      existingUser &&
+      (!userId || (existingUser?.user_id as unknown as number) != userId)
+    ) {
       this.logger.warn(`Validation failed: Handle '${handle}' already exists.`);
       throw new ConflictException(`Handle '${handle}' is already taken.`);
     }
@@ -76,7 +83,10 @@ export class ValidationService {
     return { valid: true };
   }
 
-  async validateEmail(email: string): Promise<DTOs.ValidationResponseDto> {
+  async validateEmail(
+    email: string,
+    userId: number = null,
+  ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating email: ${email}`);
     if (!email) {
       throw new BadRequestException('Email cannot be empty.');
@@ -97,7 +107,10 @@ export class ValidationService {
     });
 
     // If a record for this email address exists AND it has a user_id, it means the email is in use.
-    if (existingEmailRecord && existingEmailRecord.user_id !== null) {
+    if (
+      existingEmailRecord &&
+      (!userId || (existingEmailRecord.user_id as unknown as number) != userId)
+    ) {
       this.logger.warn(
         `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingEmailRecord.user_id.toNumber()}.`,
       );
