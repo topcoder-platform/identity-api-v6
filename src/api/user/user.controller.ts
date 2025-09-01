@@ -268,7 +268,7 @@ export class UserController {
   ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
     if (!handle) {
-      throw new BadRequestException('Handle query parameter is required.');
+      throw new BadRequestException('Handle is required.');
     }
     return this.validationService.validateHandle(handle);
   }

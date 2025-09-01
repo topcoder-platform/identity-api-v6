@@ -50,4 +50,9 @@ export const Constants = {
   ALPHABET_ALPHA_EN: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
 
   ALPHABET_DIGITS_EN: '0123456789',
+
+  MIN_LENGTH_HANDLE: 2,
+  MAX_LENGTH_HANDLE: 15,
+
+  HANDLE_PUNCTUATION: '-_.{}[]',
 };
