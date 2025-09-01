@@ -20,6 +20,9 @@ import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfil
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
 import { Constants } from '../../core/constant/constants';
+import {
+  getProviderDetails,
+} from '../../core/constant/provider-type.enum';
 // Import other needed services
 
 @Injectable()
@@ -456,56 +459,54 @@ export class UserProfileService {
       `Deleting external social profile for user ID: ${userId}, provider: ${providerName}`,
     );
 
-    const socialProvider =
-      await this.prismaClient.social_login_provider.findFirst({
-        where: { name: { equals: providerName, mode: 'insensitive' } },
-      });
-
-    if (!socialProvider) {
-      this.logger.warn(
-        `Social login provider not found: ${providerName}. Cannot delete profile.`,
-      );
-      throw new NotFoundException(
-        `Social provider '${providerName}' not found.`,
+    const providerType = getProviderDetails(providerName.toLowerCase());
+    if (!providerType) {
+      throw new BadRequestException(
+        `Provider ${providerName} is not supported`,
       );
     }
 
-    try {
-      const deleteResult = await this.prismaClient.user_social_login.deleteMany(
-        {
-          where: {
-            user_id: userId,
-            social_login_provider_id: socialProvider.social_login_provider_id,
-          },
-        },
-      );
+    if (providerType.isSocial) {
+      try {
+        const deleteResult =
+          await this.prismaClient.user_social_login.deleteMany({
+            where: {
+              user_id: userId,
+              social_login_provider_id: providerType.id,
+            },
+          });
 
-      if (deleteResult.count === 0) {
-        this.logger.warn(
-          `No external social profile found to delete for user ${userId}, provider ${providerName}.`,
-        );
-        throw new NotFoundException(
-          'External social profile link not found to delete.',
-        );
-      }
+        if (deleteResult.count === 0) {
+          this.logger.warn(
+            `No external social profile found to delete for user ${userId}, provider ${providerName}.`,
+          );
+          throw new NotFoundException(
+            'External social profile link not found to delete.',
+          );
+        }
 
-      this.logger.log(
-        `External social profile unlinked for user ${userId}, provider ${providerName}. Count: ${deleteResult.count}`,
-      );
-    } catch (error) {
-      // P2025 (Record to delete not found) is handled by checking deleteResult.count above
-      this.logger.error(
-        `Error deleting external social profile for user ${userId}, provider ${providerName}: ${error.message}`,
-        error.stack,
-      );
-      // Avoid re-throwing specific Prisma errors if already handled,
-      // but throw a generic server error for other unexpected issues.
-      if (!(error instanceof NotFoundException)) {
-        throw new InternalServerErrorException(
-          'Failed to unlink social profile.',
+        this.logger.log(
+          `External social profile unlinked for user ${userId}, provider ${providerName}. Count: ${deleteResult.count}`,
         );
+      } catch (error) {
+        // P2025 (Record to delete not found) is handled by checking deleteResult.count above
+        this.logger.error(
+          `Error deleting external social profile for user ${userId}, provider ${providerName}: ${error.message}`,
+          error.stack,
+        );
+        // Avoid re-throwing specific Prisma errors if already handled,
+        // but throw a generic server error for other unexpected issues.
+        if (!(error instanceof NotFoundException)) {
+          throw new InternalServerErrorException(
+            'Failed to unlink social profile.',
+          );
+        }
+        throw error; // Re-throw NotFoundException if it was manually thrown
       }
-      throw error; // Re-throw NotFoundException if it was manually thrown
+    } else if (providerType.isEnterprise) {
+      throw new BadRequestException(
+        `Provider ${providerName} is not supported`,
+      );
     }
   }
 }
