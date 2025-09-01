@@ -25,16 +25,14 @@ import {
   ACTIVATION_OTP_LENGTH,
 } from './user.service';
 import { v4 as uuidv4 } from 'uuid';
-import { Decimal } from '@prisma/client/runtime/library'; // Import Decimal
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from 'src/dto/member';
 import { ValidationService } from './validation.service';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
 const ONE_TIME_TOKEN_JWT_AUDIENCE = 'onetime_email_update';
 const ONE_TIME_TOKEN_CACHE_PREFIX_JTI = 'USED_JTI_OTT';
-const PASSWORD_RESET_TOKEN_CACHE_PREFIX = 'PWD_RESET_TOKEN';
+const PASSWORD_RESET_TOKEN_CACHE_PREFIX = 'ap:identity:reset-tokens:'; // same as v3 java
 const PASSWORD_RESET_TOKEN_LENGTH = 6; // Or longer for more security, Java used 6 alphanumeric
 const OTP_ACTIVATION_MODE = 1;
 
@@ -149,7 +147,7 @@ export class AuthFlowService {
     }
     if (user.status == MemberStatus.ACTIVE) {
       this.logger.log(`User ${userId} is already active.`);
-      return { message: 'User is already active.', user: user };
+      return { message: 'User has been activated.', user: user };
     }
     if (user.status != MemberStatus.UNVERIFIED) {
       this.logger.warn(
@@ -165,7 +163,10 @@ export class AuthFlowService {
     try {
       await this.prismaClient.$transaction(async (prisma) => {
         await prisma.user.update({
-          where: { user_id: userId },
+          where: {
+            user_id: userId,
+            status: { not: MemberStatus.INACTIVE_IRREGULAR_ACCOUNT },
+          },
           data: { status: 'A', modify_date: new Date() },
         });
         this.logger.log(`User status updated to 'A' for ID ${userId}`);
@@ -313,7 +314,7 @@ export class AuthFlowService {
     const primaryEmail = primaryEmailRecord.address;
 
     if (user.status == MemberStatus.ACTIVE) {
-      return { message: 'Account is already activated.' };
+      throw new BadRequestException('User has been activated');
     }
     if (user.status != MemberStatus.UNVERIFIED) {
       throw new ForbiddenException(
@@ -520,10 +521,7 @@ export class AuthFlowService {
     this.logger.log(`One-time token validated for user ${userId}. JTI: ${jti}`);
 
     // 3. Validate newEmail format and uniqueness against OTHER users
-    if (!newEmail || !EMAIL_REGEX.test(newEmail)) {
-      // Assuming EMAIL_REGEX is available or imported
-      throw new BadRequestException('Invalid new email format.');
-    }
+    await this.validationService.validateEmail(newEmail, userId);
 
     // 4. Prisma Transaction: Update email - SIMPLIFIED TO JUST UPDATE THE EXISTING PRIMARY EMAIL
     await this.prismaClient.$transaction(async (prisma) => {
@@ -543,6 +541,7 @@ export class AuthFlowService {
         where: {
           user_id: userId,
           primary_ind: Constants.primaryEmailFlag,
+          email_type_id: Constants.standardEmailType,
         },
       });
 
@@ -582,7 +581,7 @@ export class AuthFlowService {
         where: { email_id: currentPrimaryEmail.email_id },
         data: {
           address: newEmailLower,
-          status_id: new Decimal(1), // Set to verified status since token was validated
+          // status_id: new Decimal(1), // Set to verified status since token was validated
           modify_date: new Date(),
         },
       });
@@ -611,11 +610,14 @@ export class AuthFlowService {
       });
       if (user) {
         // Use postEnvelopedNotification for standard events
-        await this.eventService.postEnvelopedNotification('user.updated', {
-          userId: userId.toString(),
-          handle: user.handle,
-          email: newEmail, // This is the new email being set
-        });
+        await this.eventService.postEnvelopedNotification(
+          'event.user.updated',
+          {
+            userId: userId.toString(),
+            handle: user.handle,
+            email: newEmail, // This is the new email being set
+          },
+        );
         this.logger.log(
           `Published 'user.updated' event for email change, user ${userId}`,
         );
@@ -628,8 +630,7 @@ export class AuthFlowService {
   }
 
   private generateAlphanumericToken(length: number): string {
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const chars = Constants.ALPHABET_ALPHA_EN + Constants.ALPHABET_DIGITS_EN;
     let token = '';
     for (let i = 0; i < length; i++) {
       token += chars.charAt(Math.floor(Math.random() * chars.length));

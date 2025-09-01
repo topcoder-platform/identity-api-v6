@@ -46,4 +46,8 @@ export const Constants = {
   MAX_LENGTH_PASSWORD: 64,
 
   MIN_LENGTH_PASSWORD: 8,
+
+  ALPHABET_ALPHA_EN: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+
+  ALPHABET_DIGITS_EN: '0123456789',
 };

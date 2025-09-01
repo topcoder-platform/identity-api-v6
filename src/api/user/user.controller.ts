@@ -1492,7 +1492,11 @@ export class UserController {
   }
 
   /**
-   * Updates a user's primary email address using a one-time token for authentication.
+   * This endpoint is used to update email of a specified user (only) in the
+   * registration flow.
+   * A bearer token is needed in Authorization header, which is created by
+   * getOneTimeToken().
+   *  Updates a user's primary email address using a one-time token for authentication.
    * This endpoint is part of a two-step verification process, allowing users to change
    * their email after successfully obtaining a one-time token via `getOneTimeToken()`.
    *
@@ -1925,7 +1929,4 @@ export class UserController {
     );
     return this.userService.getAchievements(parseInt(resourceId, 10));
   }
-
-  // TODO: Add self-service endpoints like updateMyMaritalStatus, updateMyHomeAddress etc. as per Java resource if needed.
-  // These would not be admin-only.
 }

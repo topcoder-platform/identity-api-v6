@@ -423,10 +423,11 @@ export class ValidationResponseDto {
 }
 
 export class AchievementDto {
-  achievement_type_id: number;
-  achievement_desc: string;
-  date: Date;
-  // Add other fields
+  description: string;
+  typeId: number;
+  type: string;
+  achievementDate: Date;
+  createdAt: Date;
 }
 
 export class DiceConnectionResponseDto {

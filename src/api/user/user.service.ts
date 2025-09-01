@@ -36,6 +36,7 @@ import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
+import { MemberStatus } from '../../dto/member';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -1174,14 +1175,16 @@ export class UserService {
     this.logger.log(
       `Attempting to update status for user ID: ${userId} to ${newStatus} by admin: ${authUser.userId}`,
     );
+    const normalizedNewStatus = newStatus.toUpperCase();
 
-    const validStatuses = ['A', 'I', 'U', 'P']; // Active, Inactive, Unverified, Pending (example)
-    if (!validStatuses.includes(newStatus.toUpperCase())) {
+    const validStatuses = Object.values(MemberStatus).map((s) =>
+      s.toUpperCase(),
+    ); // Use MemberStatus enum
+    if (!validStatuses.includes(normalizedNewStatus)) {
       throw new BadRequestException(
         `Invalid status code: ${newStatus}. Must be one of: ${validStatuses.join(', ')}`,
       );
     }
-    const normalizedNewStatus = newStatus.toUpperCase();
 
     const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
@@ -1316,13 +1319,16 @@ export class UserService {
         include: {
           achievement_type_lu: true, // Include the description lookup table
         },
+        orderBy: { create_date: 'asc' },
       });
 
       // Map to AchievementDto
       return achievements.map((ach) => ({
-        achievement_type_id: Number(ach.achievement_type_id), // Convert Decimal to number
-        achievement_desc: ach.achievement_type_lu.achievement_type_desc,
-        date: ach.create_date, // Assuming create_date is the achievement date
+        description: ach.description,
+        typeId: Number(ach.achievement_type_id), // Convert Decimal to number
+        type: ach.achievement_type_lu.achievement_type_desc,
+        achievementDate: ach.achievement_date,
+        createdAt: ach.create_date, // Assuming create_date is the achievement date
       }));
     } catch (error) {
       this.logger.error(
