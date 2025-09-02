@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import * as tokenValidator from 'tc-core-library-js';
 import _ from 'lodash';
+import { Constants } from '../../core/constant/constants';
 
 export class CommonUtils {
   private constructor() {}
@@ -75,5 +76,19 @@ export class CommonUtils {
 
   static pick<T>(obj: T, keys: string[]) {
     return _.pick(obj, keys);
+  }
+
+  /**
+   * Generate random string of letters and numbers with given length.
+   * @param length random string length
+   * @returns random string
+   */
+  static generateAlphaNumericString(length: number) {
+    const chars = Constants.ALPHABET_ALPHA_EN + Constants.ALPHABET_DIGITS_EN;
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   }
 }

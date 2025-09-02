@@ -95,7 +95,7 @@ export class AuthorizationService {
       redirectUrl = Constants.defaultRedirectUrl;
     }
     const state = Buffer.from(
-      this.randomString(Constants.defaultAuthStateLength),
+      CommonUtils.generateAlphaNumericString(Constants.defaultAuthStateLength),
     ).toString('base64');
 
     await this.cacheManager.set(AUTH0_STATE_CACHE_PREFIX_KEY + state, state);
@@ -143,7 +143,7 @@ export class AuthorizationService {
     }
     if (dto.code == null || dto.code.trim().length === 0) {
       throw new BadRequestException(
-        'The authorizaton code should be non-null and non-empty string',
+        'The authorization code should be non-null and non-empty string',
       );
     }
     if (dto.redirectUrl == null || dto.redirectUrl.trim().length === 0) {
@@ -160,7 +160,7 @@ export class AuthorizationService {
       AUTH0_STATE_CACHE_PREFIX_KEY + dto.state,
     );
     if (cachedState == null) {
-      throw new InternalServerErrorException('The state code is not found.');
+      throw new ForbiddenException('The state code is not found.');
     }
 
     const credential: Auth0Credential = await this.auth0.getToken(
@@ -498,7 +498,7 @@ export class AuthorizationService {
       isRs256Token ? auth.token : auth.externalToken,
       cookieOptions,
     );
-    if (auth != null && auth.token != null) {
+    if (auth.token != null) {
       const userId = this.extractUserId(auth);
       res.cookie(
         Constants.tcSsoCookieName,
@@ -780,21 +780,6 @@ export class AuthorizationService {
       );
     }
     return null;
-  }
-
-  /**
-   * Generate random string of letters and numbers with given length.
-   * @param length random string length
-   * @returns random string
-   */
-  private randomString(length: number) {
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
   }
 
   /**

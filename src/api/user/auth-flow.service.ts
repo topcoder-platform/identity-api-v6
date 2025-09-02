@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from 'src/dto/member';
 import { ValidationService } from './validation.service';
+import { CommonUtils } from '../../shared/util/common.utils';
 
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
 const ONE_TIME_TOKEN_JWT_AUDIENCE = 'onetime_email_update';
@@ -629,15 +630,6 @@ export class AuthFlowService {
     }
   }
 
-  private generateAlphanumericToken(length: number): string {
-    const chars = Constants.ALPHABET_ALPHA_EN + Constants.ALPHABET_DIGITS_EN;
-    let token = '';
-    for (let i = 0; i < length; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
-  }
-
   async initiatePasswordReset(
     emailOrHandle: string,
     resetPasswordUrlPrefix?: string,
@@ -695,7 +687,7 @@ export class AuthFlowService {
       );
     }
 
-    const resetToken = this.generateAlphanumericToken(
+    const resetToken = CommonUtils.generateAlphaNumericString(
       PASSWORD_RESET_TOKEN_LENGTH,
     );
     const expirySeconds = this.resetTokenExpirySeconds;
