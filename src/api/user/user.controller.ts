@@ -268,7 +268,7 @@ export class UserController {
   ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
     if (!handle) {
-      throw new BadRequestException('Handle query parameter is required.');
+      throw new BadRequestException('Handle is required.');
     }
     return this.validationService.validateHandle(handle);
   }
@@ -920,48 +920,6 @@ export class UserController {
     );
   }
 
-  /**
-   * Retrieves all external profiles (SSO, social, etc.) for a user.
-   * Accessible by admins or the user themselves.
-   *
-   * @param userId - The numeric ID of the user.
-   * @param req - The request object containing authentication information.
-   * @returns A list of UserProfileDto objects representing the user's external profiles.
-   * @throws UnauthorizedException if the user is not authenticated.
-   * @throws ForbiddenException if the user is not an admin and not accessing their own profiles.
-   * @throws NotFoundException if the user is not found.
-   */
-  @Get(':userId/profiles')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({
-    summary:
-      'Get all external profiles (SSO, social, etc.) for a user (Admin or self).',
-    description: 'If not admin, only allowed for own userId.',
-  })
-  @ApiParam({ name: 'userId', description: 'Numeric User ID', type: Number })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of external profiles',
-    type: [DTOs.UserProfileDto],
-  })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Internal server error.',
-  })
-  async getAllExternalProfiles(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Req() req: Request,
-  ): Promise<DTOs.UserProfileDto[]> {
-    const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, userId.toString()); // Call as method
-    this.logger.log(
-      `${authUser.isAdmin ? 'Admin' : 'User'} ${authUser.userId} getting all profiles for user: ${userId}`,
-    );
-    return this.userProfileService.findAllUserProfiles(userId);
-  }
 
   /**
    * Deletes all external profiles for a user under a specific provider. Accessible only by admins.
@@ -1534,7 +1492,11 @@ export class UserController {
   }
 
   /**
-   * Updates a user's primary email address using a one-time token for authentication.
+   * This endpoint is used to update email of a specified user (only) in the
+   * registration flow.
+   * A bearer token is needed in Authorization header, which is created by
+   * getOneTimeToken().
+   *  Updates a user's primary email address using a one-time token for authentication.
    * This endpoint is part of a two-step verification process, allowing users to change
    * their email after successfully obtaining a one-time token via `getOneTimeToken()`.
    *
@@ -1967,7 +1929,4 @@ export class UserController {
     );
     return this.userService.getAchievements(parseInt(resourceId, 10));
   }
-
-  // TODO: Add self-service endpoints like updateMyMaritalStatus, updateMyHomeAddress etc. as per Java resource if needed.
-  // These would not be admin-only.
 }

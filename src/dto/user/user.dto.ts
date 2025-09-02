@@ -23,7 +23,7 @@ import { Constants } from '../../core/constant/constants';
 
 // --- Base & Nested DTOs ---
 
-class CredentialDto {
+export class CredentialDto {
   @IsString()
   @IsOptional()
   @MinLength(8) // Example validation
@@ -423,10 +423,11 @@ export class ValidationResponseDto {
 }
 
 export class AchievementDto {
-  achievement_type_id: number;
-  achievement_desc: string;
-  date: Date;
-  // Add other fields
+  description: string;
+  typeId: number;
+  type: string;
+  achievementDate: Date;
+  createdAt: Date;
 }
 
 export class DiceConnectionResponseDto {

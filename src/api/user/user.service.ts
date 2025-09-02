@@ -22,6 +22,7 @@ import {
   UpdateUserBodyDto,
   UserSearchQueryDto,
   AchievementDto,
+  CredentialDto,
 } from '../../dto/user/user.dto';
 import { ValidationService } from './validation.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -35,6 +36,7 @@ import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
+import { MemberStatus } from '../../dto/member';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -249,6 +251,83 @@ export class UserService {
       select: { address: true, status_id: true },
     });
 
+    // Attach primary email info to the returned user object
+    const userWithEmail = user as typeof user & {
+      primaryEmail?: { address: string; status_id: Decimal | null };
+    };
+    if (primaryEmailRecord) {
+      userWithEmail.primaryEmail = {
+        address: primaryEmailRecord.address,
+        status_id: primaryEmailRecord.status_id,
+      };
+    }
+
+    return userWithEmail;
+  }
+
+  async findUserByEmail(email: string): Promise<
+    | (UserModel & {
+        user_sso_login: (UserSsoLoginModel & {
+          sso_login_provider: SsoLoginProviderModel;
+        })[];
+      } & { primaryEmail?: { address: string; status_id: Decimal | null } }) // Add primary email info structure
+    | null
+  > {
+    this.logger.debug(`Finding user by email: ${email}`);
+    if (!email) {
+      throw new BadRequestException('Email cannot be empty.');
+    }
+
+    let userId: number | null = null;
+    let user:
+      | (UserModel & {
+          user_sso_login: (UserSsoLoginModel & {
+            sso_login_provider: SsoLoginProviderModel;
+          })[];
+        })
+      | null = null;
+    let primaryEmailRecord = null;
+
+    const emailRecords = await this.prismaClient.email.findMany({
+      where: {
+        address: email.toLowerCase(),
+        primary_ind: Constants.primaryEmailFlag,
+        email_type_id: Constants.standardEmailType,
+      },
+      select: { user_id: true, address: true, status_id: true },
+    });
+
+    if (emailRecords) {
+      for (let i = 0; i < emailRecords.length; i++) {
+        if (emailRecords[i].address == email) {
+          primaryEmailRecord = emailRecords[i];
+          userId = emailRecords[i].user_id as unknown as number;
+          break;
+        }
+      }
+    } else {
+      this.logger.debug(`No primary email record found for address: ${email}`);
+      // Do not throw, allow fallback to handle search or return null later
+    }
+
+    // 2. Find user by userId (if found via email)
+    if (userId) {
+      user = await this.prismaClient.user.findUnique({
+        where: { user_id: userId },
+        include: {
+          user_sso_login: { include: { sso_login_provider: true } },
+        },
+      });
+    }
+
+    if (!user) {
+      this.logger.debug(
+        `User with email '${email}' not found by findUserByEmail.`,
+      );
+      return null;
+    }
+
+    // 3. Fetch primary email details separately and attach
     // Attach primary email info to the returned user object
     const userWithEmail = user as typeof user & {
       primaryEmail?: { address: string; status_id: Decimal | null };
@@ -672,52 +751,99 @@ export class UserService {
     updateUserDto: UpdateUserBodyDto,
   ): Promise<UserModel> {
     const userId = parseInt(userIdString, 10);
-    if (isNaN(userId)) {
+    if (isNaN(userId) || userId <= 0) {
       throw new BadRequestException('Invalid user ID format.');
     }
     this.logger.log(`Updating basic info for user ID: ${userId}`);
     const userParams = updateUserDto.param; // Access nested param object
-    // Only update fields present in the DTO
-    const dataToUpdate: Prisma.userUpdateInput = {};
-    if (userParams.firstName) dataToUpdate.first_name = userParams.firstName;
-    if (userParams.lastName) dataToUpdate.last_name = userParams.lastName;
-    // Add other updatable basic fields (country, timezone etc.)
 
-    if (Object.keys(dataToUpdate).length === 0) {
-      this.logger.warn(
-        `Update basic info called for user ${userId} with no data.`,
-      );
-      // Or throw BadRequestException
-      const currentUser = await this.findUserById(userId);
-      if (!currentUser)
-        throw new NotFoundException(`User with ID ${userId} not found.`);
-      return currentUser; // Return current user if no changes
+    const cred: CredentialDto = userParams.credential;
+    // validate password if it's specified.
+    if (cred != null && cred.password != null)
+      this.validationService.validatePassword(cred.password);
+
+    const existingUser = await this.findUserById(userId);
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID ${userId} not found.`);
     }
 
-    try {
-      const updatedUser = await this.prismaClient.user.update({
+    // Can't update handle, email, isActive
+    if (userParams.handle != null && userParams.handle != existingUser.handle)
+      throw new BadRequestException("Handle can't be updated");
+    if (userParams.status != null && userParams.status != existingUser.status)
+      throw new BadRequestException("Status can't be updated");
+
+    if (
+      userParams.email != null &&
+      userParams.email != (existingUser as any).primaryEmailAddress
+    )
+      throw new BadRequestException("Email address can't be updated");
+
+    let securityUserRecord = null;
+    // validate password if it's specified.
+    if (cred != null && cred.password != null) {
+      // currentPassword is required and must match with registered password
+      if (cred.currentPassword == null)
+        throw new BadRequestException('Current Password is required');
+
+      securityUserRecord = await this.prismaClient.security_user.findUnique({
+        where: { login_id: userId },
+        select: {
+          password: true,
+        },
+      });
+      if (
+        !securityUserRecord ||
+        securityUserRecord.password !=
+          this.encodePasswordLegacy(cred.currentPassword)
+      )
+        throw new BadRequestException('Current password is not correct');
+    }
+
+    // Only update fields present in the DTO
+    const dataToUpdate: Prisma.userUpdateInput = {};
+    if (userParams.firstName)
+      existingUser.first_name = dataToUpdate.first_name = userParams.firstName;
+    if (userParams.lastName)
+      existingUser.last_name = dataToUpdate.last_name = userParams.lastName;
+    if (userParams.regSource)
+      existingUser.reg_source = dataToUpdate.reg_source = userParams.regSource;
+    if (userParams.utmSource)
+      existingUser.utm_source = dataToUpdate.utm_source = userParams.utmSource;
+    if (userParams.utmMedium)
+      existingUser.utm_medium = dataToUpdate.utm_medium = userParams.utmMedium;
+    if (userParams.utmCampaign)
+      existingUser.utm_campaign = dataToUpdate.utm_campaign =
+        userParams.utmCampaign;
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return existingUser; // Return current user if no changes
+    }
+
+    await this.prismaClient.$transaction(async (prisma) => {
+      const userInTx = await this.prismaClient.user.update({
         where: { user_id: userId },
         data: dataToUpdate,
       });
       this.logger.log(`Successfully updated basic info for user ${userId}`);
-      return updatedUser;
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === Constants.prismaNotFoundCode
-      ) {
-        throw new NotFoundException(
-          `User with ID ${userId} not found for update.`,
-        );
+
+      // update password
+      if (cred != null && cred.password != null) {
+        this.logger.debug(`"updating password: ${userInTx.handle}`);
+        existingUser.password = cred.password;
+
+        if (securityUserRecord) {
+          await prisma.security_user.update({
+            where: { login_id: userId },
+            data: { password: this.encodePasswordLegacy(cred.password) },
+          });
+        }
       }
-      this.logger.error(
-        `Error updating basic info for user ${userId}: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Failed to update user information.',
-      );
-    }
+
+      return userInTx;
+    });
+
+    return existingUser;
   }
 
   // --- Utility to convert snake_case keys to camelCase ---
@@ -750,12 +876,9 @@ export class UserService {
     this.logger.log(
       `Attempting to update handle for user ID: ${userId} to ${newHandle}, by admin: ${authUser.userId}`,
     );
-    if (!newHandle) {
-      throw new BadRequestException('New handle cannot be empty.');
-    }
 
     // Validate format and uniqueness (ValidationService throws on failure)
-    await this.validationService.validateHandle(newHandle);
+    await this.validationService.validateHandle(newHandle, userId);
 
     // Fetch the user to ensure they exist and get the old handle
     const existingUser = await this.prismaClient.user.findUnique({
@@ -793,13 +916,8 @@ export class UserService {
           );
 
           // Now update the security_user table.
-          // The 'user_id' column in 'security_user' stores the handle.
-          // We need to find the record by the old handle and update it to the new handle.
-          // The 'login_id' in 'security_user' stores the numeric user_id from the 'user' table.
-
-          // First, check if a security_user record exists with the old handle
           const securityUserRecord = await prisma.security_user.findUnique({
-            where: { user_id: oldHandle }, // user_id in security_user is the handle
+            where: { login_id: userId },
           });
 
           if (securityUserRecord) {
@@ -808,7 +926,7 @@ export class UserService {
             // If another user already has newHandle in security_user.user_id, this would fail.
             // This should ideally be caught by the initial validateHandle if security_user.user_id mirrors user.handle.
             await prisma.security_user.update({
-              where: { user_id: oldHandle },
+              where: { login_id: userId },
               data: { user_id: newHandle },
             });
             this.logger.log(
@@ -884,14 +1002,8 @@ export class UserService {
     );
 
     // Validate new email
-    if (!newEmail) {
-      throw new BadRequestException('New email cannot be empty.');
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-      throw new BadRequestException('Invalid email format.');
-    }
-
-    await this.checkEmailAvailabilityForUser(newEmail, userId);
+    await this.validationService.validateEmail(newEmail, userId);
+    // await this.checkEmailAvailabilityForUser(newEmail, userId);
     const updatedUserInTx = await this.prismaClient.$transaction(async (tx) => {
       // Find the user first
       const userInDB = await tx.user.findUnique({
@@ -907,6 +1019,7 @@ export class UserService {
         where: {
           user_id: userId,
           primary_ind: Constants.primaryEmailFlag,
+          email_type_id: Constants.standardEmailType,
         },
       });
 
@@ -946,7 +1059,7 @@ export class UserService {
         where: { email_id: currentPrimaryEmailRecord.email_id },
         data: {
           address: newEmail.toLowerCase(),
-          status_id: new Decimal(2), // Set to unverified status
+          // status_id: new Decimal(2), // Set to unverified status
           modify_date: new Date(),
         },
       });
@@ -971,6 +1084,8 @@ export class UserService {
       return updatedUser;
     });
 
+    // v3 java does not genereate otp and send the email
+    /**
     // Generate OTP and resend token for email verification using the updated email record
     const updatedEmailRecord = await this.prismaClient.email.findFirst({
       where: {
@@ -1027,7 +1142,7 @@ export class UserService {
         );
       }
     }
-
+    **/
     // Publish user updated event
     try {
       const eventAttributes = this.toCamelCase(updatedUserInTx);
@@ -1060,14 +1175,16 @@ export class UserService {
     this.logger.log(
       `Attempting to update status for user ID: ${userId} to ${newStatus} by admin: ${authUser.userId}`,
     );
+    const normalizedNewStatus = newStatus.toUpperCase();
 
-    const validStatuses = ['A', 'I', 'U', 'P']; // Active, Inactive, Unverified, Pending (example)
-    if (!validStatuses.includes(newStatus.toUpperCase())) {
+    const validStatuses = Object.values(MemberStatus).map((s) =>
+      s.toUpperCase(),
+    ); // Use MemberStatus enum
+    if (!validStatuses.includes(normalizedNewStatus)) {
       throw new BadRequestException(
         `Invalid status code: ${newStatus}. Must be one of: ${validStatuses.join(', ')}`,
       );
     }
-    const normalizedNewStatus = newStatus.toUpperCase();
 
     const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
@@ -1202,13 +1319,16 @@ export class UserService {
         include: {
           achievement_type_lu: true, // Include the description lookup table
         },
+        orderBy: { create_date: 'asc' },
       });
 
       // Map to AchievementDto
       return achievements.map((ach) => ({
-        achievement_type_id: Number(ach.achievement_type_id), // Convert Decimal to number
-        achievement_desc: ach.achievement_type_lu.achievement_type_desc,
-        date: ach.create_date, // Assuming create_date is the achievement date
+        description: ach.description,
+        typeId: Number(ach.achievement_type_id), // Convert Decimal to number
+        type: ach.achievement_type_lu.achievement_type_desc,
+        achievementDate: ach.achievement_date,
+        createdAt: ach.create_date, // Assuming create_date is the achievement date
       }));
     } catch (error) {
       this.logger.error(

@@ -14,11 +14,13 @@ import {
   ProviderDetails,
   ProviderId,
 } from '../../core/constant/provider-type.enum';
+import { Constants } from '../../core/constant/constants';
 
 // Basic email regex, can be refined
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX =
+  /^[+_A-Za-z0-9-]+(\.[+_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,}$)/;
 // Basic handle regex: 3-64 chars, alphanumeric, and specific special characters _ . - ` [ ] { }
-const HANDLE_REGEX = /^[a-zA-Z0-9\-[\]_.`{}]{3,64}$/;
+const HANDLE_REGEX = /^[a-zA-Z0-9\-[\]_.{}]{2,15}$/;
 // TODO: Add list of reserved handles if necessary
 const RESERVED_HANDLES = ['admin', 'support', 'root', 'administrator']; // Example
 
@@ -49,15 +51,29 @@ export class ValidationService {
     private readonly prismaClient: PrismaClient,
   ) {}
 
-  async validateHandle(handle: string): Promise<DTOs.ValidationResponseDto> {
+  async validateHandle(
+    handle: string,
+    userId: number = null,
+  ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
     if (!handle) {
       throw new BadRequestException('Handle cannot be empty.');
     }
+    if (
+      handle.length < Constants.MIN_LENGTH_HANDLE ||
+      handle.length > Constants.MAX_LENGTH_HANDLE
+    )
+      throw new BadRequestException(
+        `Length of Handle in character should be between ${Constants.MIN_LENGTH_HANDLE} and ${Constants.MAX_LENGTH_HANDLE}.`,
+      );
+
     if (!HANDLE_REGEX.test(handle)) {
       throw new BadRequestException(
-        'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
+        'Handle can only contain alphanumeric characters and _.-[]{} symbols.',
       );
+    }
+    if (handle.match(/^[-_.{}[\]]+$/)) {
+      throw new BadRequestException('Handle may not contain only punctuation.');
     }
     if (RESERVED_HANDLES.includes(handle.toLowerCase())) {
       throw new BadRequestException(`Handle '${handle}' is reserved.`);
@@ -67,7 +83,10 @@ export class ValidationService {
       where: { handle_lower: handle.toLowerCase() },
     });
 
-    if (existingUser) {
+    if (
+      existingUser &&
+      (!userId || (existingUser?.user_id as unknown as number) != userId)
+    ) {
       this.logger.warn(`Validation failed: Handle '${handle}' already exists.`);
       throw new ConflictException(`Handle '${handle}' is already taken.`);
     }
@@ -75,7 +94,10 @@ export class ValidationService {
     return { valid: true };
   }
 
-  async validateEmail(email: string): Promise<DTOs.ValidationResponseDto> {
+  async validateEmail(
+    email: string,
+    userId: number = null,
+  ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating email: ${email}`);
     if (!email) {
       throw new BadRequestException('Email cannot be empty.');
@@ -96,7 +118,10 @@ export class ValidationService {
     });
 
     // If a record for this email address exists AND it has a user_id, it means the email is in use.
-    if (existingEmailRecord && existingEmailRecord.user_id !== null) {
+    if (
+      existingEmailRecord &&
+      (!userId || (existingEmailRecord.user_id as unknown as number) != userId)
+    ) {
       this.logger.warn(
         `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingEmailRecord.user_id.toNumber()}.`,
       );
@@ -108,7 +133,35 @@ export class ValidationService {
     this.logger.log(`Email '${email}' is valid and available.`);
     return { valid: true };
   }
-  //////////////////////////////////////////////////////////////
+
+  validatePassword(password: string): DTOs.ValidationResponseDto {
+    // Mandatory
+    if (!password) throw new BadRequestException('Password is required.');
+
+    // Range check
+    if (
+      password.length < Constants.MIN_LENGTH_PASSWORD ||
+      password.length > Constants.MAX_LENGTH_PASSWORD
+    ) {
+      throw new BadRequestException(
+        `Length of password in character should be between ${Constants.MIN_LENGTH_PASSWORD} and ${Constants.MAX_LENGTH_PASSWORD}`,
+      );
+    }
+
+    // Check if it has a letter.
+    if (!/[A-Za-z]/.test(password)) {
+      throw new BadRequestException('Password must have at least a letter');
+    }
+
+    // Check if it has punctuation symbol
+    if (!/\\p{P}/.test(password) && !/\d/.test(password)) {
+      throw new BadRequestException(
+        'Password must have at least a symbol or number',
+      );
+    }
+
+    return { valid: true };
+  }
 
   /**
    * Checks if a specific social identity (provider + social_user_id) is already linked
@@ -133,41 +186,41 @@ export class ValidationService {
 
   /**
    * The primary validation method called by the controller.
-   * @param socialProviderKey The string key of the social provider (e.g., 'google-oauth2').
+   * @param socialProviderName The string key of the social provider (e.g., 'google-oauth2').
    * @param socialProviderUserId The user's ID within that social provider.
    */
   async validateSocial(
-    socialProviderKey: string,
+    socialProviderName: string,
     socialProviderUserId: string,
   ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(
-      `Validating social: providerKey=${socialProviderKey}, socialProviderUserId=${socialProviderUserId}`,
+      `Validating social: providerKey=${socialProviderName}, socialProviderUserId=${socialProviderUserId}`,
     );
 
     // Parameter validation (already done in controller but good for service robustness)
-    if (!socialProviderKey?.trim()) {
-      throw new BadRequestException('Social provider key cannot be empty.');
+    if (!socialProviderName?.trim()) {
+      throw new BadRequestException('Social provider name cannot be empty.');
     }
     if (!socialProviderUserId?.trim()) {
       throw new BadRequestException('Social user ID cannot be empty.');
     }
 
-    const providerDetails = getProviderDetails(socialProviderKey);
+    const providerDetails = getProviderDetails(socialProviderName);
 
     if (!providerDetails) {
       this.logger.warn(
-        `Unsupported provider key received: ${socialProviderKey}`,
+        `Unsupported provider name received: ${socialProviderName}`,
       );
       throw new BadRequestException(
-        `Unsupported provider key: ${socialProviderKey}`,
+        `Unsupported provider name: ${socialProviderName}`,
       );
     }
     if (!providerDetails.isSocial) {
       this.logger.warn(
-        `Provider ${socialProviderKey} is not a social provider.`,
+        `Provider ${socialProviderName} is not a social provider.`,
       );
       throw new BadRequestException(
-        `Unsupported provider key: ${socialProviderKey} (Not a social provider)`,
+        `Unsupported provider name: ${socialProviderName} (Not a social provider)`,
       );
     }
 
@@ -195,16 +248,12 @@ export class ValidationService {
       );
     }
 
-    if (!providerNumericId) {
-      return 'Mandatory parameter: Provider ID';
-    }
-
     const isInUse = await this.isSocialIdentityInUse(
       providerNumericId,
       socialUserId,
     );
     if (isInUse) {
-      return 'This social profile is already in use';
+      return 'Social account has already been in use';
     }
 
     return null;
