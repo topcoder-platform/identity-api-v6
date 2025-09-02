@@ -112,7 +112,7 @@ export class UserService {
       whereClause.user_email_xref = {
         some: {
           email: {
-            address: query.email,
+            address: { equals: query.email, mode: 'insensitive' },
           },
         },
       };
@@ -200,7 +200,7 @@ export class UserService {
       // 1. Find email record first to get user_id (primary email only)
       const emailRecord = await this.prismaClient.email.findFirst({
         where: {
-          address: emailOrHandle.toLowerCase(),
+          address: { equals: emailOrHandle, mode: 'insensitive' },
           primary_ind: Constants.primaryEmailFlag,
           // email_type_id: 1, // Assuming type 1 is standard primary
         },
@@ -562,7 +562,7 @@ export class UserService {
         );
 
         let emailRecord = await prisma.email.findFirst({
-          where: { address: email.toLowerCase() },
+          where: { address: { equals: email, mode: 'insensitive' } },
         });
         if (!emailRecord) {
           // ADDED: Fetch next email_id explicitly
@@ -1042,7 +1042,7 @@ export class UserService {
       // Check if new email is already taken by another user as primary
       const existingEmailRecord = await tx.email.findFirst({
         where: {
-          address: newEmail.toLowerCase(),
+          address: { equals: newEmail, mode: 'insensitive' },
           user_id: { not: userId },
           primary_ind: Constants.primaryEmailFlag,
         },
@@ -1397,7 +1397,7 @@ export class UserService {
     let userByEmail: UserModel | null = null;
     if (auth0Profile.email && auth0Profile.email_verified) {
       const emailRecord = await this.prismaClient.email.findFirst({
-        where: { address: auth0Profile.email },
+        where: { address: { equals: auth0Profile.email, mode: 'insensitive' } },
         include: {
           user_email_xref: {
             where: { is_primary: true },
@@ -1639,7 +1639,7 @@ export class UserService {
 
     const conflictingEmail = await this.prismaClient.email.findFirst({
       where: {
-        address: emailAddress.toLowerCase(),
+        address: { equals: emailAddress, mode: 'insensitive' },
         primary_ind: Constants.primaryEmailFlag, // It's a primary email
         user_id: {
           not: currentUserId, // And it does not belong to the current user

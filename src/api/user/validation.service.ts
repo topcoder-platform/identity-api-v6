@@ -109,7 +109,7 @@ export class ValidationService {
     // Check if email exists in the email table and is associated with a user
     const existingEmailRecord = await this.prismaClient.email.findFirst({
       where: {
-        address: email.toLowerCase(),
+        address: { equals: email, mode: 'insensitive' },
         // user_id: { not: null } // Ensures it's linked to a user. If an email can exist unlinked, this check is important.
         // For registration, any email record might be considered a conflict.
         // Let's assume for now that if an email address exists in the table, it's considered taken.
