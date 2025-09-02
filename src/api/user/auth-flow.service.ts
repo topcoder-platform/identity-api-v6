@@ -905,7 +905,7 @@ export class AuthFlowService {
     if (isEmail) {
       const emailRecord = await this.prismaClient.email.findFirst({
         where: {
-          address: handleOrEmail.toLowerCase(),
+          address: { equals: handleOrEmail, mode: 'insensitive' },
           primary_ind: Constants.primaryEmailFlag,
         }, // Ensure it's the primary email
         select: { user_id: true },
@@ -1104,7 +1104,7 @@ export class AuthFlowService {
     if (isEmail) {
       // 1. Find email to get user_id
       const emailRecord = await this.prismaClient.email.findFirst({
-        where: { address: handleOrEmail.toLowerCase() },
+        where: { address: { equals: handleOrEmail, mode: 'insensitive' } },
         select: { user_id: true },
       });
       if (emailRecord) {
