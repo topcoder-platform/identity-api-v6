@@ -27,6 +27,8 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from 'src/dto/member';
+import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
+import { MemberStatus as MemberDbStatus } from '../../../prisma/member/generated/member';
 import { ValidationService } from './validation.service';
 import { CommonUtils } from '../../shared/util/common.utils';
 
@@ -57,6 +59,7 @@ export class AuthFlowService {
     private readonly eventService: EventService,
     private readonly roleService: RoleService,
     private readonly validationService: ValidationService,
+    private readonly memberPrisma: MemberPrismaService,
   ) {
     this.jwtSecret = this.configService.get<string>('JWT_SECRET')!;
     this.resetTokenExpirySeconds = 30 * 60; // Example: 30 mins
@@ -603,6 +606,27 @@ export class AuthFlowService {
         `Primary email updated to ${newEmail} for user ${userId}.`,
       );
     });
+
+    // 4b. Update members.member status to ACTIVE and email to the new value
+    try {
+      const newEmailLower = newEmail.toLowerCase();
+      await this.memberPrisma.member.update({
+        where: { userId: Number(userId) },
+        data: {
+          status: MemberDbStatus.ACTIVE,
+          email: newEmailLower,
+        },
+      });
+      this.logger.log(
+        `Updated members.member for user ${userId}: status ACTIVE and email ${newEmailLower}.`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to update members.member for user ${userId}: ${err.message}`,
+        err.stack,
+      );
+      // Intentionally not throwing to avoid failing the main identity update
+    }
 
     // 5. Publish user.updated event
     try {
