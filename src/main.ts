@@ -8,6 +8,7 @@ import { RequestLoggerMiddleware } from './shared/middleware/request-logger.midd
 import { LoggingInterceptor } from './shared/interceptors/logging.interceptor'; // <-- Import the interceptor
 import { Request, Response, NextFunction } from 'express'; // Import express types
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { cors } from 'cors';
 
 const logger = new Logger('Bootstrap');
 
@@ -25,8 +26,18 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor()); // <-- Apply interceptor
 
   // Enable CORS (configure origins as needed)
-  app.enableCors();
-
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) {
+          // disable cors if service to service request
+          callback(null, false);
+        } else {
+          callback(null, new RegExp(/topcoder(-dev|-qa)?\.com$/));
+        }
+      },
+    }),
+  );
   // Set global prefix
   app.setGlobalPrefix('v6');
 
