@@ -39,7 +39,7 @@ import { AuthorizationModule } from './api/authorization/authorization.module';
     RoleModule,
     UserModule,
     GroupModule,
-    AuthorizationModule
+    AuthorizationModule,
   ],
   controllers: [], // No root controller
   providers: [], // No root service

@@ -199,7 +199,6 @@ export class AuthFlowService {
         }
       });
 
-
       // Update members.member status to ACTIVE
       try {
         await this.memberPrisma.member.update({

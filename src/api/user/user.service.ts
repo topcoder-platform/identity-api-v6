@@ -29,7 +29,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { RoleService } from '../role/role.service';
 import { EventService } from '../../shared/event/event.service';
 import { Cache } from 'cache-manager';
-import * as jwt from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';

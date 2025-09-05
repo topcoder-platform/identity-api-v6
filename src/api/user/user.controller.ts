@@ -920,7 +920,6 @@ export class UserController {
     );
   }
 
-
   /**
    * Deletes all external profiles for a user under a specific provider. Accessible only by admins.
    *

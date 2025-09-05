@@ -21,9 +21,9 @@ import { MemberPrismaModule } from '../../shared/member-prisma/member-prisma.mod
     ConfigModule, // For accessing environment variables
     HttpModule, // For making external HTTP calls
     forwardRef(() => RoleModule), // RoleService needed for roles
-    EventModule, 
+    EventModule,
     SlackModule,
-    MemberPrismaModule
+    MemberPrismaModule,
     // forwardRef(() => AuthorizationModule) // Might be needed if Auth flows depend on AuthorizationService
   ],
   controllers: [UserController],
