@@ -20,9 +20,7 @@ import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfil
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
 import { Constants } from '../../core/constant/constants';
-import {
-  getProviderDetails,
-} from '../../core/constant/provider-type.enum';
+import { getProviderDetails } from '../../core/constant/provider-type.enum';
 // Import other needed services
 
 @Injectable()
