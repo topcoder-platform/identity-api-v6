@@ -9,6 +9,7 @@ import { UserModule } from './api/user/user.module';
 import { GroupModule } from './api/group/group.module';
 import { MemberPrismaModule } from './shared/member-prisma/member-prisma.module';
 import { AuthorizationModule } from './api/authorization/authorization.module';
+import { IdentityProviderModule } from './api/identity-provider/identity-provider.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AuthorizationModule } from './api/authorization/authorization.module';
     UserModule,
     GroupModule,
     AuthorizationModule,
+    IdentityProviderModule,
   ],
   controllers: [], // No root controller
   providers: [], // No root service
