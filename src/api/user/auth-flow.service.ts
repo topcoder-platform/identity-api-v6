@@ -198,6 +198,26 @@ export class AuthFlowService {
           );
         }
       });
+
+
+      // Update members.member status to ACTIVE
+      try {
+        await this.memberPrisma.member.update({
+          where: { userId: Number(userId) },
+          data: {
+            status: MemberDbStatus.ACTIVE,
+          },
+        });
+        this.logger.log(
+          `Updated members.member for user ${userId}: status ACTIVE`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to update members.member for user ${userId}: ${err.message}`,
+          err.stack,
+        );
+        // Intentionally not throwing to avoid failing the main identity update
+      }
     } catch (dbError) {
       this.logger.error(
         `Database error during activation for user ID ${userId}: ${dbError.message}`,
