@@ -8,7 +8,7 @@ import { RequestLoggerMiddleware } from './shared/middleware/request-logger.midd
 import { LoggingInterceptor } from './shared/interceptors/logging.interceptor'; // <-- Import the interceptor
 import { Request, Response, NextFunction } from 'express'; // Import express types
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { cors } from 'cors';
+import cors, { CorsOptions } from 'cors';
 
 const logger = new Logger('Bootstrap');
 
@@ -26,18 +26,23 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor()); // <-- Apply interceptor
 
   // Enable CORS (configure origins as needed)
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin) {
-          // disable cors if service to service request
-          callback(null, false);
-        } else {
-          callback(null, new RegExp(/topcoder(-dev|-qa)?\.com$/));
-        }
-      },
-    }),
-  );
+  const corsConfig: CorsOptions = {
+    allowedHeaders:
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Headers,currentOrg,overrideOrg,x-atlassian-cloud-id,x-api-key,x-orgid',
+    credentials: true,
+    origin: process.env.CORS_ALLOWED_ORIGIN
+      ? new RegExp(process.env.CORS_ALLOWED_ORIGIN)
+      : [
+          'http://localhost:3000',
+          /\.localhost:3000$/,
+          'https://topcoder.com',
+          'https://topcoder-dev.com',
+          /\.topcoder-dev\.com$/,
+          /\.topcoder\.com$/,
+        ],
+    methods: 'GET, POST, OPTIONS, PUT, DELETE, PATCH',
+  };
+  app.use(cors(corsConfig));
   // Set global prefix
   app.setGlobalPrefix('v6');
 
