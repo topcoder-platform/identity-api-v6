@@ -416,7 +416,7 @@ export class UserService {
 
   async registerUser(createUserDto: CreateUserBodyDto): Promise<UserModel> {
     const userParams = createUserDto.param;
-    const { handle, email, credential, firstName, lastName } = userParams;
+    const { handle, email, firstName, lastName } = userParams;
 
     this.logger.log(
       `Attempting to register user with handle: ${handle} and email: ${email}`,
@@ -428,6 +428,32 @@ export class UserService {
     if (!email) {
       throw new BadRequestException('Email is required.');
     }
+    // Apply default password for enterprise/social registrations when password is missing
+    // Mirrors Java logic:
+    // if (user.getProfile() != null && (user.getCredential() == null || user.getCredential().getPassword() == null || user.getCredential().getPassword().length() == 0)) {
+    //   if (user.getCredential() == null) user.setCredential(new Credential());
+    //   user.getCredential().setPassword(Utils.getString("defaultPassword", "default-password"));
+    // }
+    if (
+      userParams.profile != null &&
+      (!userParams.credential ||
+        !userParams.credential.password ||
+        userParams.credential.password.length === 0)
+    ) {
+      if (!userParams.credential) {
+        userParams.credential = {} as CredentialDto;
+      }
+      const defaultPassword = this.configService.get<string>(
+        'DEFAULT_PASSWORD',
+        'default-password',
+      );
+      userParams.credential.password = defaultPassword;
+      this.logger.debug(
+        `[registerUser] Applied default password for social/enterprise registration (provider: ${userParams.profile.provider}).`,
+      );
+    }
+
+    const credential = userParams.credential;
     if (!credential?.password) {
       throw new BadRequestException('Password is required.');
     }
@@ -608,27 +634,6 @@ export class UserService {
             `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
         }
-        // Create the member record
-        try {
-          await this.memberPrisma.member.create({
-            data: {
-              userId: Number(nextUserId),
-              handle: handle,
-              handleLower: handle.toLowerCase(),
-              email,
-              tracks: [],
-              createdBy: String(nextUserId),
-              firstName: firstName ?? null,
-              lastName: lastName ?? null,
-              status: 'UNVERIFIED',
-            },
-          });
-        } catch (err) {
-          this.logger.error(
-            { err },
-            `Failed to create member record for new user ${String(nextUserId)} / ${handle}`,
-          );
-        }
         return createdUser;
       });
     } catch (error) {
@@ -654,6 +659,30 @@ export class UserService {
       throw new InternalServerErrorException(
         'User registration failed due to a database error.',
       );
+    }
+
+    // Create the member record outside of the interactive transaction
+    // to avoid cross-client work while a Prisma transaction is open
+    try {
+      await this.memberPrisma.member.create({
+        data: {
+          userId: Number(nextUserId),
+          handle: handle,
+          handleLower: handle.toLowerCase(),
+          email,
+          tracks: [],
+          createdBy: String(nextUserId),
+          firstName: firstName ?? null,
+          lastName: lastName ?? null,
+          status: 'UNVERIFIED',
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        { err },
+        `Failed to create member record for new user ${String(nextUserId)} / ${handle}`,
+      );
+      // Intentionally not throwing to keep registration flow consistent
     }
 
     const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${newUser.user_id.toNumber()}`;

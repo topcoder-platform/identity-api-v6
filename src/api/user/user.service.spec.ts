@@ -986,10 +986,56 @@ describe('UserService', () => {
         service.registerUser({
           param: {
             ...createUserDto.param,
+            profile: undefined, // ensure no defaulting occurs
             credential: { password: undefined },
           },
         } as any),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should apply default password when profile present and password missing', async () => {
+      const dto: CreateUserBodyDto = {
+        param: {
+          handle: 'socialuser',
+          email: 'socialuser@example.com',
+          firstName: 'Soc',
+          lastName: 'User',
+          // No credential/password provided
+          profile: { provider: 'github', userId: 'gh-777', name: 'socUser' },
+          regSource: 'friend',
+        },
+      };
+
+      // Reuse existing mocks; ensure sequences return ids
+      (mockPrismaOltp.$queryRaw as jest.Mock).mockImplementation(async (query) => {
+        const sqlString = Array.isArray(query)
+          ? query[0]
+          : (query as Prisma.Sql)?.strings?.[0] || '';
+        if (sqlString.includes('sequence_user_seq')) return [{ nextval: BigInt(1001) }];
+        if (sqlString.includes('sequence_email_seq')) return [{ nextval: BigInt(2002) }];
+        return Promise.resolve([]);
+      });
+
+      const createdUser = createMockUserModel({
+        user_id: new Decimal(1001),
+        handle: 'socialuser',
+        status: 'U',
+      });
+      (mockPrismaOltp.user.create as jest.Mock).mockResolvedValue(createdUser);
+      (mockPrismaOltp.email.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockPrismaOltp.email.create as jest.Mock).mockResolvedValue(
+        createMockEmailModel({
+          email_id: new Decimal(2002),
+          user_id: new Decimal(1001),
+          address: 'socialuser@example.com',
+          status_id: new Decimal(2),
+        }) as any,
+      );
+
+      await service.registerUser(dto);
+
+      // Since configService.get('defaultPassword') is undefined in mock, it should fall back to 'default-password'
+      expect(mockEncode).toHaveBeenCalledWith('default-password');
     });
 
     it('should throw BadRequestException for short password', async () => {
