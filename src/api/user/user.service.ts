@@ -498,7 +498,7 @@ export class UserService {
         await this.validationService.validateProfile(userParams.profile);
       } catch (error) {
         this.logger.warn(
-          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
+          `Profile validation failed for '${JSON.stringify(userParams.profile)}': ${error.message}`,
         );
         throw error;
       }
@@ -509,7 +509,7 @@ export class UserService {
         await this.validationService.validateReferral(userParams.regSource);
       } catch (error) {
         this.logger.warn(
-          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
+          `Referral validation failed for '${JSON.stringify(userParams.regSource)}': ${error.message}`,
         );
         throw error;
       }

@@ -1007,12 +1007,14 @@ describe('UserService', () => {
       };
 
       // Reuse existing mocks; ensure sequences return ids
-      (mockPrismaOltp.$queryRaw as jest.Mock).mockImplementation(async (query) => {
+      mockPrismaOltp.$queryRaw.mockImplementation(async (query) => {
         const sqlString = Array.isArray(query)
           ? query[0]
           : (query as Prisma.Sql)?.strings?.[0] || '';
-        if (sqlString.includes('sequence_user_seq')) return [{ nextval: BigInt(1001) }];
-        if (sqlString.includes('sequence_email_seq')) return [{ nextval: BigInt(2002) }];
+        if (sqlString.includes('sequence_user_seq'))
+          return [{ nextval: BigInt(1001) }];
+        if (sqlString.includes('sequence_email_seq'))
+          return [{ nextval: BigInt(2002) }];
         return Promise.resolve([]);
       });
 
@@ -1021,9 +1023,9 @@ describe('UserService', () => {
         handle: 'socialuser',
         status: 'U',
       });
-      (mockPrismaOltp.user.create as jest.Mock).mockResolvedValue(createdUser);
-      (mockPrismaOltp.email.findFirst as jest.Mock).mockResolvedValue(null);
-      (mockPrismaOltp.email.create as jest.Mock).mockResolvedValue(
+      mockPrismaOltp.user.create.mockResolvedValue(createdUser);
+      mockPrismaOltp.email.findFirst.mockResolvedValue(null);
+      mockPrismaOltp.email.create.mockResolvedValue(
         createMockEmailModel({
           email_id: new Decimal(2002),
           user_id: new Decimal(1001),
