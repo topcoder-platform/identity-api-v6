@@ -396,10 +396,10 @@ export class ValidationService {
     );
 
     // Use your existing getProviderDetails function
-    const providerDetails = getProviderDetails(profile.provider);
+    const providerDetails = getProviderDetails(profile.providerType);
     if (!providerDetails) {
-      this.logger.warn(`Unsupported provider received: ${profile.provider}`);
-      throw new BadRequestException(MSG_UNSUPPORTED_PROVIDER(profile.provider));
+      this.logger.warn(`Unsupported provider received: ${profile.providerType}`);
+      throw new BadRequestException(MSG_UNSUPPORTED_PROVIDER(profile.providerType));
     }
 
     // Update DTO with derived provider type (optional, but good for consistency using your structure)
