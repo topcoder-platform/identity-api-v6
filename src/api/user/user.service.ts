@@ -36,6 +36,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus } from '../../dto/member';
+import { getProviderDetails } from '../../core/constant/provider-type.enum';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -417,6 +418,9 @@ export class UserService {
   async registerUser(createUserDto: CreateUserBodyDto): Promise<UserModel> {
     const userParams = createUserDto.param;
     const { handle, email, firstName, lastName } = userParams;
+    console.log(`JSON: ${JSON.stringify(userParams)}`);
+    // Capture original providerType value (e.g., 'adfs', 'wipro', 'tc', etc.) before validation normalizes it
+    const originalProviderTypeKey = userParams?.profile?.provider;
 
     this.logger.log(
       `Attempting to register user with handle: ${handle} and email: ${email}`,
@@ -633,6 +637,50 @@ export class UserService {
           this.logger.debug(
             `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
+        }
+
+        // If original provider indicates an enterprise provider, create user_sso_login link
+        try {
+          if (originalProviderTypeKey) {
+            const details = getProviderDetails(originalProviderTypeKey);
+            if (details?.isEnterprise) {
+              const providerRecord = await prisma.sso_login_provider.findFirst({
+                where: { name: originalProviderTypeKey },
+              });
+              if (!providerRecord) {
+                this.logger.error(
+                  `[registerUser Transaction] Enterprise provider '${originalProviderTypeKey}' not found in sso_login_provider; skipping user_sso_login creation.`,
+                );
+              } else {
+                const ssoUserId = userParams?.profile?.userId;
+                if (!ssoUserId) {
+                  this.logger.warn(
+                    `[registerUser Transaction] Enterprise profile missing userId for provider '${originalProviderTypeKey}'; skipping user_sso_login creation.`,
+                  );
+                } else {
+                  await prisma.user_sso_login.create({
+                    data: {
+                      user_id: nextUserId,
+                      provider_id: providerRecord.sso_login_provider_id,
+                      sso_user_id: ssoUserId,
+                      email: userParams?.profile?.email || email,
+                      sso_user_name: userParams?.profile?.name,
+                    },
+                  });
+                  this.logger.log(
+                    `[registerUser Transaction] Created user_sso_login for user ${nextUserId} with provider '${originalProviderTypeKey}'.`,
+                  );
+                }
+              }
+            }
+          }
+        } catch (ssoError) {
+          this.logger.error(
+            `[registerUser Transaction] Error creating user_sso_login for enterprise provider '${originalProviderTypeKey}': ${ssoError.message}`,
+            ssoError.stack,
+          );
+          // Do not fail the whole registration for SSO link issues
+          // TODO: Should we fail here?  I don't know that the user will be able to login without that record...
         }
         return createdUser;
       });
