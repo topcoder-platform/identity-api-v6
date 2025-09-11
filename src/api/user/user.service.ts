@@ -421,7 +421,7 @@ export class UserService {
     console.log(`JSON: ${JSON.stringify(userParams)}`);
     // Capture original providerType value (e.g., 'adfs', 'wipro', 'tc', etc.) before validation normalizes it
     const originalProviderTypeKey = userParams?.profile?.provider;
-
+    
     this.logger.log(
       `Attempting to register user with handle: ${handle} and email: ${email}`,
     );
@@ -638,7 +638,7 @@ export class UserService {
             `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
           );
         }
-
+        console.log(`originalProviderTypeKey: ${originalProviderTypeKey}`);
         // If original provider indicates an enterprise provider, create user_sso_login link
         try {
           if (originalProviderTypeKey) {
@@ -658,14 +658,17 @@ export class UserService {
                     `[registerUser Transaction] Enterprise profile missing userId for provider '${originalProviderTypeKey}'; skipping user_sso_login creation.`,
                   );
                 } else {
-                  await prisma.user_sso_login.create({
-                    data: {
+                  let data={
                       user_id: nextUserId,
                       provider_id: providerRecord.sso_login_provider_id,
                       sso_user_id: ssoUserId,
                       email: userParams?.profile?.email || email,
                       sso_user_name: userParams?.profile?.name,
-                    },
+                    };
+                  console.log(`Creating user_sso_login : ${data}`);
+
+                  await prisma.user_sso_login.create({
+                    data
                   });
                   this.logger.log(
                     `[registerUser Transaction] Created user_sso_login for user ${nextUserId} with provider '${originalProviderTypeKey}'.`,
