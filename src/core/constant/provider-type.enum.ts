@@ -109,6 +109,13 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     isSocial: false,
     isEnterprise: true,
   },
+  // Topcoder SSO shorthand used in some payloads
+  tc: {
+    id: ProviderId.SAMLP,
+    key: 'tc',
+    isSocial: false,
+    isEnterprise: true,
+  },
   auth0: {
     id: ProviderId.AUTH0,
     key: 'auth0',
