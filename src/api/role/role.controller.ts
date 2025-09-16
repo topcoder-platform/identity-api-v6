@@ -30,7 +30,7 @@ import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { ADMIN_ROLE } from '../../auth/constants';
+import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 
 @Controller('roles')
 @UseGuards(AuthRequiredGuard)
@@ -64,7 +64,7 @@ export class RoleController {
     @Query() query: RoleQueryDto,
     @Req() req: Request,
   ): Promise<RoleResponseDto[]> {
-    const user: any = (req as any).authUser || (req as any).user;
+    const user = this.getAuthenticatedUser(req);
     let subjectId: number | undefined;
 
     this.logger.debug(`findAll received query: ${JSON.stringify(query)}`);
@@ -88,8 +88,18 @@ export class RoleController {
       }
     }
 
-    if (!user.isAdmin) {
-      if (subjectId === undefined || Number(user.userId) !== subjectId) {
+    const isMachineWithReadScope =
+      Boolean(user?.isMachine) &&
+      this.hasAnyScope(user, [SCOPES.READ_ROLES, SCOPES.ALL_ROLES]);
+
+    if (user?.isMachine && !isMachineWithReadScope) {
+      throw new ForbiddenException(
+        'M2M tokens must include the read:roles scope to search roles.',
+      );
+    }
+
+    if (!user?.isAdmin && !isMachineWithReadScope) {
+      if (subjectId === undefined || Number(user?.userId) !== subjectId) {
         throw new ForbiddenException(
           'Permission denied. Non-admins can only query their own roles by providing the correct subjectId filter.',
         );
@@ -115,9 +125,23 @@ export class RoleController {
     description: 'Internal server error.',
   })
   async findOne(
+    @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('fields') fields?: string,
   ): Promise<RoleResponseDto> {
+    const user = this.getAuthenticatedUser(req);
+    if (user?.isMachine) {
+      const hasScope = this.hasAnyScope(user, [
+        SCOPES.READ_ROLES,
+        SCOPES.ALL_ROLES,
+      ]);
+      if (!hasScope) {
+        throw new ForbiddenException(
+          'M2M tokens must include the read:roles scope to fetch role details.',
+        );
+      }
+    }
+
     const result = await this.roleService.findOne(roleId, fields);
     if (!result) {
       throw new NotFoundException(`Role with ID ${roleId} not found.`);
@@ -472,5 +496,33 @@ export class RoleController {
     }
 
     return roleDetails;
+  }
+
+  private getAuthenticatedUser(req: Request): any {
+    return (req as any).authUser || (req as any).user;
+  }
+
+  private extractScopes(user: any): Set<string> {
+    const raw = user?.scopes ?? user?.scope;
+    if (Array.isArray(raw)) {
+      return new Set(raw as string[]);
+    }
+    if (typeof raw === 'string') {
+      return new Set(
+        raw
+          .split(/[ ,]/)
+          .map((scope) => scope.trim())
+          .filter(Boolean),
+      );
+    }
+    return new Set();
+  }
+
+  private hasAnyScope(user: any, requiredScopes: string[]): boolean {
+    if (!requiredScopes.length) {
+      return true;
+    }
+    const scopes = this.extractScopes(user);
+    return requiredScopes.some((scope) => scopes.has(scope));
   }
 }
