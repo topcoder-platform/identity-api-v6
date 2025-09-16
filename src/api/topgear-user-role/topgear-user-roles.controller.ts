@@ -26,44 +26,46 @@ import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { SCOPES } from '../../auth/constants';
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { ModifyUserRoleDto } from '../../dto/user-role/user-role.dto';
-import { UserRolesService } from './user-roles.service';
+import { UserRolesService } from '../user-role/user-roles.service';
 
 interface AuthenticatedRequest extends Request {
   authUser?: any;
   user?: any;
 }
 
-@ApiTags('user-roles')
+const TOPGEAR_OPTIONS = { requireTopgear: true } as const;
+
+@ApiTags('topgear-user-roles')
 @ApiBearerAuth()
-@Controller('user-roles')
+@Controller('topgear-user-roles')
 @UseGuards(AuthRequiredGuard)
-export class UserRolesController {
-  private readonly logger = new Logger(UserRolesController.name);
+export class TopgearUserRolesController {
+  private readonly logger = new Logger(TopgearUserRolesController.name);
 
   constructor(private readonly userRolesService: UserRolesService) {}
 
   @Get(':identifier')
   @ApiOperation({
-    summary: 'List roles assigned to a user by ID or Topcoder member handle',
+    summary: 'List roles assigned to a Topgear user by ID or handle',
   })
   @ApiParam({
     name: 'identifier',
-    description: 'Numeric user id or Topcoder member handle',
+    description: 'Numeric user id or handle',
     required: true,
   })
   @ApiResponse({ status: HttpStatus.OK, type: [RoleResponseDto] })
-  async listUserRoles(
+  async listTopgearUserRoles(
     @Param('identifier') identifier: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<RoleResponseDto[]> {
     const user = this.getAuthenticatedUser(req);
-    this.ensureAdminOrScope(user, [SCOPES.READ_USERS_ROLE]);
-    return this.userRolesService.getUserRoles(identifier);
+    this.ensureAdminOrScope(user, [SCOPES.READ_TOPGEAR_USER_ROLES]);
+    return this.userRolesService.getUserRoles(identifier, TOPGEAR_OPTIONS);
   }
 
   @Get(':identifier/:roleId')
   @ApiOperation({
-    summary: 'Get a single role assigned to a user by role id',
+    summary: 'Get a single role assigned to a Topgear user by role id',
   })
   @ApiParam({
     name: 'identifier',
@@ -77,18 +79,22 @@ export class UserRolesController {
     type: Number,
   })
   @ApiResponse({ status: HttpStatus.OK, type: RoleResponseDto })
-  async getRoleForUser(
+  async getTopgearRoleForUser(
     @Param('identifier') identifier: string,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<RoleResponseDto> {
     const user = this.getAuthenticatedUser(req);
-    this.ensureAdminOrScope(user, [SCOPES.READ_USERS_ROLE]);
-    return this.userRolesService.getRoleForUser(identifier, roleId);
+    this.ensureAdminOrScope(user, [SCOPES.READ_TOPGEAR_USER_ROLES]);
+    return this.userRolesService.getRoleForUser(
+      identifier,
+      roleId,
+      TOPGEAR_OPTIONS,
+    );
   }
 
   @Patch(':identifier')
-  @ApiOperation({ summary: 'Assign a role to the specified user' })
+  @ApiOperation({ summary: 'Assign a role to the specified Topgear user' })
   @ApiParam({
     name: 'identifier',
     description: 'Numeric user id or handle',
@@ -96,23 +102,26 @@ export class UserRolesController {
   })
   @ApiBody({ type: ModifyUserRoleDto })
   @ApiResponse({ status: HttpStatus.OK, type: RoleResponseDto })
-  async assignRole(
+  async assignTopgearRole(
     @Param('identifier') identifier: string,
     @Body() body: ModifyUserRoleDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<RoleResponseDto> {
     const user = this.getAuthenticatedUser(req);
-    this.ensureAdminOrScope(user, [SCOPES.UPDATE_USERS_ROLE]);
+    this.ensureAdminOrScope(user, [SCOPES.WRITE_TOPGEAR_USER_ROLES]);
 
     return this.userRolesService.assignRoleToUser(
       identifier,
       body.roleId,
       this.getOperatorId(user),
+      TOPGEAR_OPTIONS,
     );
   }
 
   @Delete(':identifier/:roleId')
-  @ApiOperation({ summary: 'Remove a role from the specified user' })
+  @ApiOperation({
+    summary: 'Remove a role from the specified Topgear user',
+  })
   @ApiParam({
     name: 'identifier',
     description: 'Numeric user id or handle',
@@ -126,15 +135,19 @@ export class UserRolesController {
   })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeRole(
+  async removeTopgearRole(
     @Param('identifier') identifier: string,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
     const user = this.getAuthenticatedUser(req);
-    this.ensureAdminOrScope(user, [SCOPES.DELETE_USERS_ROLE]);
+    this.ensureAdminOrScope(user, [SCOPES.WRITE_TOPGEAR_USER_ROLES]);
 
-    await this.userRolesService.removeRoleFromUser(identifier, roleId);
+    await this.userRolesService.removeRoleFromUser(
+      identifier,
+      roleId,
+      TOPGEAR_OPTIONS,
+    );
   }
 
   private getAuthenticatedUser(req: AuthenticatedRequest): any {
@@ -164,7 +177,14 @@ export class UserRolesController {
 
     const scopes = this.extractScopes(user);
     const acceptedScopes = new Set(
-      [...requiredScopes, SCOPES.ALL_USERS_ROLE].filter(Boolean),
+      [
+        ...requiredScopes,
+        SCOPES.ALL_TOPGEAR_USER_ROLES,
+        SCOPES.ALL_USER_ROLES,
+        SCOPES.ALL_USERS_ROLE,
+        SCOPES.ALL_ROLES,
+        SCOPES.ALL_USERS,
+      ].filter(Boolean),
     );
 
     const hasScope = Array.from(acceptedScopes).some((scope) =>
@@ -174,7 +194,7 @@ export class UserRolesController {
     if (!hasScope) {
       this.logger.warn('Access denied: missing admin role or required scope.');
       throw new ForbiddenException(
-        'Admin role or appropriate M2M scope is required to manage user roles.',
+        'Admin role or Topgear user-role scope is required to manage Topgear user roles.',
       );
     }
   }

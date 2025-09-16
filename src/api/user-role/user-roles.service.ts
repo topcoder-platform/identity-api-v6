@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -14,6 +15,10 @@ import { RoleResponseDto } from '../../dto/role/role.dto';
 interface ResolvedUser {
   userId: number;
   handle: string;
+}
+
+interface UserRoleOptions {
+  requireTopgear?: boolean;
 }
 
 @Injectable()
@@ -36,7 +41,10 @@ export class UserRolesService {
     return dto;
   }
 
-  private async resolveUser(identifier: string): Promise<ResolvedUser> {
+  private async resolveUser(
+    identifier: string,
+    options?: UserRoleOptions,
+  ): Promise<ResolvedUser> {
     const trimmed = identifier?.trim();
     if (!trimmed) {
       throw new BadRequestException('User identifier is required.');
@@ -54,7 +62,11 @@ export class UserRolesService {
       this.logger.debug(
         `Resolved identifier '${trimmed}' to handle '${handleMatch.handle}' (ID ${userId}).`,
       );
-      return { userId, handle: handleMatch.handle };
+      const resolved = { userId, handle: handleMatch.handle };
+      if (options?.requireTopgear) {
+        await this.assertTopgearUser(resolved.userId, resolved.handle);
+      }
+      return resolved;
     }
 
     const numericId = Number(trimmed);
@@ -68,7 +80,11 @@ export class UserRolesService {
         this.logger.debug(
           `Resolved identifier '${trimmed}' to user id ${userId}.`,
         );
-        return { userId, handle: idMatch.handle };
+        const resolved = { userId, handle: idMatch.handle };
+        if (options?.requireTopgear) {
+          await this.assertTopgearUser(resolved.userId, resolved.handle);
+        }
+        return resolved;
       }
     }
 
@@ -78,8 +94,11 @@ export class UserRolesService {
     );
   }
 
-  async getUserRoles(identifier: string): Promise<RoleResponseDto[]> {
-    const { userId } = await this.resolveUser(identifier);
+  async getUserRoles(
+    identifier: string,
+    options?: UserRoleOptions,
+  ): Promise<RoleResponseDto[]> {
+    const { userId } = await this.resolveUser(identifier, options);
     const assignments = await this.prismaClient.roleAssignment.findMany({
       where: {
         subjectId: userId,
@@ -97,8 +116,9 @@ export class UserRolesService {
   async getRoleForUser(
     identifier: string,
     roleId: number,
+    options?: UserRoleOptions,
   ): Promise<RoleResponseDto> {
-    const { userId } = await this.resolveUser(identifier);
+    const { userId } = await this.resolveUser(identifier, options);
     const role = await this.roleService.checkSubjectHasRole(roleId, userId);
     if (!role) {
       throw new NotFoundException(
@@ -112,8 +132,9 @@ export class UserRolesService {
     identifier: string,
     roleId: number,
     operatorId?: number,
+    options?: UserRoleOptions,
   ): Promise<RoleResponseDto> {
-    const { userId } = await this.resolveUser(identifier);
+    const { userId } = await this.resolveUser(identifier, options);
     const actorId =
       typeof operatorId === 'number' && Number.isFinite(operatorId)
         ? operatorId
@@ -129,8 +150,12 @@ export class UserRolesService {
     return assigned;
   }
 
-  async removeRoleFromUser(identifier: string, roleId: number): Promise<void> {
-    const { userId } = await this.resolveUser(identifier);
+  async removeRoleFromUser(
+    identifier: string,
+    roleId: number,
+    options?: UserRoleOptions,
+  ): Promise<void> {
+    const { userId } = await this.resolveUser(identifier, options);
     const role = await this.roleService.checkSubjectHasRole(roleId, userId);
     if (!role) {
       throw new NotFoundException(
@@ -138,5 +163,26 @@ export class UserRolesService {
       );
     }
     await this.roleService.deassignRoleFromSubject(roleId, userId);
+  }
+
+  private async assertTopgearUser(
+    userId: number,
+    handle?: string,
+  ): Promise<void> {
+    const topgearEmail = await this.prismaClient.email.findFirst({
+      where: {
+        user_id: userId,
+        address: {
+          endsWith: '@wipro.com',
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (!topgearEmail) {
+      throw new ForbiddenException(
+        `User '${handle ?? userId}' is not a Topgear user (requires @wipro.com email).`,
+      );
+    }
   }
 }

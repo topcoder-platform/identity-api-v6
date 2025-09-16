@@ -3,7 +3,7 @@ import { UserRolesService } from './user-roles.service';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { RoleService } from '../role/role.service';
 import { RoleResponseDto } from '../../dto/role/role.dto';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 const createMockPrisma = () => ({
   user: {
@@ -12,6 +12,9 @@ const createMockPrisma = () => ({
   },
   roleAssignment: {
     findMany: jest.fn(),
+  },
+  email: {
+    findFirst: jest.fn(),
   },
 });
 
@@ -30,6 +33,7 @@ describe('UserRolesService', () => {
     jest.clearAllMocks();
     Object.values(mockPrisma.user).forEach((fn) => fn.mockReset());
     Object.values(mockPrisma.roleAssignment).forEach((fn) => fn.mockReset());
+    Object.values(mockPrisma.email).forEach((fn) => fn.mockReset());
     Object.values(mockRoleService).forEach((fn) => fn.mockReset?.());
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -212,6 +216,43 @@ describe('UserRolesService', () => {
         6,
         3003,
       );
+    });
+  });
+
+  describe('Topgear enforcement', () => {
+    it('allows operations when user has @wipro.com email', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        user_id: 4004,
+        handle: 'topgearUser',
+      });
+      mockPrisma.email.findFirst.mockResolvedValue({
+        address: 'foo@wipro.com',
+      });
+      mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
+
+      await service.getUserRoles('topgearUser', { requireTopgear: true });
+
+      expect(mockPrisma.email.findFirst).toHaveBeenCalledWith({
+        where: {
+          user_id: 4004,
+          address: {
+            endsWith: '@wipro.com',
+            mode: 'insensitive',
+          },
+        },
+      });
+    });
+
+    it('throws ForbiddenException when user is not a Topgear user', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        user_id: 5005,
+        handle: 'regularUser',
+      });
+      mockPrisma.email.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getUserRoles('regularUser', { requireTopgear: true }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

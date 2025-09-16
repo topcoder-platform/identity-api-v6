@@ -12,6 +12,7 @@ import { AuthorizationModule } from './api/authorization/authorization.module';
 import { IdentityProviderModule } from './api/identity-provider/identity-provider.module';
 import { AuthMiddleware } from './auth/auth.middleware';
 import { UserRolesModule } from './api/user-role/user-roles.module';
+import { TopgearUserRolesModule } from './api/topgear-user-role/topgear-user-roles.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { UserRolesModule } from './api/user-role/user-roles.module';
     MemberPrismaModule,
     RoleModule,
     UserRolesModule,
+    TopgearUserRolesModule,
     UserModule,
     GroupModule,
     AuthorizationModule,
