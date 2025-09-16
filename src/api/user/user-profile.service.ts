@@ -20,7 +20,6 @@ import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfil
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
 import { Constants } from '../../core/constant/constants';
-import { getProviderDetails } from '../../core/constant/provider-type.enum';
 // Import other needed services
 
 @Injectable()
@@ -463,16 +462,20 @@ export class UserProfileService {
       });
 
     if (!socialProvider) {
-      throw new NotFoundException(`Social provider '${providerName}' not found.`);
+      throw new NotFoundException(
+        `Social provider '${providerName}' not found.`,
+      );
     }
 
     try {
-      const deleteResult = await this.prismaClient.user_social_login.deleteMany({
-        where: {
-          user_id: userId,
-          social_login_provider_id: socialProvider.social_login_provider_id,
+      const deleteResult = await this.prismaClient.user_social_login.deleteMany(
+        {
+          where: {
+            user_id: userId,
+            social_login_provider_id: socialProvider.social_login_provider_id,
+          },
         },
-      });
+      );
 
       if (deleteResult.count === 0) {
         this.logger.warn(
@@ -492,7 +495,9 @@ export class UserProfileService {
         error.stack,
       );
       if (!(error instanceof NotFoundException)) {
-        throw new InternalServerErrorException('Failed to unlink social profile.');
+        throw new InternalServerErrorException(
+          'Failed to unlink social profile.',
+        );
       }
       throw error;
     }

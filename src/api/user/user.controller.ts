@@ -928,7 +928,11 @@ export class UserController {
    */
   @Get(':resourceId/profiles')
   @ApiOperation({ summary: 'Get all external profiles for a user.' })
-  @ApiParam({ name: 'resourceId', description: 'Numeric User ID', type: Number })
+  @ApiParam({
+    name: 'resourceId',
+    description: 'Numeric User ID',
+    type: Number,
+  })
   @ApiResponse({ status: HttpStatus.OK, type: [DTOs.UserProfileDto] })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })

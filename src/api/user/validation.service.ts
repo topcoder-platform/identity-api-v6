@@ -20,7 +20,7 @@ import { Constants } from '../../core/constant/constants';
 const EMAIL_REGEX =
   /^[+_A-Za-z0-9-]+(\.[+_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,}$)/;
 // Basic handle regex: 3-64 chars, alphanumeric, and specific special characters _ . - ` [ ] { }
-const HANDLE_REGEX = /^[A-Za-z0-9_.`{}\[\]\-]{3,64}$/;
+const HANDLE_REGEX = /^[-A-Za-z0-9_.`{}[\]]{3,64}$/;
 // TODO: Add list of reserved handles if necessary
 const RESERVED_HANDLES = ['admin', 'support', 'root', 'administrator']; // Example
 
@@ -199,11 +199,17 @@ export class ValidationService {
     const providerDetails = getProviderDetails(socialProviderName);
 
     if (!providerDetails) {
-      this.logger.warn(`Unsupported provider name received: ${socialProviderName}`);
-      throw new BadRequestException(`Unsupported provider key: ${socialProviderName}`);
+      this.logger.warn(
+        `Unsupported provider name received: ${socialProviderName}`,
+      );
+      throw new BadRequestException(
+        `Unsupported provider key: ${socialProviderName}`,
+      );
     }
     if (!providerDetails.isSocial) {
-      this.logger.warn(`Provider ${socialProviderName} is not a social provider.`);
+      this.logger.warn(
+        `Provider ${socialProviderName} is not a social provider.`,
+      );
       throw new BadRequestException(
         `Unsupported provider key: ${socialProviderName} (Not a social provider)`,
       );
@@ -383,12 +389,8 @@ export class ValidationService {
     // Use your existing getProviderDetails function
     const providerDetails = getProviderDetails(profile.provider);
     if (!providerDetails) {
-      this.logger.warn(
-        `Unsupported provider received: ${profile.provider}`,
-      );
-      throw new BadRequestException(
-        MSG_UNSUPPORTED_PROVIDER(profile.provider),
-      );
+      this.logger.warn(`Unsupported provider received: ${profile.provider}`);
+      throw new BadRequestException(MSG_UNSUPPORTED_PROVIDER(profile.provider));
     }
 
     // Update DTO with derived provider type (optional, but good for consistency using your structure)

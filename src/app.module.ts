@@ -11,6 +11,7 @@ import { MemberPrismaModule } from './shared/member-prisma/member-prisma.module'
 import { AuthorizationModule } from './api/authorization/authorization.module';
 import { IdentityProviderModule } from './api/identity-provider/identity-provider.module';
 import { AuthMiddleware } from './auth/auth.middleware';
+import { UserRolesModule } from './api/user-role/user-roles.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AuthMiddleware } from './auth/auth.middleware';
     // UserModule,
     MemberPrismaModule,
     RoleModule,
+    UserRolesModule,
     UserModule,
     GroupModule,
     AuthorizationModule,
