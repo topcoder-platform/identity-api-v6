@@ -20,7 +20,7 @@ import { Constants } from '../../core/constant/constants';
 const EMAIL_REGEX =
   /^[+_A-Za-z0-9-]+(\.[+_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,}$)/;
 // Basic handle regex: 3-64 chars, alphanumeric, and specific special characters _ . - ` [ ] { }
-const HANDLE_REGEX = /^[a-zA-Z0-9\-[\]_.{}]{2,15}$/;
+const HANDLE_REGEX = /^[A-Za-z0-9_.`{}\[\]\-]{3,64}$/;
 // TODO: Add list of reserved handles if necessary
 const RESERVED_HANDLES = ['admin', 'support', 'root', 'administrator']; // Example
 
@@ -61,15 +61,11 @@ export class ValidationService {
     }
     if (
       handle.length < Constants.MIN_LENGTH_HANDLE ||
-      handle.length > Constants.MAX_LENGTH_HANDLE
-    )
+      handle.length > Constants.MAX_LENGTH_HANDLE ||
+      !HANDLE_REGEX.test(handle)
+    ) {
       throw new BadRequestException(
-        `Length of Handle in character should be between ${Constants.MIN_LENGTH_HANDLE} and ${Constants.MAX_LENGTH_HANDLE}.`,
-      );
-
-    if (!HANDLE_REGEX.test(handle)) {
-      throw new BadRequestException(
-        'Handle can only contain alphanumeric characters and _.-[]{} symbols.',
+        'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
       );
     }
     if (handle.match(/^[-_.{}[\]]+$/)) {
@@ -108,24 +104,19 @@ export class ValidationService {
 
     // Check if email exists in the email table and is associated with a user
     const existingEmailRecord = await this.prismaClient.email.findFirst({
-      where: {
-        address: { equals: email, mode: 'insensitive' },
-        // user_id: { not: null } // Ensures it's linked to a user. If an email can exist unlinked, this check is important.
-        // For registration, any email record might be considered a conflict.
-        // Let's assume for now that if an email address exists in the table, it's considered taken.
-      },
-      select: { user_id: true }, // We only need to know if it exists and if it has a user_id
+      where: { address: email },
+      select: { user_id: true },
     });
 
     // If a record for this email address exists AND it has a user_id, it means the email is in use.
-    if (
-      existingEmailRecord &&
-      (!userId || (existingEmailRecord.user_id as unknown as number) != userId)
-    ) {
-      this.logger.warn(
-        `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingEmailRecord.user_id.toNumber()}.`,
-      );
-      throw new ConflictException(`Email '${email}' is already in use.`);
+    if (existingEmailRecord && existingEmailRecord.user_id != null) {
+      const existingId = Number(existingEmailRecord.user_id);
+      if (!userId || existingId !== userId) {
+        this.logger.warn(
+          `Validation failed: Email '${email}' already exists and is associated with user ID: ${existingId}.`,
+        );
+        throw new ConflictException(`Email '${email}' is already in use.`);
+      }
     }
 
     // If existingEmailRecord is null, or if it exists but user_id is null (orphaned, less likely/problematic for new registration),
@@ -199,7 +190,7 @@ export class ValidationService {
 
     // Parameter validation (already done in controller but good for service robustness)
     if (!socialProviderName?.trim()) {
-      throw new BadRequestException('Social provider name cannot be empty.');
+      throw new BadRequestException('Social provider key cannot be empty.');
     }
     if (!socialProviderUserId?.trim()) {
       throw new BadRequestException('Social user ID cannot be empty.');
@@ -208,19 +199,13 @@ export class ValidationService {
     const providerDetails = getProviderDetails(socialProviderName);
 
     if (!providerDetails) {
-      this.logger.warn(
-        `Unsupported provider name received: ${socialProviderName}`,
-      );
-      throw new BadRequestException(
-        `Unsupported provider name: ${socialProviderName}`,
-      );
+      this.logger.warn(`Unsupported provider name received: ${socialProviderName}`);
+      throw new BadRequestException(`Unsupported provider key: ${socialProviderName}`);
     }
     if (!providerDetails.isSocial) {
-      this.logger.warn(
-        `Provider ${socialProviderName} is not a social provider.`,
-      );
+      this.logger.warn(`Provider ${socialProviderName} is not a social provider.`);
       throw new BadRequestException(
-        `Unsupported provider name: ${socialProviderName} (Not a social provider)`,
+        `Unsupported provider key: ${socialProviderName} (Not a social provider)`,
       );
     }
 
@@ -253,7 +238,7 @@ export class ValidationService {
       socialUserId,
     );
     if (isInUse) {
-      return 'Social account has already been in use';
+      return 'This social profile is already in use';
     }
 
     return null;
@@ -396,10 +381,14 @@ export class ValidationService {
     );
 
     // Use your existing getProviderDetails function
-    const providerDetails = getProviderDetails(profile.providerType);
+    const providerDetails = getProviderDetails(profile.provider);
     if (!providerDetails) {
-      this.logger.warn(`Unsupported provider received: ${profile.providerType}`);
-      throw new BadRequestException(MSG_UNSUPPORTED_PROVIDER(profile.providerType));
+      this.logger.warn(
+        `Unsupported provider received: ${profile.provider}`,
+      );
+      throw new BadRequestException(
+        MSG_UNSUPPORTED_PROVIDER(profile.provider),
+      );
     }
 
     // Update DTO with derived provider type (optional, but good for consistency using your structure)

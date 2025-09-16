@@ -204,7 +204,6 @@ export class UserProfileService {
         data: {
           email: profileDto.email, // Updateable fields
           sso_user_name: profileDto.name,
-          sso_user_id: profileDto.userId,
           // modified_by: operatorId,    // Add if schema supports
         },
         include: { sso_login_provider: true }, // Added include to ensure data for mapSsoLoginToDto
@@ -457,54 +456,45 @@ export class UserProfileService {
       `Deleting external social profile for user ID: ${userId}, provider: ${providerName}`,
     );
 
-    const providerType = getProviderDetails(providerName.toLowerCase());
-    if (!providerType) {
-      throw new BadRequestException(
-        `Provider ${providerName} is not supported`,
-      );
+    // Find provider by name (case-insensitive)
+    const socialProvider =
+      await this.prismaClient.social_login_provider.findFirst({
+        where: { name: { equals: providerName, mode: 'insensitive' } },
+      });
+
+    if (!socialProvider) {
+      throw new NotFoundException(`Social provider '${providerName}' not found.`);
     }
 
-    if (providerType.isSocial) {
-      try {
-        const deleteResult =
-          await this.prismaClient.user_social_login.deleteMany({
-            where: {
-              user_id: userId,
-              social_login_provider_id: providerType.id,
-            },
-          });
+    try {
+      const deleteResult = await this.prismaClient.user_social_login.deleteMany({
+        where: {
+          user_id: userId,
+          social_login_provider_id: socialProvider.social_login_provider_id,
+        },
+      });
 
-        if (deleteResult.count === 0) {
-          this.logger.warn(
-            `No external social profile found to delete for user ${userId}, provider ${providerName}.`,
-          );
-          throw new NotFoundException(
-            'External social profile link not found to delete.',
-          );
-        }
-
-        this.logger.log(
-          `External social profile unlinked for user ${userId}, provider ${providerName}. Count: ${deleteResult.count}`,
+      if (deleteResult.count === 0) {
+        this.logger.warn(
+          `No external social profile found to delete for user ${userId}, provider ${providerName}.`,
         );
-      } catch (error) {
-        // P2025 (Record to delete not found) is handled by checking deleteResult.count above
-        this.logger.error(
-          `Error deleting external social profile for user ${userId}, provider ${providerName}: ${error.message}`,
-          error.stack,
+        throw new NotFoundException(
+          'External social profile link not found to delete.',
         );
-        // Avoid re-throwing specific Prisma errors if already handled,
-        // but throw a generic server error for other unexpected issues.
-        if (!(error instanceof NotFoundException)) {
-          throw new InternalServerErrorException(
-            'Failed to unlink social profile.',
-          );
-        }
-        throw error; // Re-throw NotFoundException if it was manually thrown
       }
-    } else if (providerType.isEnterprise) {
-      throw new BadRequestException(
-        `Provider ${providerName} is not supported`,
+
+      this.logger.log(
+        `External social profile unlinked for user ${userId}, provider ${providerName}. Count: ${deleteResult.count}`,
       );
+    } catch (error) {
+      this.logger.error(
+        `Error deleting external social profile for user ${userId}, provider ${providerName}: ${error.message}`,
+        error.stack,
+      );
+      if (!(error instanceof NotFoundException)) {
+        throw new InternalServerErrorException('Failed to unlink social profile.');
+      }
+      throw error;
     }
   }
 }

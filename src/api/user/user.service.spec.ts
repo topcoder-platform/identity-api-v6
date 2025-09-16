@@ -136,6 +136,13 @@ const mockEventService: jest.Mocked<Partial<EventService>> = {
   postDirectBusMessage: jest.fn(),
 };
 
+const mockMemberPrisma: Partial<MemberPrismaService> = {
+  // Only the parts used by UserService need to be mocked
+  member: {
+    create: jest.fn(),
+  } as any,
+};
+
 const mockConfigService = {
   get: jest.fn(
     (
@@ -356,6 +363,7 @@ describe('UserService', () => {
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: EventService, useValue: mockEventService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: MemberPrismaService, useValue: mockMemberPrisma },
       ],
     })
       .setLogger(nullLogger)

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RoleController } from './role.controller';
 import { RoleService } from './role.service';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import {
   ForbiddenException,
   NotFoundException,
@@ -64,8 +66,12 @@ describe('RoleController', () => {
         },
       ],
     })
-      .overrideGuard(AuthGuard('jwt')) // Mock the AuthGuard
-      .useValue({ canActivate: () => true }) // Always allow activation for unit tests
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(AuthRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<RoleController>(RoleController);

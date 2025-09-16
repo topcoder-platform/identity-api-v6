@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GroupController } from './group.controller';
 import { GroupService } from './group.service';
 import { AuthGuard } from '@nestjs/passport';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { AuthenticatedUser, JwtPayload } from '../../core/auth/jwt.strategy';
 import {
@@ -147,6 +148,8 @@ describe('GroupController', () => {
       providers: [{ provide: GroupService, useValue: mockGroupService }],
     })
       .overrideGuard(AuthGuard('jwt'))
+      .useValue({ canActivate: () => true })
+      .overrideGuard(AuthRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

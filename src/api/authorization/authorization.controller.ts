@@ -30,7 +30,8 @@ import {
   GetTokenQueryDto,
   ValidateClientQueryDto,
 } from '../../dto/authorization/authorization.dto';
-import { AuthGuard } from '@nestjs/passport';
+// import { AuthGuard } from '@nestjs/passport';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { Constants } from '../../core/constant/constants';
 
 @ApiTags('authorizations')
@@ -144,7 +145,7 @@ export class AuthorizationController {
    * @returns Promise<void>
    */
   @Delete('/:targetId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthRequiredGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete access token and refresh token' })
   @ApiParam({
@@ -177,7 +178,7 @@ export class AuthorizationController {
    * @returns Promise<void>
    */
   @Delete()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthRequiredGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete access token of logged in user' })
   @ApiResponse({

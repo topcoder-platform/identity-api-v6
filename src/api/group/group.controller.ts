@@ -17,7 +17,8 @@ import {
   ParseBoolPipe,
   BadRequestException,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+// import { AuthGuard } from '@nestjs/passport';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { GroupService } from './group.service';
 import {
   ApiTags,
@@ -60,7 +61,7 @@ function checkParamExists(
 
 @ApiTags('groups')
 @Controller('groups')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthRequiredGuard)
 @ApiBearerAuth()
 export class GroupController {
   private readonly logger = new Logger(GroupController.name);
@@ -95,7 +96,7 @@ export class GroupController {
   ): Promise<BaseResponse<GroupResponseDto>> {
     checkParamExists(groupDataParam);
     const groupData = groupDataParam.param;
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(`User ${user.userId} creating group: ${groupData.name}`);
 
     const dataToSubmit = { ...groupData };
@@ -136,7 +137,7 @@ export class GroupController {
   ): Promise<BaseResponse<SecurityGroupsResponseDto>> {
     checkParamExists(securityDataParam);
     const securityData = securityDataParam.param;
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} creating security group: ${securityData.name}`,
     );
@@ -180,7 +181,7 @@ export class GroupController {
     @Param('memberId', ParseIntPipe) memberId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupMembershipResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} getting member ${memberId} from group ${groupId}`,
     );
@@ -226,7 +227,7 @@ export class GroupController {
     @Query('includeSubGroups', new ParseBoolPipe({ optional: true }))
     includeSubGroups?: boolean,
   ): Promise<BaseResponse<{ count: number }>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} getting member count for group ${groupId}`,
     );
@@ -281,7 +282,7 @@ export class GroupController {
   ): Promise<BaseResponse<GroupResponseDto>> {
     checkParamExists(groupDataParam);
     const groupData = groupDataParam.param;
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.log(`User ${user.userId} updating group ID: ${groupId}`);
 
     const dataToSubmit = { ...groupData };
@@ -333,7 +334,7 @@ export class GroupController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(`User ${user.userId} deleting group ID: ${groupId}`);
 
     const group = await this.groupService.deleteGroupAndMemberships(
@@ -388,7 +389,7 @@ export class GroupController {
     @Req() req: Request,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(`User ${user.userId} retrieving group ID: ${groupId}`);
     const response = await this.groupService.getGroupByGroupId(groupId, user);
     this.logger.debug(`Group retrieved: ${JSON.stringify(response)}`);
@@ -452,7 +453,7 @@ export class GroupController {
     }
     const addMemberDto = addMemberDtoParam.param;
 
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} adding member ${addMemberDto.memberId} to group ${groupId}`,
     );
@@ -518,7 +519,7 @@ export class GroupController {
     @Param('membershipId', ParseIntPipe) membershipId: number,
     @Req() req: Request,
   ): Promise<BaseResponse<GroupMembershipResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} removing membership ${membershipId} from group ${groupId}`,
     );
@@ -595,7 +596,7 @@ export class GroupController {
     oneLevel?: boolean,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     this.logger.debug(
       `User ${user.userId} requesting subgroups for group ${groupId}`,
     );
@@ -666,7 +667,7 @@ export class GroupController {
     oneLevel?: boolean,
     @Query('fields') fields?: string,
   ): Promise<BaseResponse<GroupResponseDto>> {
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     const effectiveOneLevel = oneLevel === undefined ? true : oneLevel;
     this.logger.debug(
       `User ${user.userId} requesting parent for group ${groupId}, oneLevel: ${effectiveOneLevel}`,
@@ -714,7 +715,7 @@ export class GroupController {
     @Param('groupId', ParseIntPipe) groupId: number,
   ): Promise<BaseResponse<GroupMembershipResponseDto[]>> {
     this.logger.debug(`getMembers : ` + groupId);
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
     const response = await this.groupService.getMembers(user, groupId);
     return createBaseResponse(response);
   }
@@ -755,7 +756,7 @@ export class GroupController {
     @Query('membershipType') membershipType: string,
   ): Promise<BaseResponse<GroupResponseDto[]>> {
     this.logger.debug(`getGroupByMember : ` + memberId);
-    const user = req.user;
+    const user = (req as any).authUser || (req as any).user;
 
     const response = await this.groupService.getGroupByMember(
       user,

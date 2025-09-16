@@ -26,7 +26,7 @@ import {
 } from './user.service';
 import { v4 as uuidv4 } from 'uuid';
 import { Constants } from '../../core/constant/constants';
-import { MemberStatus } from 'src/dto/member';
+import { MemberStatus } from '../../dto/member/member.status.enum';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus as MemberDbStatus } from '../../../prisma/member/generated/member';
 import { ValidationService } from './validation.service';

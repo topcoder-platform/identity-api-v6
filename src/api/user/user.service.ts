@@ -421,7 +421,7 @@ export class UserService {
     console.log(`JSON: ${JSON.stringify(userParams)}`);
     // Capture original providerType value (e.g., 'adfs', 'wipro', 'tc', etc.) before validation normalizes it
     const originalProviderTypeKey = userParams?.profile?.provider;
-    
+
     this.logger.log(
       `Attempting to register user with handle: ${handle} and email: ${email}`,
     );
@@ -658,17 +658,19 @@ export class UserService {
                     `[registerUser Transaction] Enterprise profile missing userId for provider '${originalProviderTypeKey}'; skipping user_sso_login creation.`,
                   );
                 } else {
-                  let data={
-                      user_id: nextUserId,
-                      provider_id: providerRecord.sso_login_provider_id,
-                      sso_user_id: ssoUserId,
-                      email: userParams?.profile?.email || email,
-                      sso_user_name: userParams?.profile?.name,
-                    };
-                  console.log(`Creating user_sso_login : ${data}`);
+                  const data = {
+                    user_id: nextUserId,
+                    provider_id: providerRecord.sso_login_provider_id,
+                    sso_user_id: ssoUserId,
+                    email: userParams?.profile?.email || email,
+                    sso_user_name: userParams?.profile?.name,
+                  };
+                  console.log(
+                    `Creating user_sso_login : ${JSON.stringify(data)}`,
+                  );
 
                   await prisma.user_sso_login.create({
-                    data
+                    data,
                   });
                   this.logger.log(
                     `[registerUser Transaction] Created user_sso_login for user ${nextUserId} with provider '${originalProviderTypeKey}'.`,
@@ -1398,16 +1400,14 @@ export class UserService {
         include: {
           achievement_type_lu: true, // Include the description lookup table
         },
-        orderBy: { create_date: 'asc' },
       });
 
       // Map to AchievementDto
       return achievements.map((ach) => ({
+        achievement_type_id: Number(ach.achievement_type_id),
+        achievement_desc: ach.achievement_type_lu.achievement_type_desc,
+        date: ach.create_date,
         description: ach.description,
-        typeId: Number(ach.achievement_type_id), // Convert Decimal to number
-        type: ach.achievement_type_lu.achievement_type_desc,
-        achievementDate: ach.achievement_date,
-        createdAt: ach.create_date, // Assuming create_date is the achievement date
       }));
     } catch (error) {
       this.logger.error(

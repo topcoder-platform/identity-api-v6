@@ -153,7 +153,7 @@ export class MemberApiService {
         batchIds.length > 1
           ? batchIds.map((id) => `userIds=${encodeURIComponent(id)}`).join('&')
           : `userId=${encodeURIComponent(batchIds[0])}`;
-      const apiUrl = `${this.MEMBER_API_URL}?fields=handle,email,userId&${queryString}`;
+      const apiUrl = `${this.MEMBER_API_URL}?${queryString}`;
 
       // Log base URL and count for the current batch
       this.logger.debug(

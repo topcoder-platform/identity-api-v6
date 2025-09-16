@@ -62,8 +62,8 @@ export class RoleService {
     const roles = await this.prismaClient.role.findMany({
       where: whereClause,
     });
-    // no member infos in this section. we pass null so it is seen in response
-    return roles.map((role) => this.mapToRoleResponseDto(role, null));
+    // No member infos in this section; omit subjects field by leaving undefined
+    return roles.map((role) => this.mapToRoleResponseDto(role));
   }
 
   async findOne(

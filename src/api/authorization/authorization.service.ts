@@ -159,7 +159,7 @@ export class AuthorizationService {
       AUTH0_STATE_CACHE_PREFIX_KEY + dto.state,
     );
     if (cachedState == null) {
-      throw new ForbiddenException('The state code is not found.');
+      throw new InternalServerErrorException('The state code is not found.');
     }
 
     const credential: Auth0Credential = await this.auth0.getToken(

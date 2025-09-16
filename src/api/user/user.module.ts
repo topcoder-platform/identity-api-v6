@@ -13,6 +13,10 @@ import { RoleModule } from '../role/role.module';
 import { EventModule } from '../../shared/event/event.module';
 import { SlackModule } from '../../shared/slack/slack.module';
 import { MemberPrismaModule } from '../../shared/member-prisma/member-prisma.module';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { ScopesGuard } from '../../auth/guards/scopes.guard';
+import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 // Assuming NotificationService and CacheService are global or provided elsewhere
 
 @Module({
@@ -33,6 +37,10 @@ import { MemberPrismaModule } from '../../shared/member-prisma/member-prisma.mod
     AuthFlowService,
     TwoFactorAuthService,
     ValidationService,
+    RolesGuard,
+    ScopesGuard,
+    SelfOrAdminGuard,
+    AuthRequiredGuard,
     // Add NotificationService, SlackService if they belong here
   ],
   // Export services needed by other modules (e.g., AuthorizationService needs UserService?)

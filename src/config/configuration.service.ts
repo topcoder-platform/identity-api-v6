@@ -6,7 +6,7 @@ export class ConfigurationService {
   constructor(private readonly configService: ConfigService) {}
 
   getCommon() {
-    const issuerValue = this.configService.get<string>('VALID_ISSUERS', '');
+    const issuerValue = this.configService.get<string>('VALID_ISSUERS', '[]');
     const issuers = issuerValue.split(',').map((t) => t.trim());
     return {
       authSecret: this.configService.get<string>('AUTH_SECRET'),

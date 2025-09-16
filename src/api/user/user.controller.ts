@@ -30,6 +30,12 @@ import { AuthFlowService } from './auth-flow.service';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy'; // For type hints
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { ADMIN_ROLE } from '../../auth/constants';
+import { SelfOrAdmin } from '../../auth/decorators/self-or-admin.decorator';
+import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { RoleService } from '../role/role.service'; // If needed directly
 import * as DTOs from '../../dto/user/user.dto'; // Import all user DTOs
 import {
@@ -43,7 +49,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger'; // For Swagger documentation
 import { ValidationExceptionFilter } from '../../shared/filters/validation-exception.filter';
-import { AuthGuard } from '@nestjs/passport';
+// import { AuthGuard } from '@nestjs/passport';
 import { PrismaClient } from '@prisma/client'; // Import PrismaClient
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module'; // Import injection token
 
@@ -76,7 +82,7 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
  * @throws InternalServerErrorException if user object is incomplete.
  */
 function getAuthenticatedUser(req: Request): AuthenticatedUser {
-  const user = req.user;
+  const user: any = (req as any).authUser || (req as any).user;
   const logger = new Logger('getAuthenticatedUser'); // It's a global helper, so create a local logger.
   logger.debug(
     `[getAuthenticatedUser] Attempting to get authenticated user. req.user present: ${!!user}`,
@@ -371,7 +377,8 @@ export class UserController {
    * @throws ForbiddenException if the user is not an admin.
    */
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Find users based on query parameters' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -391,25 +398,14 @@ export class UserController {
     @Query() query: DTOs.UserSearchQueryDto,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto[]> {
+    // AuthZ: admin-only endpoint
+    const authUser = getAuthenticatedUser(req);
+    this.checkPermission(authUser, undefined, true);
     // Log the Authorization header
     this.logger.debug(
       `[findUsers] Incoming Request Headers: ${JSON.stringify(req.headers)}`,
     );
-    const authUser = req.user; // This should now be populated by the guard if auth succeeds
-    // Check if authUser is populated after the guard
-    if (!authUser) {
-      this.logger.error(
-        '[findUsers] AuthGuard ran, but req.user is still undefined!',
-      );
-      // This case should ideally be caught by the guard itself, but good to check.
-      throw new UnauthorizedException(
-        'User context not available after authentication guard.',
-      );
-    }
-    this.logger.debug(
-      `[findUsers] req.user object after AuthGuard: ${JSON.stringify(authUser)}`,
-    );
-    this.checkPermission(authUser, undefined, true); // Admin required
+    this.logger.debug(`[findUsers] auth user: ${JSON.stringify(authUser)}`);
     this.logger.log('Finding users with query:', query);
     const users = await this.userService.findUsers(query);
     return users.map(mapUserToDto);
@@ -424,7 +420,8 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Get(':resourceId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
   @ApiOperation({ summary: 'Get a specific user by ID' })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiResponse({
@@ -447,12 +444,13 @@ export class UserController {
     @Param('resourceId') resourceId: string,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
-    const authUser = req.user;
+    // AuthZ: self or admin
+    const authUser = getAuthenticatedUser(req);
+    this.checkPermission(authUser, resourceId, false);
     const idNum = parseInt(resourceId, 10);
     if (isNaN(idNum)) {
       throw new BadRequestException('Invalid user ID format.');
     }
-    this.checkPermission(authUser, idNum); // Call as method
     this.logger.log(`Finding user by ID: ${idNum}`);
     const user = await this.userService.findUserById(idNum);
     return mapUserToDto(user);
@@ -500,7 +498,8 @@ export class UserController {
    * @returns The updated UserResponseDto.
    */
   @Patch(':resourceId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
   @ApiOperation({ summary: 'Update basic user information' })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiBody({ type: DTOs.UpdateUserBodyDto })
@@ -524,8 +523,9 @@ export class UserController {
     @Body() updateUserDto: DTOs.UpdateUserBodyDto,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
-    const authUser = req.user;
-    this.checkPermission(authUser, resourceId); // Call as method
+    // AuthZ: self or admin
+    const authUser = getAuthenticatedUser(req);
+    this.checkPermission(authUser, resourceId, false);
     this.logger.log(`Updating user: ${resourceId}`);
     const user = await this.userService.updateBasicInfo(
       resourceId,
@@ -541,7 +541,8 @@ export class UserController {
    * @throws NotImplementedException Always, as this endpoint is not implemented.
    */
   @Delete(':resourceId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Delete a user - NOT IMPLEMENTED as per legacy system.',
   })
@@ -565,8 +566,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<void> {
     const authUser = getAuthenticatedUser(req);
-    // Still perform admin check, as only admins would know it's not implemented
-    this.checkPermission(authUser, undefined, true);
     this.logger.warn(
       `Admin ${authUser.userId} attempted to access DELETE /users/${resourceId}, which is not implemented.`,
     );
@@ -583,7 +582,8 @@ export class UserController {
    * @returns The UserProfileDto for the updated user.
    */
   @Post(':userId/SSOUserLogin')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Link an SSO profile to a user (Admin only).' })
   @ApiParam({
     name: 'userId',
@@ -620,7 +620,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} creating SSO login for user: ${userId}, provider: ${createSSODto.param?.provider}`,
     );
@@ -641,7 +640,8 @@ export class UserController {
    * @returns The UserProfileDto for the updated user.
    */
   @Put(':userId/SSOUserLogin') // Using provider and ssoUserId from body to identify the record
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('userId')
   @ApiOperation({
     summary: 'Update an existing SSO profile linked to a user (Admin only).',
   })
@@ -683,7 +683,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, userId, false); // Call as method
     this.logger.log(
       `User ${authUser.userId} updating SSO login for user: ${userId}, provider: ${updateSSODto.param.provider}`,
     );
@@ -707,7 +706,8 @@ export class UserController {
    * @param req The request object.
    */
   @Delete(':userId/SSOUserLogin')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('userId')
   @ApiOperation({ summary: 'Delete an SSO login link for a user' })
   @ApiParam({
     name: 'userId',
@@ -762,7 +762,6 @@ export class UserController {
     this.logger.debug(
       `[deleteSSOUserLogin] Authenticated user from getAuthenticatedUser: ${JSON.stringify(authUser)}`,
     );
-    this.checkPermission(authUser, userId, false); // Call as method
 
     const { provider: providerNameQuery, providerId, ssoUserId } = query;
 
@@ -823,7 +822,8 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Get(':userId/SSOUserLogins')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Get all SSO profiles linked to a user (Admin only).',
   })
@@ -848,7 +848,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto[]> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} getting SSO logins for user: ${userId}`,
     );
@@ -870,7 +869,8 @@ export class UserController {
    * @throws ConflictException if the profile already exists for the user.
    */
   @Post(':resourceId/profiles')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Add an external profile (social, etc.) to a user (Admin only).',
   })
@@ -908,7 +908,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} adding profile for user: ${resourceId}, provider: ${createProfileDto.param?.provider}`,
     );
@@ -918,6 +917,32 @@ export class UserController {
       resourceId,
       createProfileDto.param,
     );
+  }
+
+  /**
+   * Retrieves all external profiles for a user. Accessible by the user (self) or admins.
+   *
+   * @param resourceId - The numeric ID of the user whose profiles to retrieve.
+   * @param req - The request object containing authentication information.
+   * @returns A list of UserProfileDto objects.
+   */
+  @Get(':resourceId/profiles')
+  @ApiOperation({ summary: 'Get all external profiles for a user.' })
+  @ApiParam({ name: 'resourceId', description: 'Numeric User ID', type: Number })
+  @ApiResponse({ status: HttpStatus.OK, type: [DTOs.UserProfileDto] })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  async getAllExternalProfiles(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: Request,
+  ): Promise<DTOs.UserProfileDto[]> {
+    const authUser = getAuthenticatedUser(req);
+    this.checkPermission(authUser, resourceId, false);
+    this.logger.log(
+      `User ${authUser.userId} fetching external profiles for user: ${resourceId}`,
+    );
+    return this.userProfileService.findAllUserProfiles(resourceId);
   }
 
   /**
@@ -931,7 +956,8 @@ export class UserController {
    * @throws NotFoundException if the user or profile is not found.
    */
   @Delete(':resourceId/profiles/:providerName')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary:
       'Delete all external profiles for a user under a specific provider (Admin only).',
@@ -967,7 +993,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<void> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} deleting profiles for user: ${resourceId}, provider: ${providerName}`,
     );
@@ -1307,7 +1332,8 @@ export class UserController {
    * @throws ConflictException If the new handle is already in use by another user.
    */
   @Patch(':resourceId/handle')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Update user handle (Admin only).' })
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateHandleBodyDto })
@@ -1340,7 +1366,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} attempting to update handle for user ${resourceId}`,
     );
@@ -1374,7 +1399,8 @@ export class UserController {
    * @throws ConflictException If the new email is already registered to another account.
    */
   @Patch(':resourceId/email')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary:
       'Update user primary email (Admin only). This will set the new email to unverified and trigger verification.',
@@ -1410,7 +1436,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} attempting to update primary email for user ${resourceId}`,
     );
@@ -1591,7 +1616,8 @@ export class UserController {
    * @throws NotFoundException If the target user is not found.
    */
   @Patch(':resourceId/status')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Update user status (Admin only).' })
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateStatusBodyDto })
@@ -1620,7 +1646,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} attempting to update status for user ${resourceId}`,
     );
@@ -1650,7 +1675,7 @@ export class UserController {
    * @throws NotFoundException If the specified role is not found.
    */
   @Post('updatePrimaryRole')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthRequiredGuard)
   @ApiOperation({
     summary: 'Update the primary role for the authenticated user (Self only).',
   })
@@ -1708,7 +1733,8 @@ export class UserController {
    * @throws ForbiddenException If the requester is not authorized to access the information.
    */
   @Get(':resourceId/2fa')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
   @ApiOperation({ summary: "Get user's 2FA status (MFA and DICE)." })
   @ApiParam({
     name: 'resourceId',
@@ -1731,7 +1757,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.User2faDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, resourceId); // Call as method
     this.logger.log(
       `Getting 2FA status for user: ${resourceId} by ${authUser.userId}`,
     );
@@ -1751,7 +1776,8 @@ export class UserController {
    * @throws ForbiddenException If the requester is not authorized to modify the settings.
    */
   @Patch(':resourceId/2fa')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
   @ApiOperation({ summary: "Update user's 2FA status (MFA and DICE)." })
   @ApiParam({
     name: 'resourceId',
@@ -1776,7 +1802,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.User2faDto> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, resourceId); // Call as method
     this.logger.log(
       `Updating 2FA status for user: ${resourceId} by ${authUser.userId}`,
     );
@@ -1900,7 +1925,8 @@ export class UserController {
    * @throws ForbiddenException If the requester is not an administrator.
    */
   @Get(':resourceId/achievements')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Get achievements for a user (Admin only).' })
   @ApiParam({
     name: 'resourceId',
@@ -1922,7 +1948,6 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.AchievementDto[]> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true); // Call as method
     this.logger.log(
       `Admin ${authUser.userId} getting achievements for user: ${resourceId}`,
     );

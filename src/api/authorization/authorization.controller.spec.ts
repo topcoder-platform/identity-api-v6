@@ -3,6 +3,7 @@ import { AuthorizationController } from './authorization.controller';
 import { AuthorizationService } from './authorization.service';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import {
   AuthorizationCreateRequest,
   AuthorizationForm,
@@ -47,6 +48,8 @@ describe('AuthorizationController', () => {
       ],
     })
       .overrideGuard(AuthGuard('jwt'))
+      .useValue({ canActivate: () => true })
+      .overrideGuard(AuthRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

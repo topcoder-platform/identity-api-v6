@@ -7,6 +7,9 @@ import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
 import { RoleService } from '../role/role.service';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import {
   ForbiddenException,
   BadRequestException,
@@ -246,6 +249,12 @@ describe('UserController', () => {
           return true;
         },
       })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(SelfOrAdminGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(AuthRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<UserController>(UserController);

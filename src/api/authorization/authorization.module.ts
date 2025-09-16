@@ -9,6 +9,7 @@ import { AuthDataStore } from './auth-data-store.service';
 import { ZendeskAuthPlugin } from './zendesk.service';
 import { UserProfileHelper } from './user-profile.helper';
 import { ConfigurationModule } from 'src/config/configuration.module';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 
 @Module({
   imports: [Auth0Module, ConfigurationModule, UserModule],
@@ -22,6 +23,7 @@ import { ConfigurationModule } from 'src/config/configuration.module';
     AuthDataStore,
     ZendeskAuthPlugin,
     UserProfileHelper,
+    AuthRequiredGuard,
   ],
   exports: [AuthorizationService],
 })

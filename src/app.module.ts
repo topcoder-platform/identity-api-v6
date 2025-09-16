@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis';
@@ -10,6 +10,7 @@ import { GroupModule } from './api/group/group.module';
 import { MemberPrismaModule } from './shared/member-prisma/member-prisma.module';
 import { AuthorizationModule } from './api/authorization/authorization.module';
 import { IdentityProviderModule } from './api/identity-provider/identity-provider.module';
+import { AuthMiddleware } from './auth/auth.middleware';
 
 @Module({
   imports: [
@@ -46,4 +47,8 @@ import { IdentityProviderModule } from './api/identity-provider/identity-provide
   controllers: [], // No root controller
   providers: [], // No root service
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AuthMiddleware).forRoutes('*');
+  }
+}

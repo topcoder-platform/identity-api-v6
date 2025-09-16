@@ -25,11 +25,15 @@ import {
   RoleQueryDto,
 } from '../../dto/role/role.dto';
 import { Request } from 'express';
-import { AuthGuard } from '@nestjs/passport';
+// import { AuthGuard } from '@nestjs/passport';
+import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { ADMIN_ROLE } from '../../auth/constants';
 
 @Controller('roles')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthRequiredGuard)
 @ApiTags('roles')
 export class RoleController {
   private readonly logger = new Logger(RoleController.name);
@@ -60,7 +64,7 @@ export class RoleController {
     @Query() query: RoleQueryDto,
     @Req() req: Request,
   ): Promise<RoleResponseDto[]> {
-    const user = req.user;
+    const user: any = (req as any).authUser || (req as any).user;
     let subjectId: number | undefined;
 
     this.logger.debug(`findAll received query: ${JSON.stringify(query)}`);
@@ -142,15 +146,15 @@ export class RoleController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   async create(
     @Req() req: Request,
     @Body() createRoleBody: CreateRoleBodyDto,
   ): Promise<RoleResponseDto> {
-    const user = req.user;
-    if (!user.isAdmin) {
-      throw new ForbiddenException(
-        'Admin privileges required to create roles.',
-      );
+    const user = (req as any).authUser || (req as any).user;
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Only administrators can create roles.');
     }
     const createRoleDto = { roleName: createRoleBody.param.roleName };
     return this.roleService.create(createRoleDto, Number(user.userId));
@@ -180,16 +184,16 @@ export class RoleController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   async update(
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Body() updateRoleBody: UpdateRoleBodyDto,
   ): Promise<RoleResponseDto> {
-    const user = req.user;
-    if (!user.isAdmin) {
-      throw new ForbiddenException(
-        'Admin privileges required to update roles.',
-      );
+    const user = (req as any).authUser || (req as any).user;
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Only administrators can update roles.');
     }
     const updateRoleDto = { roleName: updateRoleBody.param.roleName };
     return this.roleService.update(roleId, updateRoleDto, Number(user.userId));
@@ -220,15 +224,15 @@ export class RoleController {
     description: 'Internal server error.',
   })
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   async remove(
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
   ): Promise<void> {
-    const user = req.user;
-    if (!user.isAdmin) {
-      throw new ForbiddenException(
-        'Admin privileges required to delete roles.',
-      );
+    const user: any = (req as any).authUser || (req as any).user;
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Only administrators can delete roles.');
     }
     await this.roleService.remove(roleId);
   }
@@ -260,16 +264,16 @@ export class RoleController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   async assignRoleToSubject(
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
   ): Promise<any> {
-    const user = req.user;
-    if (!user.isAdmin) {
-      throw new ForbiddenException(
-        'Admin privileges required to assign roles.',
-      );
+    const user = (req as any).authUser || (req as any).user;
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Only administrators can assign roles.');
     }
 
     if (roleId <= 0) {
@@ -338,18 +342,17 @@ export class RoleController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
+  @UseGuards(RolesGuard)
+  @Roles(ADMIN_ROLE)
   async deassignRoleFromSubject(
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
   ): Promise<any> {
-    const user = req.user;
-    if (!user.isAdmin) {
-      throw new ForbiddenException(
-        'Admin privileges required to unassign roles.',
-      );
+    const user: any = (req as any).authUser || (req as any).user;
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Only administrators can deassign roles.');
     }
-
     if (roleId <= 0) {
       throw new BadRequestException('roleId must be a positive number.');
     }
@@ -417,7 +420,7 @@ export class RoleController {
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
   ): Promise<RoleResponseDto> {
-    const user = req.user;
+    const user: any = (req as any).authUser || (req as any).user;
 
     if (roleId <= 0) {
       throw new BadRequestException('roleId must be a positive number.');
