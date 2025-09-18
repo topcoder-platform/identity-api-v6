@@ -487,7 +487,55 @@ describe('UserService', () => {
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
         where: {
           user_email_xref: {
-            some: { email: { address: 'test@example.com' } },
+            some: {
+              email: {
+                address: {
+                  equals: 'test@example.com',
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        },
+        skip: 0,
+        take: 20,
+      });
+    });
+
+    it('should support legacy filter string for handle search', async () => {
+      const query: UserSearchQueryDto = { filter: 'handle=TestUser' } as any;
+      const mockUsers = [createMockUserModel({ handle: 'TestUser' })];
+      prismaOltp.user.findMany.mockResolvedValue(mockUsers);
+
+      const result = await service.findUsers(query);
+
+      expect(result).toEqual(mockUsers);
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: { handle_lower: 'testuser' },
+        skip: 0,
+        take: 20,
+      });
+    });
+
+    it('should support legacy filter string for email search', async () => {
+      const query: UserSearchQueryDto = {
+        filter: 'email=legacy@example.com',
+      } as any;
+      prismaOltp.user.findMany.mockResolvedValue([]);
+
+      await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          user_email_xref: {
+            some: {
+              email: {
+                address: {
+                  equals: 'legacy@example.com',
+                  mode: 'insensitive',
+                },
+              },
+            },
           },
         },
         skip: 0,

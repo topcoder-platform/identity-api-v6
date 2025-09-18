@@ -104,15 +104,16 @@ export class UserService {
 
   async findUsers(query: UserSearchQueryDto): Promise<UserModel[]> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
+    const { handle, email } = this.extractSearchFilters(query);
     const whereClause: Prisma.userWhereInput = {};
-    if (query.handle) {
-      whereClause.handle_lower = query.handle.toLowerCase();
+    if (handle) {
+      whereClause.handle_lower = handle.toLowerCase();
     }
-    if (query.email) {
+    if (email) {
       whereClause.user_email_xref = {
         some: {
           email: {
-            address: { equals: query.email, mode: 'insensitive' },
+            address: { equals: email, mode: 'insensitive' },
           },
         },
       };
@@ -128,6 +129,82 @@ export class UserService {
       this.logger.error(`Error finding users: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to search users.');
     }
+  }
+
+  private extractSearchFilters(
+    query: UserSearchQueryDto,
+  ): { handle?: string; email?: string } {
+    const parsedFilters = this.parseFilterString(query.filter);
+    const handle =
+      query.handle ??
+      this.getFirstFilterValue(parsedFilters, ['handle', 'handleLower']);
+    const email =
+      query.email ??
+      this.getFirstFilterValue(parsedFilters, [
+        'email',
+        'emailAddress',
+        'primaryEmail',
+      ]);
+
+    return { handle, email };
+  }
+
+  private parseFilterString(filter?: string): Record<string, string> {
+    if (!filter) {
+      return {};
+    }
+
+    const rawFilters = (Array.isArray(filter) ? filter : [filter]) as string[];
+    const parsed: Record<string, string> = {};
+
+    for (const rawFilter of rawFilters) {
+      if (!rawFilter) {
+        continue;
+      }
+
+      const expressions = rawFilter
+        .split(',')
+        .map((expression) => expression.trim())
+        .filter(Boolean);
+
+      for (const expression of expressions) {
+        const [rawKey, ...rawValueParts] = expression.split('=');
+        if (!rawKey || rawValueParts.length === 0) {
+          continue;
+        }
+        const value = rawValueParts.join('=').trim();
+        if (!value) {
+          continue;
+        }
+
+        const key = this.normalizeFilterKey(rawKey);
+        if (!key) {
+          continue;
+        }
+
+        parsed[key] = value;
+      }
+    }
+
+    return parsed;
+  }
+
+  private normalizeFilterKey(key: string): string {
+    return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  }
+
+  private getFirstFilterValue(
+    parsedFilters: Record<string, string>,
+    candidates: string[],
+  ): string | undefined {
+    for (const candidate of candidates) {
+      const normalizedCandidate = this.normalizeFilterKey(candidate);
+      const match = parsedFilters[normalizedCandidate];
+      if (match) {
+        return match;
+      }
+    }
+    return undefined;
   }
 
   async findUserById(userId: number): Promise<UserModel | null> {

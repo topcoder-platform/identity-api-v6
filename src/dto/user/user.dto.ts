@@ -454,6 +454,15 @@ export class UserSearchQueryDto {
   @IsString()
   @IsOptional()
   @ApiPropertyOptional({
+    name: 'filter',
+    type: String,
+    description: "Legacy filter string in the form 'field=value'",
+  })
+  filter?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
     name: 'handle',
     type: String,
     description: 'member handle',
