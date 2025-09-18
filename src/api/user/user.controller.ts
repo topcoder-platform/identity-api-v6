@@ -38,6 +38,7 @@ import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { RoleService } from '../role/role.service'; // If needed directly
 import * as DTOs from '../../dto/user/user.dto'; // Import all user DTOs
+import { Constants } from '../../core/constant/constants';
 import {
   ApiTags,
   ApiOperation,
@@ -67,6 +68,44 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
   dto.firstName = user.first_name;
   dto.lastName = user.last_name;
   dto.status = user.status;
+  dto.email = user.primaryEmailAddress ?? user.email ?? undefined;
+
+  const rawEmailStatus =
+    user.primaryEmailStatusId ??
+    user.primaryEmailStatus ??
+    user.emailStatusId ??
+    user.email_status_id ??
+    null;
+
+  if (rawEmailStatus !== null && rawEmailStatus !== undefined) {
+    let statusId: number | undefined;
+    if (
+      typeof rawEmailStatus === 'object' &&
+      typeof rawEmailStatus.toNumber === 'function'
+    ) {
+      const numericValue = rawEmailStatus.toNumber();
+      statusId = Number.isNaN(numericValue) ? undefined : numericValue;
+    } else {
+      const numericValue = Number(rawEmailStatus);
+      statusId = Number.isNaN(numericValue) ? undefined : numericValue;
+    }
+
+    if (statusId !== undefined) {
+      dto.emailActive = statusId === Constants.verifiedEmailStatus;
+      dto.emailVerified ??= dto.emailActive;
+    }
+  }
+
+  if (dto.emailActive === undefined && typeof user.emailActive === 'boolean') {
+    dto.emailActive = user.emailActive;
+  }
+
+  if (
+    dto.emailVerified === undefined &&
+    typeof user.emailVerified === 'boolean'
+  ) {
+    dto.emailVerified = user.emailVerified;
+  }
   // Map other fields as needed from UserModel to UserResponseDto
   dto.createdAt = user.create_date?.toISOString();
   dto.updatedAt = user.modify_date?.toISOString();

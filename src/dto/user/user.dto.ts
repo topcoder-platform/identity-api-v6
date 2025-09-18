@@ -404,6 +404,7 @@ export class UserResponseDto {
   id: string;
   handle: string;
   email?: string; // Primary email
+  emailActive?: boolean;
   firstName?: string;
   lastName?: string;
   status: string;

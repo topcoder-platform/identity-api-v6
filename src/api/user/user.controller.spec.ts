@@ -207,6 +207,12 @@ const createMockUserModel = (
   last_name: lastName || 'User',
   create_date: new Date(),
   modify_date: new Date(),
+  ...( _email
+    ? {
+        primaryEmailAddress: _email,
+        primaryEmailStatusId: new Prisma.Decimal(1),
+      }
+    : {}),
 });
 
 describe('UserController', () => {
@@ -362,7 +368,9 @@ describe('UserController', () => {
         authorization: 'Bearer admin-token',
       });
       const query: DTOs.UserSearchQueryDto = { limit: 10, offset: 0 };
-      const mockRawUsers = [createMockUserModel(3, 'foundUser') as UserModel];
+      const mockRawUsers = [
+        createMockUserModel(3, 'foundUser', 'found@example.com') as UserModel,
+      ];
       mockUserService.findUsers.mockResolvedValue(mockRawUsers);
 
       const result = await controller.findUsers(query, mockReq);
@@ -370,6 +378,8 @@ describe('UserController', () => {
       expect(result.length).toBe(1);
       expect(result[0].id).toBe('3'); // mapUserToDto converts user_id (Decimal) to string id
       expect(result[0].handle).toBe('foundUser');
+      expect(result[0].email).toBe('found@example.com');
+      expect(result[0].emailActive).toBe(true);
     });
 
     it('should forbid non-admin from finding users', async () => {

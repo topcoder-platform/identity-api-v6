@@ -120,11 +120,51 @@ export class UserService {
     }
 
     try {
-      return this.prismaClient.user.findMany({
+      const users = await this.prismaClient.user.findMany({
         where: whereClause,
         skip: query.offset ?? 0,
         take: query.limit ?? Constants.defaultPageSize,
       });
+
+      if (!users.length) {
+        return users;
+      }
+
+      const userIds = users.map((user) => user.user_id);
+      const primaryEmails = await this.prismaClient.email.findMany({
+        where: {
+          user_id: { in: userIds },
+          primary_ind: Constants.primaryEmailFlag,
+          email_type_id: Constants.standardEmailType,
+        },
+        select: {
+          user_id: true,
+          address: true,
+          status_id: true,
+        },
+      });
+
+      const emailMap = new Map<
+        string,
+        { address: string | null; statusId: Decimal | null }
+      >();
+
+      for (const email of primaryEmails) {
+        emailMap.set(email.user_id.toString(), {
+          address: email.address ?? null,
+          statusId: email.status_id ?? null,
+        });
+      }
+
+      for (const user of users) {
+        const emailRecord = emailMap.get(user.user_id.toString());
+        if (emailRecord) {
+          (user as any).primaryEmailAddress = emailRecord.address;
+          (user as any).primaryEmailStatusId = emailRecord.statusId;
+        }
+      }
+
+      return users;
     } catch (error) {
       this.logger.error(`Error finding users: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to search users.');
