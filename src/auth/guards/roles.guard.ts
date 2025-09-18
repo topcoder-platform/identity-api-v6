@@ -30,7 +30,10 @@ export class RolesGuard implements CanActivate {
           .map((r) => r.trim())
           .filter(Boolean);
 
-    const ok = roles.some((r) => required.includes(r));
+    const requiredNormalized = required.map((r) => r.toLowerCase());
+    const ok = roles.some((r) =>
+      requiredNormalized.includes(r.toLowerCase()),
+    );
     if (!ok) throw new ForbiddenException('Insufficient role');
     return true;
   }

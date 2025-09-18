@@ -29,7 +29,7 @@ import { UserProfileService } from './user-profile.service';
 import { AuthFlowService } from './auth-flow.service';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy'; // For type hints
+import { AuthenticatedUser, JwtStrategy } from '../../core/auth/jwt.strategy'; // For type hints
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE } from '../../auth/constants';
@@ -84,6 +84,12 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
 function getAuthenticatedUser(req: Request): AuthenticatedUser {
   const user: any = (req as any).authUser || (req as any).user;
   const logger = new Logger('getAuthenticatedUser'); // It's a global helper, so create a local logger.
+  logger.debug(`[getAuthenticatedUser] User user: ${JSON.stringify(user, null, 5)}`);
+
+  if(user.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+    user.isAdmin=true;
+  }
+
   logger.debug(
     `[getAuthenticatedUser] Attempting to get authenticated user. req.user present: ${!!user}`,
   );
@@ -103,8 +109,9 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
       'User not authenticated or user context is missing.',
     );
   }
+
   // Basic check for essential properties. Adjust as per your AuthenticatedUser interface definition from jwt.strategy.ts
-  if (!user.userId || !user.handle || !user.roles || !user.scopes) {
+  if (!user.userId || !user.handle || !user.roles) {
     throw new InternalServerErrorException(
       'Authenticated user object is incomplete.',
     );
