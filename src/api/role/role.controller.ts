@@ -65,9 +65,17 @@ export class RoleController {
     @Req() req: Request,
   ): Promise<RoleResponseDto[]> {
     const user = this.getAuthenticatedUser(req);
+    const isAdmin = Boolean(user?.isAdmin);
+    const isMachine = Boolean(user?.isMachine);
     let subjectId: number | undefined;
 
     this.logger.debug(`findAll received query: ${JSON.stringify(query)}`);
+
+    if (!isAdmin && !isMachine) {
+      throw new ForbiddenException(
+        'Only administrators can search roles.',
+      );
+    }
 
     if (query.filter) {
       this.logger.debug(`findAll received filter: ${query.filter}`);
@@ -89,10 +97,9 @@ export class RoleController {
     }
 
     const isMachineWithReadScope =
-      Boolean(user?.isMachine) &&
-      this.hasAnyScope(user, [SCOPES.READ_ROLES, SCOPES.ALL_ROLES]);
+      isMachine && this.hasAnyScope(user, [SCOPES.READ_ROLES, SCOPES.ALL_ROLES]);
 
-    if (user?.isMachine && !isMachineWithReadScope) {
+    if (isMachine && !isMachineWithReadScope) {
       throw new ForbiddenException(
         'M2M tokens must include the read:roles scope to search roles.',
       );
@@ -122,7 +129,16 @@ export class RoleController {
     @Query('fields') fields?: string,
   ): Promise<RoleResponseDto> {
     const user = this.getAuthenticatedUser(req);
-    if (user?.isMachine) {
+    const isAdmin = Boolean(user?.isAdmin);
+    const isMachine = Boolean(user?.isMachine);
+
+    if (!isAdmin && !isMachine) {
+      throw new ForbiddenException(
+        'Only administrators can fetch role details.',
+      );
+    }
+
+    if (isMachine) {
       const hasScope = this.hasAnyScope(user, [
         SCOPES.READ_ROLES,
         SCOPES.ALL_ROLES,
