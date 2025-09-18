@@ -98,14 +98,6 @@ export class RoleController {
       );
     }
 
-    if (!user?.isAdmin && !isMachineWithReadScope) {
-      if (subjectId === undefined || Number(user?.userId) !== subjectId) {
-        throw new ForbiddenException(
-          'Permission denied. Non-admins can only query their own roles by providing the correct subjectId filter.',
-        );
-      }
-    }
-
     return this.roleService.findAll(subjectId);
   }
 
