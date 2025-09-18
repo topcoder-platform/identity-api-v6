@@ -507,7 +507,11 @@ export class RoleController {
   }
 
   private getAuthenticatedUser(req: Request): any {
-    return (req as any).authUser || (req as any).user;
+    const result:any = (req as any).authUser || (req as any).user;
+    if(result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+      result.isAdmin=true;
+    }
+    return result;
   }
 
   private extractScopes(user: any): Set<string> {
