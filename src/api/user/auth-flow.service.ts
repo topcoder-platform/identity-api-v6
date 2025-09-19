@@ -951,7 +951,7 @@ export class AuthFlowService {
         where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
         select: { address: true, status_id: true },
       });
-      if (primaryEmailRecord) { // TODO: review again
+      if (primaryEmailRecord) {
         primaryEmail = primaryEmailRecord.address;
         emailVerified =
           primaryEmailRecord.status_id.toNumber() ===
@@ -1151,7 +1151,6 @@ export class AuthFlowService {
       select: { address: true, status_id: true },
     });
     const primaryEmail = primaryEmailRecord?.address;
-    // TODO: review again
     const emailVerified =
       primaryEmailRecord?.status_id.toNumber() ===
       Constants.verifiedEmailStatus;
