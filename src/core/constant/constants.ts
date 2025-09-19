@@ -43,9 +43,12 @@ export const Constants = {
   prismaUniqueConflictcode: 'P2002',
   prismaNotFoundCode: 'P2025',
 
+  // password validation
   MAX_LENGTH_PASSWORD: 64,
-
   MIN_LENGTH_PASSWORD: 8,
+  PASSWORD_HAS_LETTER_REGEX: /[A-Za-z]/,
+  PASSWORD_HAS_SYMBOL_REGEX: /\\p{P}/,
+  PASSWORD_HAS_DIGIT_REGEX: /\d/,
 
   ALPHABET_ALPHA_EN: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
 
@@ -55,4 +58,15 @@ export const Constants = {
   MAX_LENGTH_HANDLE: 64,
 
   HANDLE_PUNCTUATION: '-_.{}[]',
+
+  MAX_LENGTH_FIRST_NAME: 64,
+  MAX_LENGTH_LAST_NAME: 64,
+  MAX_LENGTH_EMAIL: 100,
+};
+
+export const MachineScopes = {
+  readScopes: ['read:user_profiles', 'all:user_profiles'],
+  createScopes: ['create:user_profiles', 'all:user_profiles'],
+  deleteScopes: ['delete:user_profiles', 'all:user_profiles'],
+  updateScopes: ['update:user_profiles', 'all:user_profiles'],
 };

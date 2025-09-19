@@ -1,7 +1,8 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { isBefore, addMinutes } from 'date-fns';
+import { isBefore, addMinutes, addSeconds } from 'date-fns';
+import { format } from 'date-fns-tz';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, user as UserModel } from '@prisma/client';
 import { Cache } from 'cache-manager'; // Import Cache type
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -9,7 +10,11 @@ import * as jwt from 'jsonwebtoken';
 import { UserService } from './user.service';
 import { EventService } from '../../shared/event/event.service';
 import { RoleService } from '../role/role.service';
-import { ActivateUserBodyDto, UserOtpDto } from '../../dto/user/user.dto';
+import {
+  ActivateUserBodyDto,
+  ResetPasswordBodyDto,
+  UserOtpDto,
+} from '../../dto/user/user.dto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -20,8 +25,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import {
-  ACTIVATION_OTP_CACHE_PREFIX_KEY,
-  ACTIVATION_OTP_EXPIRY_SECONDS,
+  // ACTIVATION_OTP_CACHE_PREFIX_KEY,
+  // ACTIVATION_OTP_EXPIRY_SECONDS,
   ACTIVATION_OTP_LENGTH,
 } from './user.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,6 +53,7 @@ export class AuthFlowService {
   private readonly activationCodeExpirationMinutes: number;
   private readonly oneTimeTokenExpirySeconds: number;
   private readonly legacyBlowfishKey: string; // For legacy password decryption
+  private readonly authDomain: string;
 
   constructor(
     @Inject(PRISMA_CLIENT)
@@ -61,6 +67,7 @@ export class AuthFlowService {
     private readonly validationService: ValidationService,
     private readonly memberPrisma: MemberPrismaService,
   ) {
+    this.authDomain = this.configService.get<string>('AUTH_DOMAIN');
     this.jwtSecret = this.configService.get<string>('JWT_SECRET')!;
     this.resetTokenExpirySeconds = 30 * 60; // Example: 30 mins
     this.activationResendExpirySeconds = 1 * 60 * 60; // Example: 1 hour
@@ -102,13 +109,9 @@ export class AuthFlowService {
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
+        userId: userId,
       }) as jwt.JwtPayload;
-      if (decodedJwtPayload.sub !== userId.toString()) {
-        this.logger.warn(
-          `Resend token subject (${decodedJwtPayload.sub}) does not match user ID (${userId}) for activation.`,
-        );
-        throw new ForbiddenException('Invalid resend token: User ID mismatch.');
-      }
+      this.logger.log('Decoded JWT: ' + JSON.stringify(decodedJwtPayload));
     } catch (error) {
       this.logger.warn(
         `Resend token validation failed for user ID ${userId}: ${error.message}`,
@@ -118,53 +121,45 @@ export class AuthFlowService {
       }
       throw new ForbiddenException('Invalid or expired resend token.');
     }
+
     this.logger.debug(`Resend token validated for user ID ${userId}`);
 
-    const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`;
-    const cachedOtp = await this.cacheManager.get<string>(otpCacheKey);
-
-    if (!cachedOtp) {
-      this.logger.warn(
-        `Activation OTP not found or expired in cache for user ID ${userId}. Key: ${otpCacheKey}`,
-      );
-      throw new GoneException(
-        'Activation OTP has expired or was not found. Please request a new one.',
-      );
+    const userActivation = await this.findUserOtpByUserId(
+      userId,
+      OTP_ACTIVATION_MODE,
+    );
+    if (!userActivation) {
+      throw new NotFoundException('User does not exist'); // just like in UserResource.java line 1111
     }
-
-    if (cachedOtp !== otp) {
-      this.logger.warn(
-        `Invalid OTP provided for user ID ${userId}. Expected: ${cachedOtp}, Got: ${otp}`,
-      );
-      throw new BadRequestException('Invalid activation OTP.');
+    if (userActivation.status == MemberStatus.ACTIVE) {
+      throw new BadRequestException('User has been activated');
     }
-    this.logger.log(`Activation OTP validated for user ID ${userId}`);
-
-    await this.cacheManager.del(otpCacheKey);
-
-    const user = await this.prismaClient.user.findUnique({
-      where: { user_id: userId },
-    });
-    if (!user) {
-      this.logger.error(`User not found for activation: ${userId}`);
-      throw new NotFoundException('User not found.');
+    if (userActivation.status != MemberStatus.UNVERIFIED) {
+      throw new ForbiddenException(`Account is deactivated`);
     }
-    if (user.status == MemberStatus.ACTIVE) {
-      this.logger.log(`User ${userId} is already active.`);
-      return { message: 'User has been activated.', user: user };
+    if (!userActivation.id) {
+      throw new NotFoundException('No activation code found');
     }
-    if (user.status != MemberStatus.UNVERIFIED) {
-      this.logger.warn(
-        `User ${userId} has an unexpected status '${user.status}' for activation.`,
+    if (userActivation.failCount >= 3) {
+      throw new BadRequestException('Too many attempts');
+    } else if (isBefore(userActivation.expireAt, new Date())) {
+      throw new BadRequestException('Activation code expired');
+    } else if (userActivation.otp != otp) {
+      console.log(`${userActivation.otp} != ${otp}`);
+      // update user otp attempt
+      await this.updateUserOtpAttempt(
+        userActivation.id,
+        userActivation.failCount + 1,
       );
-      throw new ForbiddenException(
-        `User account status (${user.status}) does not allow activation.`,
-      );
+      if (userActivation.failCount >= 2) {
+        throw new BadRequestException('Too many attempts');
+      }
+      throw new BadRequestException('Wrong activation code');
     }
 
     let primaryEmailAddress: string | undefined;
-
     try {
+      // this point starts user activation similar to UserDAO.java line 701
       await this.prismaClient.$transaction(async (prisma) => {
         await prisma.user.update({
           where: {
@@ -175,26 +170,31 @@ export class AuthFlowService {
         });
         this.logger.log(`User status updated to 'A' for ID ${userId}`);
 
-        // Find the primary email record for this user directly from the email table
-        const primaryEmailRecord = await prisma.email.findFirst({
-          where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
+        // Find the standard email record for this user directly from the email table
+        const stdEmailRecord = await prisma.email.findFirst({
+          where: {
+            user_id: userId,
+            email_type_id: Constants.standardEmailType,
+          },
         });
-
-        if (primaryEmailRecord) {
-          primaryEmailAddress = primaryEmailRecord.address;
+        if (stdEmailRecord) {
+          primaryEmailAddress = stdEmailRecord.address;
           // Update the status of the primary email to Verified (assuming status_id 1)
           await prisma.email.update({
             where: {
-              email_id: primaryEmailRecord.email_id,
+              email_id: stdEmailRecord.email_id,
             },
-            data: { status_id: 1, modify_date: new Date() }, // Prisma handles number to Decimal for DTOs
+            data: {
+              status_id: Constants.verifiedEmailStatus,
+              modify_date: new Date(),
+            }, // Prisma handles number to Decimal for DTOs
           });
           this.logger.log(
-            `Primary email (ID: ${primaryEmailRecord.email_id.toNumber()}, Address: ${primaryEmailRecord.address}) status_id updated to verified for user ${userId}.`,
+            `Standard email (ID: ${stdEmailRecord.email_id.toNumber()}, Address: ${stdEmailRecord.address}) status_id updated to verified for user ${userId}.`,
           );
         } else {
           this.logger.warn(
-            `No primary email record (primary_ind = 1) found for user ${userId} during activation to mark as verified.`,
+            `No primary email record (email_type_id = 1) found for user ${userId} during activation to mark as verified.`,
           );
         }
       });
@@ -228,53 +228,32 @@ export class AuthFlowService {
     }
 
     try {
+      const user = await this.userService.findUserById(userId);
       // Use postEnvelopedNotification for standard events
-      await this.eventService.postEnvelopedNotification('user.activated', {
-        userId: userId.toString(),
-      });
-      this.logger.log(`Published 'user.activated' event for ${userId}`);
+      // whole user details sent not just userId
+      await this.eventService.postEnvelopedNotification(
+        'event.user.activated',
+        {
+          user: user,
+        },
+      );
+      this.logger.log(`Published 'event.user.activated' event for ${userId}`);
 
       // Send Welcome Email directly, matching legacy Java behavior
-      if (primaryEmailAddress && user?.handle) {
-        const domain =
-          this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
-        const fromEmail = `Topcoder <noreply@${domain}>`;
-        const welcomeTemplateId = this.configService.get<string>(
-          'SENDGRID_WELCOME_EMAIL_TEMPLATE_ID',
-        );
-
-        if (!welcomeTemplateId) {
-          this.logger.error(
-            `SendGrid template ID not configured (SENDGRID_WELCOME_EMAIL_TEMPLATE_ID). Cannot send welcome email for user ${userId}.`,
-          );
-        } else {
-          const welcomeEmailPayload = {
-            data: {
-              handle: user.handle,
-              // Add other data fields specific to the welcome template if needed
-            },
-            from: { email: fromEmail },
-            version: 'v6',
-            sendgrid_template_id: welcomeTemplateId,
-            recipients: [primaryEmailAddress],
-          };
-          await this.eventService.postDirectBusMessage(
-            'external.action.email',
-            welcomeEmailPayload,
-          );
-          this.logger.log(
-            `Published 'external.action.email' (welcome) for user ${userId} to ${primaryEmailAddress}. Payload: ${JSON.stringify(welcomeEmailPayload, null, 2)}`,
-          );
-        }
-      } else {
-        this.logger.warn(
-          `Could not send welcome email for user ${userId} due to missing primary email address or handle.`,
-        );
+      if (
+        CommonUtils.validateString(user.reg_source) &&
+        user.reg_source.match(/^tcBusiness$/)
+      ) {
+        // The current Welcome mail should not be sent to customers (connect users).
+        await this.userService.notifyWelcome(userId, primaryEmailAddress);
       }
-    } catch (eventError) {
+
+      // assign a default user role
+      await this.userService.assignDefaultUserRole(userId);
+    } catch (error) {
       this.logger.error(
-        `Failed to publish events for user activation ${userId}: ${eventError.message}`,
-        eventError.stack,
+        `Error tryting to publish events for user activation ${userId} or assigning default user role: ${error.message}`,
+        error.stack,
       );
     }
 
@@ -285,6 +264,11 @@ export class AuthFlowService {
     return activatedUser;
   }
 
+  /**
+   * Resend activation email.
+   * @param resendDto Resend DTO request
+   * @returns resulting message
+   */
   async requestResendActivation(
     resendDto: UserOtpDto,
   ): Promise<{ message: string }> {
@@ -299,10 +283,9 @@ export class AuthFlowService {
     try {
       decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
+        userId: userId,
       }) as jwt.JwtPayload;
-      if (decodedJwtPayload.sub !== userId.toString()) {
-        throw new ForbiddenException('Invalid resend token: User ID mismatch.');
-      }
+      this.logger.log('Decoded JWT:' + JSON.stringify(decodedJwtPayload));
     } catch (error) {
       this.logger.warn(
         `Resend activation token validation failed for user ID ${userId}: ${error.message}`,
@@ -313,61 +296,61 @@ export class AuthFlowService {
       throw new ForbiddenException('Invalid or expired resend token.');
     }
 
-    const user = await this.prismaClient.user.findUnique({
-      where: { user_id: userId },
-    });
+    const userOtp = await this.findUserOtpByUserId(userId, OTP_ACTIVATION_MODE);
 
-    if (!user) {
-      throw new NotFoundException('User not found.');
+    if (!userOtp) {
+      throw new NotFoundException('User does not exist'); // just like in UserResource.java line 1057
+    }
+    if (userOtp.status == MemberStatus.ACTIVE) {
+      throw new BadRequestException('User has been activated');
+    }
+    if (userOtp.status != MemberStatus.UNVERIFIED) {
+      throw new ForbiddenException(`Account is deactivated`);
+    }
+    if (!userOtp.id) {
+      throw new NotFoundException('No activation code found');
+    }
+    if (userOtp.resend) {
+      throw new BadRequestException('Activation email already resent');
+    }
+    if (isBefore(userOtp.expireAt, new Date())) {
+      throw new BadRequestException('Activation code expired');
+    }
+    if (userOtp.failCount >= 3) {
+      throw new BadRequestException('Too many attempts');
     }
 
+    // update user OTP resend
+    await this.updateUserOtpResend(
+      userOtp.id,
+      addMinutes(new Date(), this.activationCodeExpirationMinutes),
+      true,
+    );
+
+    // send activation email event
     const primaryEmailRecord = await this.prismaClient.email.findFirst({
       where: {
         user_id: userId,
         primary_ind: Constants.primaryEmailFlag,
-        status_id: Constants.unverifiedEmailStatus, // Look for an UNVERIFIED primary email
+        email_type_id: Constants.standardEmailType,
       },
     });
-
     if (!primaryEmailRecord) {
       throw new InternalServerErrorException(
-        'Primary unverified email not found for the user.', // Updated error message for clarity
+        'Primary email not found for the user.', // Updated error message for clarity
       );
     }
-    const primaryEmail = primaryEmailRecord.address;
+    await this.resendActivationEmailEvent(userOtp, primaryEmailRecord.address);
 
-    if (user.status == MemberStatus.ACTIVE) {
-      throw new BadRequestException('User has been activated');
-    }
-    if (user.status != MemberStatus.UNVERIFIED) {
-      throw new ForbiddenException(
-        `User account status (${user.status}) does not allow resending activation.`,
-      );
-    }
+    return { message: 'SUCCESS' }; // same as UserResource.java line 1080
+  }
 
-    const newOtp = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
-    const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`;
-    const otpExpiry =
-      this.configService.get<number>(
-        'ACTIVATION_OTP_EXPIRY_SECONDS',
-        ACTIVATION_OTP_EXPIRY_SECONDS,
-      ) * 1000;
-
-    try {
-      await this.cacheManager.set(otpCacheKey, newOtp, otpExpiry);
-      this.logger.log(
-        `New activation OTP ${newOtp} generated and cached for user ${userId} (key: ${otpCacheKey})`,
-      );
-    } catch (cacheError) {
-      this.logger.error(
-        `Failed to cache new OTP for user ${userId}: ${cacheError.message}`,
-        cacheError.stack,
-      );
-      throw new InternalServerErrorException(
-        'Failed to process request due to caching error.',
-      );
-    }
-
+  /**
+   * Resend activation email event.
+   * @param userOtp User OTP details
+   * @param primaryEmail Primary email address
+   */
+  async resendActivationEmailEvent(userOtp: UserOtpDto, primaryEmail: string) {
     try {
       // For activation email (resend), use postDirectBusMessage to match legacy Java structure
       const domain =
@@ -384,7 +367,7 @@ export class AuthFlowService {
         );
       } else {
         const activationEmailPayload = {
-          data: { handle: user.handle, code: newOtp },
+          data: { handle: userOtp.handle, code: userOtp.otp },
           from: { email: fromEmail },
           version: 'v6',
           sendgrid_template_id: sendgridTemplateId,
@@ -395,17 +378,15 @@ export class AuthFlowService {
           activationEmailPayload,
         );
         this.logger.log(
-          `Published 'external.action.email' (activation resend) for ${userId} with new OTP. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
+          `Published 'external.action.email' (activation resend) for ${userOtp.userId} with new OTP. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
         );
       }
     } catch (eventError) {
       this.logger.error(
-        `Failed to publish resend activation event for user ${userId}: ${eventError.message}`,
+        `Failed to publish resend activation event for user ${userOtp.userId}: ${eventError.message}`,
         eventError.stack,
       );
     }
-
-    return { message: 'Activation email has been resent successfully.' };
   }
 
   async generateOneTimeToken(
@@ -676,7 +657,8 @@ export class AuthFlowService {
   async initiatePasswordReset(
     emailOrHandle: string,
     resetPasswordUrlPrefix?: string,
-  ): Promise<void> {
+    source?: string,
+  ): Promise<any> {
     this.logger.log(`Initiating password reset for: ${emailOrHandle}`);
     if (!emailOrHandle) {
       throw new BadRequestException('Email or handle is required.');
@@ -743,10 +725,10 @@ export class AuthFlowService {
       `Password reset token ${resetToken} generated and cached for user ${user.user_id.toNumber()}`,
     );
 
-    const finalResetUrlPrefix =
-      resetPasswordUrlPrefix ||
-      this.configService.get<string>('DEFAULT_RESET_PASSWORD_URL_PREFIX') ||
-      'https://www.topcoder-dev.com/reset-password?token='; // Fallback if not in config
+    const finalResetUrlPrefix = this.getResetPasswordUrlPrefix(
+      resetPasswordUrlPrefix,
+      source,
+    );
 
     // Ensure user has a primary email to send the reset link to
     const primaryEmailAddress = user.primaryEmail?.address;
@@ -758,8 +740,14 @@ export class AuthFlowService {
       return;
     }
 
-    const finalResetUrl = `${finalResetUrlPrefix}${resetToken}`;
-    const resetTokenExpiryMinutes = this.resetTokenExpirySeconds / 60;
+    const expiryDateFormat = "HH:mm:ss z 'on' yyyy-MM-dd";
+    const expiryDateStr = format(
+      addSeconds(new Date(), this.resetTokenExpirySeconds * 1000),
+      expiryDateFormat,
+      {
+        timeZone: 'America/New_York',
+      },
+    );
 
     // Construct the attributes for the 'userpasswordreset' notificationType
     // This matches the fields of the legacy Java MailRepresentation, excluding its own notificationType field.
@@ -773,10 +761,10 @@ export class AuthFlowService {
       ],
       data: {
         // Nested data payload as per legacy MailRepresentation
-        handle: user.handle,
-        resetToken: resetToken,
-        tokenExpiry: resetTokenExpiryMinutes,
-        resetUrl: finalResetUrl,
+        user: user,
+        token: resetToken,
+        expiry: expiryDateStr,
+        resetPassworUrlPrefix: finalResetUrlPrefix,
         subject: 'Your Topcoder Password Reset Request', // Retaining from previous logic
         from:
           this.configService.get<string>('EVENT_DEFAULT_SENDER_EMAIL') ||
@@ -812,93 +800,47 @@ export class AuthFlowService {
       // Depending on business requirements, you might want to re-throw or handle this error differently.
       // For example, if email is critical, this could be a hard failure.
     }
+
+    return user;
   }
 
-  // async resetPassword(resetDto: {
-  //   handleOrEmail?: string;
-  //   resetToken: string;
-  //   newPassword?: string;
-  // }): Promise<void> {
-  //   const { handleOrEmail, resetToken, newPassword } = resetDto;
-  //   this.logger.log(`Attempting to reset password with token.`);
+  /**
+   * Sanitized reset password URL prefix
+   * @param resetPasswordUrlPrefix Provided URL prefix
+   * @param source Source of request
+   * @returns actual URL that can be used
+   */
+  private getResetPasswordUrlPrefix(
+    resetPasswordUrlPrefix: string,
+    source: string,
+  ): string {
+    if (CommonUtils.validateString(resetPasswordUrlPrefix)) {
+      // Sanitize / ensure domains other than topcoder.com or topcoder-dev.com can't be used.
+      let i = resetPasswordUrlPrefix.indexOf('://');
+      i = i < 0 ? 0 : i + 3;
+      let domainName = resetPasswordUrlPrefix.substring(i);
+      i = domainName.indexOf('/');
+      i = i < 0 ? domainName.length : i;
+      domainName = domainName.substring(0, i);
+      i = domainName.lastIndexOf('.');
+      i = domainName.lastIndexOf('.', i - 1);
+      domainName = domainName.substring(i + 1);
+      if (
+        !(domainName === 'topcoder.com' || domainName === 'topcoder-dev.com')
+      ) {
+        resetPasswordUrlPrefix = null;
+      }
+      return resetPasswordUrlPrefix;
+    }
 
-  //   if (!resetToken || !newPassword) {
-  //     throw new BadRequestException(
-  //       'Reset token and new password are required.',
-  //     );
-  //   }
-  //   if (newPassword.length < 8) {
-  //     throw new BadRequestException(
-  //       'New password must be at least 8 characters long.',
-  //     );
-  //   }
-
-  //   // Find user by handleOrEmail - needed to construct cache key as per Java logic
-  //   if (!handleOrEmail) {
-  //     // Java logic: if handle/email not provided in DTO, it implies it might have been part of an earlier step
-  //     // or the token itself is globally unique. For now, require handleOrEmail for key construction.
-  //     throw new BadRequestException(
-  //       'Handle or email is required to identify the user for password reset.',
-  //     );
-  //   }
-
-  //   let user: Awaited<
-  //     ReturnType<typeof this.userService.findUserByEmailOrHandle>
-  //   >;
-  //   try {
-  //     user = await this.userService.findUserByEmailOrHandle(handleOrEmail);
-  //   } catch (error) {
-  //     throw new NotFoundException(`User '${handleOrEmail}' not found.`); // Or BadRequest if user identity is solely from token
-  //   }
-  //   if (!user)
-  //     throw new NotFoundException(`User '${handleOrEmail}' not found.`);
-
-  //   const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id}`;
-  //   const cachedToken = await this.cacheManager.get<string>(resetTokenCacheKey);
-
-  //   if (!cachedToken) {
-  //     this.logger.warn(
-  //       `Password reset token not found in cache for user ${user.user_id}. Key: ${resetTokenCacheKey}`,
-  //     );
-  //     throw new GoneException(
-  //       'Password reset token has expired or is invalid.',
-  //     );
-  //   }
-
-  //   if (cachedToken !== resetToken) {
-  //     this.logger.warn(
-  //       `Invalid password reset token provided for user ${user.user_id}.`,
-  //     );
-  //     throw new BadRequestException('Invalid password reset token.');
-  //   }
-
-  //   await this.cacheManager.del(resetTokenCacheKey);
-  //   this.logger.log(
-  //     `Password reset token validated and consumed for user ${user.user_id}`,
-  //   );
-
-  //   // Encrypt the new password using the legacy Blowfish method from UserService
-  //   const legacyEncodedPassword =
-  //     this.userService.encodePasswordLegacy(newPassword);
-  //   this.logger.debug(
-  //     `Password reset: New password encoded using legacy method for user ${user.handle}.`,
-  //   );
-
-  //   // Update the password in the security_user table using the user's handle
-  //   await this.prismaClient.security_user.update({
-  //     where: { user_id: user.handle }, // security_user.user_id is the user handle
-  //     data: { password: legacyEncodedPassword },
-  //   });
-
-  //   // Also update the modify_date on the main user record
-  //   await this.prismaClient.user.update({
-  //     where: { user_id: user.user_id.toNumber() },
-  //     data: { modify_date: new Date() }, // Only update modify_date here
-  //   });
-
-  //   this.logger.log(`Password successfully reset for user ${user.user_id}`);
-  //   // Optionally publish user.password.updated event
-  // }
+    const domain = CommonUtils.validateString(this.authDomain)
+      ? this.authDomain
+      : 'topcoder.com';
+    return CommonUtils.validateString(source) &&
+      source.toLocaleLowerCase() === 'connect'
+      ? `https://connect.${domain}/reset-password`
+      : `https://www.${domain}/reset-password`;
+  }
 
   /**
    * Authenticates a user with handle/email and password, mimicking legacy Java logic.
@@ -1009,9 +951,11 @@ export class AuthFlowService {
         where: { user_id: userId, primary_ind: Constants.primaryEmailFlag },
         select: { address: true, status_id: true },
       });
-      if (primaryEmailRecord) {
+      if (primaryEmailRecord) { // TODO: review again
         primaryEmail = primaryEmailRecord.address;
-        emailVerified = primaryEmailRecord.status_id.toNumber() === 1;
+        emailVerified =
+          primaryEmailRecord.status_id.toNumber() ===
+          Constants.verifiedEmailStatus;
       }
     }
 
@@ -1207,7 +1151,10 @@ export class AuthFlowService {
       select: { address: true, status_id: true },
     });
     const primaryEmail = primaryEmailRecord?.address;
-    const emailVerified = primaryEmailRecord?.status_id.toNumber() === 1;
+    // TODO: review again
+    const emailVerified =
+      primaryEmailRecord?.status_id.toNumber() ===
+      Constants.verifiedEmailStatus;
 
     // check credentials
     const securityUserRecord = await this.prismaClient.security_user.findUnique(
@@ -1285,8 +1232,9 @@ export class AuthFlowService {
           new Date(),
           this.activationCodeExpirationMinutes,
         );
+        this.logger.debug(`New OTP for activation: ${newOtp}`);
         // if activation is not found, then need to insert one
-        await this.userService.insertUserOtp(
+        await this.insertUserOtp(
           userIdNumber,
           OTP_ACTIVATION_MODE,
           newOtp,
@@ -1298,6 +1246,7 @@ export class AuthFlowService {
       // set resend token. similar to java code, line 874 of UserResource.java
       const payload = {
         sub: user.user_id.toString(),
+        userId: user.user_id.toString(),
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       };
       response.credential.resendToken = jwt.sign(payload, this.jwtSecret, {
@@ -1366,5 +1315,351 @@ export class AuthFlowService {
       `Auth0 Action: Password successfully changed for user ${user.handle}.`,
     );
     return { message: 'Password changed successfully.' };
+  }
+
+  /**
+   * Insert User OTP similar to java.
+   * @param userId User Id
+   * @param mode Mode. If otpActivationMode or otp2faMode
+   * @param otp The OTP
+   * @param resend If allowed to resend
+   * @param failCount Failure counts
+   * @param expireAt Expires at
+   */
+  async insertUserOtp(
+    userId: number,
+    mode: number,
+    otp: string,
+    resend: boolean,
+    failCount: number,
+    expireAt: Date,
+  ): Promise<void> {
+    try {
+      await this.prismaClient.user_otp_email.create({
+        data: {
+          user_id: userId,
+          mode: mode,
+          otp: otp,
+          resend: resend,
+          fail_count: failCount,
+          expire_at: expireAt,
+        },
+      });
+    } catch (error) {
+      if (error.code === Constants.prismaUniqueConflictcode) {
+        this.logger.warn(
+          `Attempt to create otp for user ${userId} which already exists in mode ${mode}.`,
+        );
+        throw new ConflictException(
+          `OTP email already exist for user ${userId} in mode ${mode}.`,
+        );
+      } else {
+        this.logger.error(
+          `Failed to create otp for user ${userId} in mode ${mode}: ${error.message}`,
+          error.stack,
+        );
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Updates user otp.
+   * @param id The row id
+   * @param userId User id
+   * @param otp The new otp
+   * @param resend New value for resend
+   * @param failCount New value for fail count
+   * @param expireAt New expires at
+   */
+  async updateUserOtp(
+    id: number,
+    userId: number,
+    otp: string,
+    resend: boolean,
+    failCount: number,
+    expireAt: Date,
+  ): Promise<void> {
+    try {
+      await this.prismaClient.user_otp_email.update({
+        where: { id: id },
+        data: {
+          otp: otp,
+          user_id: userId,
+          resend: resend,
+          fail_count: failCount,
+          expire_at: expireAt,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to update otp for id ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Find User OTP Email by user ID and mode.  Primary email is required for user.  OTP email may not exist.
+   * @param userId User ID
+   * @param mode Mode to look for
+   * @returns user details with otp email if exists
+   * @throws NotFoundException when user not found or does not have primary email
+   * @throws InternalServerErrorException when other errors occur
+   */
+  async findUserOtpEmailByUserId(
+    userId: number,
+    mode: number,
+  ): Promise<UserOtpDto | null> {
+    try {
+      // like in UserDAO.findUserOtpEmailByUserId(), we want to ensure user exists with primary email
+      const user = await this.prismaClient.user.findFirst({
+        where: {
+          user_id: userId,
+          emails: {
+            some: {
+              email_type_id: Constants.standardEmailType,
+              primary_ind: Constants.primaryEmailFlag,
+            },
+          },
+        },
+        select: {
+          user_id: true,
+          handle: true,
+          status: true,
+          emails: {
+            select: {
+              address: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User does not exist');
+      }
+
+      // get user_otp_email if it exists, we won't error out if it does not exist
+      const userOtpEmail = await this.prismaClient.user_otp_email.findFirst({
+        where: {
+          user_id: userId,
+          mode: mode,
+        },
+        select: {
+          id: true,
+          otp: true,
+          expire_at: true,
+          resend: true,
+          fail_count: true,
+        },
+      });
+
+      // verify if there is user otp from db
+      return {
+        id: userOtpEmail?.id,
+        userId: Number(user.user_id.toString()),
+        handle: user.handle,
+        status: user.status,
+        email:
+          Array.isArray(user.emails) && user.emails.length > 0
+            ? user.emails[0].address
+            : null,
+        otp: userOtpEmail?.otp,
+        expireAt: userOtpEmail?.expire_at,
+        resend: userOtpEmail?.resend,
+        failCount: userOtpEmail?.fail_count,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        // rethrow not found exception (user not found)
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to search for user otp');
+    }
+  }
+
+  /**
+   * Find User OTP by user ID and mode.
+   * @param userId User ID
+   * @param mode OTP mode
+   * @returns UserOtpDto when found
+   * @throws NotFoundException when user not found
+   * @throws InternalServerErrorException when other errors occur
+   */
+  async findUserOtpByUserId(
+    userId: number,
+    mode: number,
+  ): Promise<UserOtpDto | null> {
+    try {
+      const user = await this.prismaClient.user.findFirst({
+        where: {
+          user_id: userId,
+        },
+        select: {
+          user_id: true,
+          handle: true,
+          status: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User does not exist');
+      }
+
+      // get user_otp_email if it exists, we won't error out if it does not exist
+      const userOtpEmail = await this.prismaClient.user_otp_email.findFirst({
+        where: {
+          user_id: userId,
+          mode: mode,
+        },
+        select: {
+          id: true,
+          otp: true,
+          expire_at: true,
+          resend: true,
+          fail_count: true,
+        },
+      });
+
+      return {
+        id: userOtpEmail?.id,
+        userId: Number(user.user_id.toString()),
+        handle: user.handle,
+        status: user.status,
+        otp: userOtpEmail?.otp,
+        expireAt: userOtpEmail?.expire_at,
+        resend: userOtpEmail?.resend,
+        failCount: userOtpEmail?.fail_count,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        // rethrow not found exception (user not found)
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to search for user otp');
+    }
+  }
+
+  /**
+   * Updates user OTP with new duration and resend flag.
+   * @param id ID of user otp email
+   * @param duration New duration
+   * @param resend Resend flag
+   * @throws InternalServerErrorException When an error occurs updating user otp email
+   */
+  async updateUserOtpResend(id: number, duration: Date, resend: boolean) {
+    try {
+      await this.prismaClient.user_otp_email.update({
+        where: {
+          id: id,
+        },
+        data: {
+          expire_at: duration,
+          resend: resend,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error updating user otp email: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Error updating user otp email');
+    }
+  }
+
+  /**
+   * Update user OTP attempts
+   * @param id OTP ID
+   * @param failCount New fail count
+   * @throws InternalServerErrorException When an error occurs updating user otp email
+   */
+  async updateUserOtpAttempt(id: number, failCount: number) {
+    try {
+      await this.prismaClient.user_otp_email.update({
+        where: {
+          id: id,
+        },
+        data: {
+          fail_count: failCount,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error updating user otp email fail count: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        "Error updating 'user otp email' fail count",
+      );
+    }
+  }
+
+  /**
+   * Resets password for user, given the reset token and new password.
+   * @param passUserDto The reset password DTO
+   * @returns user when password reset is successful
+   * @throws BadRequestException when validation fails
+   * @throws NotFoundException when user not found
+   * @throws InternalServerErrorException when other errors occur
+   */
+  async resetPassword(passUserDto: ResetPasswordBodyDto): Promise<UserModel> {
+    const userParams = passUserDto.param;
+    const { handle, email, credential } = userParams;
+    // validate password
+    this.validationService.validatePassword(credential?.password);
+    // validate token
+    if (!credential || !credential.resetToken) {
+      throw new BadRequestException('Token is required.');
+    }
+    // find user
+    let user: UserModel | null = null;
+    // first by handle
+    if (CommonUtils.validateString(handle)) {
+      user = await this.userService.findUserByEmailOrHandle(handle);
+    }
+    // then by email
+    if (!user && CommonUtils.validateString(email)) {
+      user = await this.userService.findUserByEmailOrHandle(email);
+    }
+    if (!user) {
+      throw new NotFoundException('User does not exist');
+    }
+
+    // get cache key
+    const resetTokenCacheKey = `${PASSWORD_RESET_TOKEN_CACHE_PREFIX}:${user.user_id.toNumber()}`;
+    const existingCachedToken =
+      await this.cacheManager.get<string>(resetTokenCacheKey);
+    if (!existingCachedToken) {
+      throw new BadRequestException('Token is expired');
+    }
+    // compare with request
+    if (existingCachedToken !== credential.resetToken) {
+      throw new BadRequestException('Token is incorrect');
+    }
+
+    try {
+      // now update password
+      // Encrypt the new password using the legacy Blowfish method from UserService
+      const legacyEncodedPassword = this.userService.encodePasswordLegacy(
+        credential.password,
+      );
+      // Update the password in the security_user table using the user's handle
+      await this.prismaClient.security_user.update({
+        where: { user_id: user.handle }, // Find security_user record by handle
+        data: { password: legacyEncodedPassword },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to update password for user ${user.handle}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to update password');
+    }
+
+    // delete the token from cache
+    await this.cacheManager.del(resetTokenCacheKey);
+    // return user as per java code
+    return user;
   }
 }

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
-import { country, PrismaClient } from '@prisma/client';
+import { country, sso_login_provider, PrismaClient } from '@prisma/client';
 import * as DTOs from '../../dto/user/user.dto';
 import {
   getProviderDetails,
@@ -15,6 +15,8 @@ import {
   ProviderId,
 } from '../../core/constant/provider-type.enum';
 import { Constants } from '../../core/constant/constants';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CommonUtils } from '../../shared/util/common.utils';
 
 // Basic email regex, can be refined
 const EMAIL_REGEX =
@@ -42,6 +44,8 @@ const MSG_TEMPLATE_MISSING_UTMSOURCE =
 const MSG_TEMPLATE_USER_NOT_FOUND =
   'Referring user not found with the provided handle.';
 
+const INVALID_HANDLE_PATTERNS = [/^(.*?)es$/, /^(.*?)s$/, /^_*(.*?)_*$/];
+
 @Injectable()
 export class ValidationService {
   private readonly logger = new Logger(ValidationService.name);
@@ -51,30 +55,137 @@ export class ValidationService {
     private readonly prismaClient: PrismaClient,
   ) {}
 
+  /**
+   * Performs quick validations for first name.
+   * @param firstName To be checked
+   * @throws BadRequestException if invalid
+   */
+  validateFirstName(firstName: string) {
+    if (firstName && firstName.length > Constants.MAX_LENGTH_FIRST_NAME) {
+      throw new BadRequestException(
+        `Maximum length of first name is ${Constants.MAX_LENGTH_FIRST_NAME}`,
+      );
+    }
+  }
+
+  /**
+   * Performs quick validations for last name.
+   * @param lastName To be checked
+   * @throws BadRequestException if invalid
+   */
+  validateLastName(lastName: string) {
+    if (lastName && lastName.length > Constants.MAX_LENGTH_LAST_NAME) {
+      throw new BadRequestException(
+        `Maximum length of last name is ${Constants.MAX_LENGTH_LAST_NAME}`,
+      );
+    }
+  }
+
+  /**
+   * Performs quick validations for email.
+   * @param email To be checked
+   * @throws BadRequestException if invalid
+   */
+  staticValidateEmail(email: string) {
+    if (!CommonUtils.validateString(email)) {
+      throw new BadRequestException('Email address is required');
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      throw new BadRequestException('Invalid email format.');
+    }
+    if (email.length > Constants.MAX_LENGTH_EMAIL) {
+      throw new BadRequestException(
+        `Maximum length of email address is ${Constants.MAX_LENGTH_EMAIL}`,
+      );
+    }
+  }
+
+  /**
+   * Quick validation for user object.
+   * @param user User to be checked
+   * @throws BadRequestException if invalid
+   */
+  validateUser(user: DTOs.UserParamBaseDto) {
+    // validate first name
+    this.validateFirstName(user.firstName);
+    // validate last name
+    this.validateLastName(user.lastName);
+    // validate password
+    // at this point, if password is not provided, we don't check
+    if (user.credential?.password) {
+      this.validatePassword(user.credential?.password);
+    }
+    // validate email
+    this.staticValidateEmail(user.email);
+    // validate handle - called from user service (includes static checks)
+  }
+
   async validateHandle(
     handle: string,
     userId: number = null,
   ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
     if (!handle) {
-      throw new BadRequestException('Handle cannot be empty.');
+      return { valid: false, reason: 'Handle is required' };
     }
     if (
       handle.length < Constants.MIN_LENGTH_HANDLE ||
-      handle.length > Constants.MAX_LENGTH_HANDLE ||
-      !HANDLE_REGEX.test(handle)
+      handle.length > Constants.MAX_LENGTH_HANDLE
     ) {
-      throw new BadRequestException(
-        'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
-      );
-    }
-    if (handle.match(/^[-_.{}[\]]+$/)) {
-      throw new BadRequestException('Handle may not contain only punctuation.');
-    }
-    if (RESERVED_HANDLES.includes(handle.toLowerCase())) {
-      throw new BadRequestException(`Handle '${handle}' is reserved.`);
+      return {
+        valid: false,
+        reason: `Length of Handle in character should be between ${Constants.MIN_LENGTH_HANDLE} and ${Constants.MAX_LENGTH_HANDLE}.`,
+        reasonCode: 'INVALID_LENGTH',
+      };
     }
 
+    if (handle.indexOf(' ') != -1) {
+      return {
+        valid: false,
+        reason: 'Handle may not contain a space',
+        reasonCode: 'INVALID_FORMAT',
+      };
+    }
+
+    if (!HANDLE_REGEX.test(handle)) {
+      return {
+        valid: false,
+        reason:
+          'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
+        reasonCode: 'INVALID_FORMAT',
+      };
+    }
+    if (handle.match(/^[-_.{}[\]]+$/)) {
+      return {
+        valid: false,
+        reason: 'Handle may not contain only punctuation.',
+        reasonCode: 'INVALID_FORMAT',
+      };
+    }
+    if (handle.toLocaleLowerCase().trim().startsWith('admin')) {
+      return {
+        valid: false,
+        reason: 'Please choose another handle, not starting with admin.',
+        reasonCode: 'INVALID_HANDLE',
+      };
+    }
+    if (RESERVED_HANDLES.includes(handle.toLowerCase())) {
+      return {
+        valid: false,
+        reason: `Handle '${handle}' is reserved`,
+        reasonCode: 'INVALID_HANDLE',
+      };
+    }
+
+    if (await this.isInvalidHandle(handle)) {
+      return {
+        valid: false,
+        reason: `Handle is invalid`,
+        reasonCode: 'INVALID_HANDLE',
+      };
+    }
+
+    // now check if handle is already used by someone else
     const existingUser = await this.prismaClient.user.findFirst({
       where: { handle_lower: handle.toLowerCase() },
     });
@@ -83,11 +194,88 @@ export class ValidationService {
       existingUser &&
       (!userId || (existingUser?.user_id as unknown as number) != userId)
     ) {
-      this.logger.warn(`Validation failed: Handle '${handle}' already exists.`);
-      throw new ConflictException(`Handle '${handle}' is already taken.`);
+      return {
+        valid: false,
+        reason: `Handle '${handle}' has already been taken`,
+        reasonCode: 'ALREADY_TAKEN',
+      };
     }
     this.logger.log(`Handle '${handle}' is valid and available.`);
     return { valid: true };
+  }
+
+  /**
+   * Validate email via database.
+   * @param email Email to be checked
+   * @throws BadRequestException if invalid
+   */
+  async validateEmailViaDB(email: string) {
+    if (!CommonUtils.validateString(email)) {
+      throw new BadRequestException('Email address is required');
+    }
+    const emailCount = await this.prismaClient.email.count({
+      where: { address: { equals: email, mode: 'insensitive' } },
+    });
+    if (emailCount > 0) {
+      throw new BadRequestException(
+        `Email address '${email}' has already been registered, please use another one.`,
+      );
+    }
+  }
+
+  async isInvalidHandle(handle: string): Promise<boolean> {
+    if (!handle) {
+      return false;
+    }
+    const checkedHandles = new Set<string>();
+    // check invalid handles
+    if (await this.isExactInvalidHandle(handle)) {
+      return true;
+    }
+    checkedHandles.add(handle);
+
+    const extractedHandles = this.numberTrimTokenExtract(
+      checkedHandles,
+      handle,
+    );
+    if (extractedHandles.size > 0) {
+      for (const token of extractedHandles) {
+        if (await this.isExactInvalidHandle(token)) {
+          return true;
+        }
+      }
+    }
+
+    // last check using regex
+    const regexHandles = this.regexTokenExtract(
+      INVALID_HANDLE_PATTERNS,
+      checkedHandles,
+      handle,
+    );
+    if (regexHandles.size > 0) {
+      for (const token of regexHandles) {
+        if (await this.isExactInvalidHandle(token)) {
+          return true;
+        }
+      }
+    }
+    // when everything passed, return false
+    return false;
+  }
+
+  async isExactInvalidHandle(handle: string): Promise<boolean> {
+    if (!handle) {
+      return false;
+    }
+    const count = await this.prismaClient.invalid_handles.count({
+      where: {
+        invalid_handle: {
+          equals: handle,
+          mode: 'insensitive',
+        },
+      },
+    });
+    return count > 0;
   }
 
   async validateEmail(
@@ -140,12 +328,15 @@ export class ValidationService {
     }
 
     // Check if it has a letter.
-    if (!/[A-Za-z]/.test(password)) {
+    if (!Constants.PASSWORD_HAS_LETTER_REGEX.test(password)) {
       throw new BadRequestException('Password must have at least a letter');
     }
 
     // Check if it has punctuation symbol
-    if (!/\\p{P}/.test(password) && !/\d/.test(password)) {
+    if (
+      !Constants.PASSWORD_HAS_SYMBOL_REGEX.test(password) &&
+      !Constants.PASSWORD_HAS_DIGIT_REGEX.test(password)
+    ) {
       throw new BadRequestException(
         'Password must have at least a symbol or number',
       );
@@ -216,7 +407,7 @@ export class ValidationService {
     }
 
     // The numeric ID (e.g., 1 for FACEBOOK, 2 for GOOGLE) is used in user_social_login.social_login_provider_id
-    const providerNumericId = providerDetails.id;
+    const providerNumericId: number = providerDetails.id;
 
     const err = await this.validateSocialProfiles(
       socialProviderUserId,
@@ -322,42 +513,27 @@ export class ValidationService {
       // The Java code threw IllegalArgumentException. Here, we return an error message
       // to match the contract of "string for error, null for success".
       this.logger.warn('Validation failed: countryInput is null.');
-      return 'Country data must be specified.'; // Or throw new BadRequestException
+      return 'Country data must be specified.';
     }
 
-    // Assuming 'code' is the primary identifier in CountryDto for lookup
     if (
-      !countryInput.code ||
-      typeof countryInput.code !== 'string' ||
-      countryInput.code.trim() === ''
+      !countryInput.code &&
+      !countryInput.name &&
+      !countryInput.isoAlpha2Code &&
+      !countryInput.isoAlpha3Code
     ) {
-      this.logger.warn(
-        'Validation failed: Country code is missing or invalid.',
-      );
-      return 'Country code must be provided and valid.'; // Or throw new BadRequestException
+      this.logger.warn('Validation failed: Country code is invalid.');
+      return 'Country data is invalid.';
     }
 
-    let dbCountryRecord: country | null;
-    try {
-      dbCountryRecord = await this.prismaClient.country.findUnique({
-        // Ensure 'country' is your Prisma model name
-        where: { country_code: countryInput.code },
-      });
-    } catch (error) {
-      this.logger.error(
-        `Database error while finding country by code '${countryInput.code}': ${error.message}`,
-        error.stack,
-      );
-      // To strictly follow the "return string for error" and avoid throwing,
-      // we'd return a generic error message here.
-      return 'An internal error occurred while validating country data.';
-    }
-
-    if (!dbCountryRecord) {
+    const dbCountryRecord: country | null | string =
+      await this.findCountryBy(countryInput);
+    if (!dbCountryRecord || typeof dbCountryRecord === 'string') {
+      // if an error string
       this.logger.warn(
-        `Country with code '${countryInput.code}' not found in database.`,
+        `Country with details: '${JSON.stringify(countryInput)}' not found in database.`,
       );
-      return `Country with code ` + ` for code '${countryInput.code}'.`;
+      return `Country data is invalid.`;
     }
 
     // --- MUTATION PART ---
@@ -368,11 +544,69 @@ export class ValidationService {
     );
     countryInput.code = dbCountryRecord.country_code; // Usually already the same
     countryInput.name = dbCountryRecord.country_name;
-    // If CountryDto was extended to include these:
-    // countryInput.isoAlpha2Code = dbCountryRecord.isoAlpha2Code;
-    // countryInput.isoAlpha3Code = dbCountryRecord.isoAlpha3Code;
-
+    countryInput.isoAlpha2Code = dbCountryRecord.iso_alpha2_code;
+    countryInput.isoAlpha3Code = dbCountryRecord.iso_alpha3_code;
     return null; // Signifies success, and countryInput has been mutated.
+  }
+
+  /**
+   * Find country by multiple ways.
+   * @param country Country to look for from DB
+   * @returns the country from DB
+   */
+  private async findCountryBy(
+    country: DTOs.CountryDto,
+  ): Promise<string | country | null> {
+    // it is assumed that at this point, country is a valid object
+    try {
+      let dbCountryRecord: country | null;
+      // find country by code
+      dbCountryRecord = await this.prismaClient.country.findUnique({
+        where: { country_code: country.code },
+      });
+      // find by alpha 2 code
+      if (
+        !dbCountryRecord &&
+        CommonUtils.validateString(country.isoAlpha2Code)
+      ) {
+        dbCountryRecord = await this.prismaClient.country.findFirst({
+          where: { iso_alpha2_code: country.isoAlpha2Code },
+        });
+      }
+      // find by alpha 3 code
+      if (
+        !dbCountryRecord &&
+        CommonUtils.validateString(country.isoAlpha3Code)
+      ) {
+        dbCountryRecord = await this.prismaClient.country.findFirst({
+          where: { iso_alpha3_code: country.isoAlpha3Code },
+        });
+      }
+      // find by name
+      if (!dbCountryRecord && CommonUtils.validateString(country.name)) {
+        dbCountryRecord = await this.prismaClient.country.findFirst({
+          where: {
+            OR: [
+              {
+                iso_name: country.name,
+              },
+              {
+                country_name: country.name,
+              },
+            ],
+          },
+        });
+      }
+      return dbCountryRecord;
+    } catch (error) {
+      this.logger.error(
+        `Database error while finding country by code '${country.code}': ${error.message}`,
+        error.stack,
+      );
+      // To strictly follow the "return string for error" and avoid throwing,
+      // we'd return a generic error message here.
+      return 'An internal error occurred while retrieving country data.';
+    }
   }
 
   public async validateProfile(
@@ -426,7 +660,9 @@ export class ValidationService {
       providerDetails.id !== ProviderId.LDAP
     ) {
       await this.validateSsoProfile(profile, providerDetails);
-    } else if (providerDetails.id === ProviderId.LDAP) {
+    }
+    // the following checks are left as they only output debug logs
+    else if (providerDetails.id === ProviderId.LDAP) {
       // Explicitly LDAP
       this.logger.debug(
         `LDAP profile validation for provider '${providerDetails.key}'. No specific database validation rules applied here based on Java logic.`,
@@ -467,7 +703,7 @@ export class ValidationService {
         this.logger.warn(
           `User ${internalUserId} already bound with provider ${providerDetails.key} (ID: ${providerDetails.id})`,
         );
-        throw new ConflictException(MSG_USER_ALREADY_BOUND_WITH_PROVIDER);
+        throw new BadRequestException(MSG_USER_ALREADY_BOUND_WITH_PROVIDER);
       }
     }
 
@@ -487,7 +723,7 @@ export class ValidationService {
         this.logger.warn(
           `Social profile for provider ${providerDetails.key} and external ID ${profile.userId} is already in use by user ${socialProfileInUse.user_id.toNumber()}.`,
         );
-        throw new ConflictException(MSG_SOCIAL_PROFILE_IN_USE);
+        throw new BadRequestException(MSG_SOCIAL_PROFILE_IN_USE);
       }
     }
   }
@@ -513,7 +749,7 @@ export class ValidationService {
     return this.prismaClient.user_social_login.findMany({
       where: {
         user_id: internalUserId,
-        social_login_provider_id: providerDetails.id, // Use id from your ProviderDetails
+        social_login_provider_id: new Decimal(providerDetails.id), // Use id from your ProviderDetails
       },
       include: {
         social_login_provider: true,
@@ -550,14 +786,18 @@ export class ValidationService {
     profile: DTOs.UserProfileDto,
     providerInput: ProviderDetails | string, // Can accept key string or details object
   ): Promise<number | null> {
-    let providerDetails: ProviderDetails | undefined;
+    let provider: sso_login_provider | undefined;
     if (typeof providerInput === 'string') {
-      providerDetails = getProviderDetails(providerInput); // Use your function
+      provider = await this.prismaClient.sso_login_provider.findFirst({
+        where: { name: providerInput },
+      });
     } else {
-      providerDetails = providerInput;
+      provider = await this.prismaClient.sso_login_provider.findFirst({
+        where: { name: providerInput.key },
+      });
     }
 
-    if (!providerDetails) {
+    if (!provider) {
       this.logger.warn(
         `findInternalUserIdBySsoProfile called with unknown provider input: ${JSON.stringify(providerInput)}`,
       );
@@ -567,31 +807,25 @@ export class ValidationService {
     }
 
     this.logger.debug(
-      `Finding internal user ID by SSO profile: ${JSON.stringify(profile)}, provider: ${providerDetails.key}`,
+      `Finding internal user ID by SSO profile: ${JSON.stringify(profile)}, provider: ${provider.name}`,
     );
 
-    if (!providerDetails.isEnterprise) {
-      this.logger.warn(
-        `Attempted to find SSO user with non-enterprise provider: ${providerDetails.key}`,
-      );
-      return null;
-    }
-
     let ssoLink;
+    // getUserIdBySSOEmail
     if (profile.email) {
       ssoLink = await this.prismaClient.user_sso_login.findFirst({
         where: {
-          provider_id: providerDetails.id, // Use id from your ProviderDetails
+          provider_id: provider.sso_login_provider_id,
           email: profile.email,
         },
         select: { user_id: true },
       });
     }
-
+    // getUserIdBySSOUserId
     if (!ssoLink && profile.userId) {
       ssoLink = await this.prismaClient.user_sso_login.findFirst({
         where: {
-          provider_id: providerDetails.id, // Use id from your ProviderDetails
+          provider_id: provider.sso_login_provider_id,
           sso_user_id: profile.userId,
         },
         select: { user_id: true },
@@ -680,5 +914,75 @@ export class ValidationService {
       // Let's signal error with a specific string for the caller to interpret.
       return 'ERROR';
     }
+  }
+
+  private isDigit(char) {
+    return /^\d$/.test(char);
+  }
+
+  numberTrimTokenExtract(
+    ignoreTokens: Set<string>,
+    handle: string,
+  ): Set<string> {
+    const extractedTokens = new Set<string>();
+    if (handle == null || handle.length == 0) {
+      return extractedTokens;
+    }
+
+    // find heading and trailing digits count
+    let head = 0;
+    while (head < handle.length && this.isDigit(handle.charAt(head))) {
+      head++;
+    }
+    if (head >= handle.length) {
+      head = handle.length - 1;
+    }
+    let tail = handle.length - 1;
+    while (tail >= 0 && this.isDigit(handle.charAt(tail))) {
+      tail--;
+    }
+    if (tail < 0) {
+      tail = 0;
+    }
+    // remove all possible heading and trailing digits
+    for (let i = 0; i <= head; i++) {
+      for (let j = handle.length; j > tail && j > i; j--) {
+        const token = handle.substring(i, j);
+        if (token.length > 0 && !ignoreTokens.has(token)) {
+          extractedTokens.add(token);
+          ignoreTokens.add(token);
+        }
+      }
+    }
+    return extractedTokens;
+  }
+
+  private isIterable(obj): boolean {
+    if (obj === null || obj === undefined) {
+      return false;
+    }
+    return typeof obj[Symbol.iterator] === 'function';
+  }
+
+  regexTokenExtract(
+    patterns: Array<RegExp>,
+    ignoreTokens: Set<string>,
+    handle: string,
+  ): Set<string> {
+    const extractedTokens = new Set<string>();
+    if (handle == null || handle.length == 0) {
+      return extractedTokens;
+    }
+    for (const pattern of patterns) {
+      const matchesIterator = handle.match(pattern);
+      if (this.isIterable(matchesIterator)) {
+        const token = matchesIterator[1];
+        if (!ignoreTokens.has(token) && token.length > 0) {
+          extractedTokens.add(token);
+          ignoreTokens.add(token);
+        }
+      }
+    }
+    return extractedTokens;
   }
 }

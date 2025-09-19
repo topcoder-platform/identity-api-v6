@@ -20,6 +20,9 @@ import { UserProfileDto } from '../../dto/user/user.dto'; // Assuming UserProfil
 import { EventService } from '../../shared/event/event.service';
 import { ConfigService } from '@nestjs/config';
 import { Constants } from '../../core/constant/constants';
+import { getProviderDetails } from '../../core/constant/provider-type.enum';
+import { UserService } from './user.service';
+import { Decimal } from '@prisma/client/runtime/library';
 // Import other needed services
 
 @Injectable()
@@ -31,6 +34,7 @@ export class UserProfileService {
     private readonly prismaClient: PrismaClient,
     private readonly eventService: EventService,
     private readonly configService: ConfigService,
+    private readonly userService: UserService,
     // Inject other services
   ) {}
 
@@ -101,12 +105,7 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
-      {
-        where: { name: profileDto.provider },
-      },
-    );
-
+    const providerRecord = getProviderDetails(profileDto.provider);
     if (!providerRecord) {
       this.logger.error(
         `SSO Provider ${profileDto.provider} not found. Dynamic creation is currently disabled.`,
@@ -120,7 +119,7 @@ export class UserProfileService {
       const newSsoLogin = await this.prismaClient.user_sso_login.create({
         data: {
           user_id: userId,
-          provider_id: providerRecord.sso_login_provider_id,
+          provider_id: new Decimal(providerRecord.id),
           sso_user_id: profileDto.userId,
           email: profileDto.email, // Optional, from provider
           sso_user_name: profileDto.name, // Optional, from provider
@@ -167,6 +166,49 @@ export class UserProfileService {
     }
   }
 
+  /**
+   * Find provider id by provider name.
+   * @param providerName The provider name to use
+   * @returns the provider id if it is found
+   */
+  async findProviderIdByName(providerName: string): Promise<number | null> {
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: providerName },
+      },
+    );
+    return providerRecord?.sso_login_provider_id
+      ? Number(providerRecord?.sso_login_provider_id)
+      : null;
+  }
+
+  /**
+   * Count SSO logins by providerId and userId.
+   * @param providerId The provider ID
+   * @param userId The user ID
+   * @returns number of SSO logins
+   * @throws InternalServerErrorException for any errors retrieving information
+   */
+  async countLoginsByProviderIdAndUserId(
+    providerId: number,
+    userId: number,
+  ): Promise<number> {
+    try {
+      return await this.prismaClient.user_sso_login.count({
+        where: { provider_id: providerId, user_id: userId },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error counting SSO logins by providerId: ${providerId} and userId: ${userId}. Error: ${error.message}`,
+        error.stack,
+      );
+      // any error from retrieving information
+      throw new InternalServerErrorException(
+        `Error retrieving sso logins by providerId: ${providerId}  and userId: ${userId}`,
+      );
+    }
+  }
+
   async updateSSOUserLogin(
     userId: number,
     profileDto: UserProfileDto,
@@ -180,12 +222,7 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
-      {
-        where: { name: profileDto.provider },
-      },
-    );
-
+    const providerRecord = getProviderDetails(profileDto.provider);
     if (!providerRecord) {
       throw new NotFoundException(
         `SSO Provider '${profileDto.provider}' not found. Cannot update SSO link.`,
@@ -197,7 +234,7 @@ export class UserProfileService {
         where: {
           user_id_provider_id: {
             user_id: userId,
-            provider_id: providerRecord.sso_login_provider_id,
+            provider_id: new Decimal(providerRecord.id),
           },
         },
         data: {
@@ -233,61 +270,21 @@ export class UserProfileService {
     }
   }
 
-  async deleteSSOUserLogin(
-    userId: number,
-    providerName: string,
-    ssoUserIdForEvent: string,
-  ): Promise<void> {
-    // ssoUserIdForEvent is needed because if we delete by user_id and providerName only,
-    // we might not know the exact sso_user_id if it wasn't passed in the request, but it is part of PK.
-    // The controller will need to ensure it gets this, perhaps from a query param if not deleting by the full composite key.
-    // For now, assume it's provided or can be derived by the caller if needed for the event.
-    // However, the PK of user_sso_login is user_id + provider_id + sso_user_id, so sso_user_id IS required for deletion.
-
+  async deleteSSOUserLogin(userId: number, providerId: number): Promise<void> {
     this.logger.log(
-      `Deleting SSO login for user ID: ${userId}, provider: ${providerName}, ssoUserId: ${ssoUserIdForEvent}`,
+      `Deleting SSO login for user ID: ${userId}, providerId: ${providerId}`,
     );
-
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
-      {
-        where: { name: providerName },
-      },
-    );
-
-    if (!providerRecord) {
-      this.logger.warn(
-        `SSO Provider '${providerName}' not found. Cannot delete SSO link.`,
-      );
-      throw new NotFoundException(`SSO Provider '${providerName}' not found.`);
-    }
-
     try {
       await this.prismaClient.user_sso_login.delete({
         where: {
           user_id_provider_id: {
             user_id: userId,
-            provider_id: providerRecord.sso_login_provider_id,
+            provider_id: providerId,
           },
         },
       });
-
-      try {
-        await this.eventService.postEnvelopedNotification('user.sso.unlinked', {
-          userId: userId.toString(),
-          profileProvider: providerName,
-          profileId: ssoUserIdForEvent,
-        });
-      } catch (eventError) {
-        this.logger.error(
-          `Failed to post 'user.sso.unlinked' event for user ${userId}, provider ${providerName}. Error: ${eventError.message}`,
-          eventError.stack,
-        );
-        // Do not rethrow; allow the main operation to be considered successful if DB part worked.
-        // In a real scenario, this might go to a dead-letter queue or trigger an alert.
-      }
-
       this.logger.log(
-        `SSO login unlinked for user ${userId}, provider ${providerName}, ssoUserId ${ssoUserIdForEvent}.`,
+        `SSO login unlinked for user ${userId}, providerId ${providerId}.`,
       );
     } catch (error) {
       if (
@@ -296,12 +293,12 @@ export class UserProfileService {
       ) {
         // Record to delete not found
         this.logger.warn(
-          `SSO login not found for deletion (P2025): user ${userId}, provider ${providerName}, sso_user_id ${ssoUserIdForEvent}.`,
+          `SSO login not found for deletion (P2025): user ${userId}, providerId ${providerId}.`,
         );
         throw new NotFoundException('SSO login link to delete not found.');
       }
       this.logger.error(
-        `Error deleting SSO login for user ${userId}, provider ${providerName}: ${error.message}`,
+        `Error deleting SSO login for user ${userId}, providerId ${providerId}: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException('Failed to unlink SSO account.');
@@ -315,6 +312,12 @@ export class UserProfileService {
     this.logger.log(
       `Adding external social profile for user ID: ${userId}, provider: ${profileDto.provider}, providerUserId: ${profileDto.userId}`,
     );
+
+    // make sure userId exists
+    const user = await this.userService.findUserById(userId);
+    if (user == null) {
+      throw new NotFoundException('User does not exist');
+    }
 
     if (
       profileDto.providerType &&
@@ -334,11 +337,7 @@ export class UserProfileService {
       );
     }
 
-    const socialProvider =
-      await this.prismaClient.social_login_provider.findFirst({
-        where: { name: { equals: profileDto.provider, mode: 'insensitive' } }, // Case-insensitive match for provider name
-      });
-
+    const socialProvider = getProviderDetails(profileDto.provider);
     if (!socialProvider) {
       this.logger.warn(
         `Social login provider not found: ${profileDto.provider}`,
@@ -353,7 +352,7 @@ export class UserProfileService {
       const newSocialLogin = await this.prismaClient.user_social_login.create({
         data: {
           user_id: userId,
-          social_login_provider_id: socialProvider.social_login_provider_id,
+          social_login_provider_id: new Decimal(socialProvider.id),
           social_user_id: profileDto.userId, // This is the user's ID on the social platform
           social_user_name: profileDto.name, // Optional: user's name/handle on the social platform
           // created_by: operatorId, // Add if schema supports and if operatorId type is correct
@@ -433,6 +432,18 @@ export class UserProfileService {
       `Found ${ssoProfiles.length} SSO profiles for user ID: ${userId}`,
     );
 
+    const socialProfiles = await this.findSocialProfiles(userId);
+    return [...ssoProfiles, ...socialProfiles];
+  }
+
+  /**
+   * Find user's social profiles.
+   * @param userId The user id
+   * @returns social profiles
+   */
+  async findSocialProfiles(userId: number): Promise<UserProfileDto[]> {
+    this.logger.debug(`Finding social profiles for user ID: ${userId}`);
+
     const socialLogins = await this.prismaClient.user_social_login.findMany({
       where: { user_id: userId },
       include: { social_login_provider: true },
@@ -444,7 +455,7 @@ export class UserProfileService {
       `Found ${socialProfiles.length} social profiles for user ID: ${userId}`,
     );
 
-    return [...ssoProfiles, ...socialProfiles];
+    return [...socialProfiles];
   }
 
   async deleteExternalProfile(

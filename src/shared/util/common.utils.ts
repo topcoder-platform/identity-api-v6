@@ -78,6 +78,10 @@ export class CommonUtils {
     return _.pick(obj, keys);
   }
 
+  static pickArray<T>(objs: T[], keys: string[]) {
+    return _.map(objs, (obj) => _.pick(obj, keys));
+  }
+
   /**
    * Generate random string of letters and numbers with given length.
    * @param length random string length
