@@ -451,13 +451,14 @@ export class UserResponseDto {
   id: string;
   handle: string;
   email?: string; // Primary email
+  emailActive?: boolean;
   firstName?: string;
   lastName?: string;
   status: string;
   roles?: any[]; // Simplified for now
   profiles?: UserProfileDto[]; // Social/SSO profiles
   mfaEnabled?: boolean;
-  emailActive?: boolean; // changed from emailVerified to match legacy
+  emailVerified?: boolean;
   createdAt?: string;
   modifiedAt?: string; // should use modifiedAt to match legacy
   // Add other fields as needed based on FieldSelector
@@ -520,6 +521,33 @@ export class OneTimeTokenResponseDto {
 
 // Placeholder DTO for user search queries
 export class UserSearchQueryDto {
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'filter',
+    type: String,
+    description: "Legacy filter string in the form 'field=value'",
+  })
+  filter?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'handle',
+    type: String,
+    description: 'member handle',
+  })
+  handle?: string;
+
+  @IsEmail()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'email',
+    type: String,
+    description: 'member email',
+  })
+  email?: string;
+
   @IsInt()
   @Min(1)
   @IsOptional()
@@ -548,16 +576,6 @@ export class UserSearchQueryDto {
     description: 'comma-separated list of fields to include in response',
   })
   selector?: string;
-
-  @IsString()
-  @IsOptional()
-  @ApiPropertyOptional({
-    name: 'sortBy',
-    type: String,
-    description:
-      'Request query filter, e.g.: /api/va1/stories?filter=URLENCODE(param1=filter_a&param2=filter_b&....)',
-  })
-  filter?: string;
 }
 
 // --- Added for UserController.deleteSSOUserLogin ---

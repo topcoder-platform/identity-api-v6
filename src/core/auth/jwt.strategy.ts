@@ -315,13 +315,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       });
 
       // Extract role names
-      const dbRoles = assignments.map((assignment) => assignment.role.name);
+      const dbRoles = assignments
+        .map((assignment) => assignment.role?.name)
+        .filter((name): name is string => Boolean(name));
       this.logger.debug(
         `[JwtStrategy] Roles from DB for user ${userId}: ${JSON.stringify(dbRoles)}`,
       );
 
-      // Check if the admin role name is among the assigned roles
-      const isAdmin = dbRoles.includes(adminRoleName);
+      // Check if the admin role name is among the assigned roles (case-insensitive)
+      const normalizedAdminRole = adminRoleName.toLowerCase();
+      const isAdmin = dbRoles
+        .map((roleName) => roleName.toLowerCase())
+        .includes(normalizedAdminRole);
       this.logger.debug(
         `[JwtStrategy] isAdmin check for user ${userId} (role: '${adminRoleName}'): ${isAdmin}`,
       );

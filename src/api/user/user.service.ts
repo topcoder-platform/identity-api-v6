@@ -114,69 +114,149 @@ export class UserService {
 
   // --- Core User Methods ---
 
-  /**
-   * Find users.  Results are filtered using query.filter.  For pagination, query.offset and query.limit is used.
-   * Currently, sort/ordering is not supported.
-   * @param query The query details
-   * @returns users based on query
-   */
   async findUsers(query: UserSearchQueryDto): Promise<UserModel[]> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const whereClause: Prisma.userWhereInput = this.buildUserWhereClause(
-      query.filter,
-    );
+    const { handle, email } = this.extractSearchFilters(query);
+    const whereClause: Prisma.userWhereInput = {};
+    if (handle) {
+      whereClause.handle_lower = handle.toLowerCase();
+    }
+    if (email) {
+      whereClause.user_email_xref = {
+        some: {
+          email: {
+            address: { equals: email, mode: 'insensitive' },
+          },
+        },
+      };
+    }
+
     try {
-      return this.prismaClient.user.findMany({
+      const users = await this.prismaClient.user.findMany({
         where: whereClause,
         skip: query.offset ?? 0,
         take: query.limit ?? Constants.defaultPageSize,
       });
+
+      if (!users.length) {
+        return users;
+      }
+
+      const userIds = users.map((user) => user.user_id);
+      const primaryEmails = await this.prismaClient.email.findMany({
+        where: {
+          user_id: { in: userIds },
+          primary_ind: Constants.primaryEmailFlag,
+          email_type_id: Constants.standardEmailType,
+        },
+        select: {
+          user_id: true,
+          address: true,
+          status_id: true,
+        },
+      });
+
+      const emailMap = new Map<
+        string,
+        { address: string | null; statusId: Decimal | null }
+      >();
+
+      for (const email of primaryEmails) {
+        emailMap.set(email.user_id.toString(), {
+          address: email.address ?? null,
+          statusId: email.status_id ?? null,
+        });
+      }
+
+      for (const user of users) {
+        const emailRecord = emailMap.get(user.user_id.toString());
+        if (emailRecord) {
+          (user as any).primaryEmailAddress = emailRecord.address;
+          (user as any).primaryEmailStatusId = emailRecord.statusId;
+        }
+      }
+
+      return users;
     } catch (error) {
       this.logger.error(`Error finding users: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to search users.');
     }
   }
 
-  private buildUserWhereClause(filter: string): Prisma.userWhereInput {
-    this.logger.log(`[findUsers] Filters received: ${filter}`);
-    const whereClause: Prisma.userWhereInput = {};
-    if (!filter || filter.length === 0) {
-      return whereClause; // No filters, return empty clause
-    }
-    // parse filters
-    // is there a need to decode here?
-    const filterMap = new Map<string, string>();
-    filter.split('&').forEach((pair) => {
-      const [key, value] = pair.split('=');
-      if (key && value) {
-        filterMap.set(key, decodeURIComponent(value));
-      }
-    });
-    // only include those that are supported
-    // currently supported: id, handle, email, status (active)
-    if (filterMap.has('id')) {
-      whereClause.user_id = filterMap.get('id') as unknown as number;
-    }
-    if (filterMap.has('handle')) {
-      whereClause.handle_lower = filterMap.get('handle').toLowerCase();
-    }
-    if (filterMap.has('email')) {
-      whereClause.user_email_xref = {
-        some: {
-          email: {
-            address: { equals: filterMap.get('email'), mode: 'insensitive' },
-          },
-        },
-      };
-    }
-    if (filterMap.has('active')) {
-      whereClause.status =
-        filterMap.get('active').toLowerCase() === 'true'
-          ? MemberStatus.ACTIVE
-          : MemberStatus.UNVERIFIED;
+  private extractSearchFilters(
+    query: UserSearchQueryDto,
+  ): { handle?: string; email?: string } {
+    const parsedFilters = this.parseFilterString(query.filter);
+    const handle =
+      query.handle ??
+      this.getFirstFilterValue(parsedFilters, ['handle', 'handleLower']);
+    const email =
+      query.email ??
+      this.getFirstFilterValue(parsedFilters, [
+        'email',
+        'emailAddress',
+        'primaryEmail',
+      ]);
+
+    return { handle, email };
+  }
+
+  private parseFilterString(filter?: string): Record<string, string> {
+    if (!filter) {
+      return {};
     }
 
-    return whereClause;
+    const rawFilters = (Array.isArray(filter) ? filter : [filter]) as string[];
+    const parsed: Record<string, string> = {};
+
+    for (const rawFilter of rawFilters) {
+      if (!rawFilter) {
+        continue;
+      }
+
+      const expressions = rawFilter
+        .split(',')
+        .map((expression) => expression.trim())
+        .filter(Boolean);
+
+      for (const expression of expressions) {
+        const [rawKey, ...rawValueParts] = expression.split('=');
+        if (!rawKey || rawValueParts.length === 0) {
+          continue;
+        }
+        const value = rawValueParts.join('=').trim();
+        if (!value) {
+          continue;
+        }
+
+        const key = this.normalizeFilterKey(rawKey);
+        if (!key) {
+          continue;
+        }
+
+        parsed[key] = value;
+      }
+    }
+
+    return parsed;
+  }
+
+  private normalizeFilterKey(key: string): string {
+    return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  }
+
+  private getFirstFilterValue(
+    parsedFilters: Record<string, string>,
+    candidates: string[],
+  ): string | undefined {
+    for (const candidate of candidates) {
+      const normalizedCandidate = this.normalizeFilterKey(candidate);
+      const match = parsedFilters[normalizedCandidate];
+      if (match) {
+        return match;
+      }
+    }
+    return undefined;
   }
 
   async findUserById(userId: number): Promise<UserModel | null> {
@@ -1390,9 +1470,9 @@ export class UserService {
         `Successfully updated status for user ${userId} from ${oldStatus} to ${normalizedNewStatus}`,
       );
 
-      // create user achivement
+      // create user achievement
       if (CommonUtils.validateString(comment)) {
-        await this.createUserAchivement(userId, comment);
+        await this.createUserAchievement(userId, comment);
       }
       // activate email
       const primaryEmailRecord = await this.prismaClient.email.findFirst({
@@ -1525,7 +1605,7 @@ export class UserService {
     }
   }
 
-  async createUserAchivement(userId: number, comment: string) {
+  async createUserAchievement(userId: number, comment: string) {
     try {
       const now = new Date();
       await this.prismaClient.user_achievement.create({
