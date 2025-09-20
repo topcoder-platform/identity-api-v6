@@ -821,9 +821,7 @@ describe('TwoFactorAuthService', () => {
 
     it('should throw BadRequestException if OTP not in cache and log warning', async () => {
       mockCacheManager.get.mockResolvedValue(null);
-      await expect(
-        service.checkOtpAndCompleteLogin(userIdStr, otp),
-      ).rejects.toThrow(
+      await expect(service.checkOtp(userIdStr, otp)).rejects.toThrow(
         new BadRequestException(
           '2FA OTP has expired or was not found. Please request a new one.',
         ),
@@ -837,9 +835,9 @@ describe('TwoFactorAuthService', () => {
 
     it('should throw BadRequestException if OTP does not match and log warning', async () => {
       mockCacheManager.get.mockResolvedValue('654321'); // Wrong OTP in cache
-      await expect(
-        service.checkOtpAndCompleteLogin(userIdStr, otp),
-      ).rejects.toThrow(new BadRequestException('Invalid 2FA OTP.'));
+      await expect(service.checkOtp(userIdStr, otp)).rejects.toThrow(
+        new BadRequestException('Invalid 2FA OTP.'),
+      );
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Invalid 2FA OTP provided for user ${userIdStr}`,
@@ -850,9 +848,7 @@ describe('TwoFactorAuthService', () => {
     it('should throw NotFoundException if user not found for final response', async () => {
       mockCacheManager.get.mockResolvedValue(otp); // Correct OTP
       mockPrismaOltp.user.findUnique.mockResolvedValue(null); // User not found
-      await expect(
-        service.checkOtpAndCompleteLogin(userIdStr, otp),
-      ).rejects.toThrow(
+      await expect(service.checkOtp(userIdStr, otp)).rejects.toThrow(
         new NotFoundException(
           'User not found after OTP check for final response.',
         ),

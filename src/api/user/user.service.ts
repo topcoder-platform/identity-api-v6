@@ -7,6 +7,7 @@ import {
   ConflictException,
   forwardRef,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -23,6 +24,9 @@ import {
   UserSearchQueryDto,
   AchievementDto,
   CredentialDto,
+  UserParamBaseDto,
+  ValidationResponseDto,
+  UserOtpDto,
 } from '../../dto/user/user.dto';
 import { ValidationService } from './validation.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,7 +40,9 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { Constants } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus } from '../../dto/member';
+import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
+import { addMinutes } from 'date-fns';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -56,12 +62,15 @@ export interface Auth0UserProfile {
 export const ACTIVATION_OTP_CACHE_PREFIX_KEY = 'USER_ACTIVATION_OTP';
 export const ACTIVATION_OTP_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 export const ACTIVATION_OTP_LENGTH = 6;
+const OTP_ACTIVATION_MODE = 1;
+const ACTIVATION_OTP_EXPIRY_MINUTES = 24 * 60;
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
   private readonly AUTH0_PROVIDER_NAME = 'auth0'; // Define constant for Auth0 provider name
   private legacyBlowfishKey: string; // Changed: Store the raw Base64 key string directly
+  private readonly defaultPassword: string;
 
   constructor(
     @Inject(PRISMA_CLIENT)
@@ -98,6 +107,9 @@ export class UserService {
         this.legacyBlowfishKey = '';
       }
     }
+    this.defaultPassword = this.configService.get<string>(
+      'DEFAULT_REGISTRATION_PASS',
+    );
   }
 
   // --- Core User Methods ---
@@ -533,277 +545,144 @@ export class UserService {
   }
 
   async registerUser(createUserDto: CreateUserBodyDto): Promise<UserModel> {
-    const userParams = createUserDto.param;
-    const { handle, email, firstName, lastName } = userParams;
-    console.log(`JSON: ${JSON.stringify(userParams)}`);
-    // Capture original providerType value (e.g., 'adfs', 'wipro', 'tc', etc.) before validation normalizes it
-    const originalProviderTypeKey = userParams?.profile?.provider;
+    const userParams: UserParamBaseDto = createUserDto.param;
 
-    this.logger.log(
-      `Attempting to register user with handle: ${handle} and email: ${email}`,
-    );
-
-    if (!handle) {
-      throw new BadRequestException('Handle is required.');
-    }
-    if (!email) {
-      throw new BadRequestException('Email is required.');
-    }
-    // Apply default password for enterprise/social registrations when password is missing
-    // Mirrors Java logic:
-    // if (user.getProfile() != null && (user.getCredential() == null || user.getCredential().getPassword() == null || user.getCredential().getPassword().length() == 0)) {
-    //   if (user.getCredential() == null) user.setCredential(new Credential());
-    //   user.getCredential().setPassword(Utils.getString("defaultPassword", "default-password"));
-    // }
-    if (
-      userParams.profile != null &&
-      (!userParams.credential ||
-        !userParams.credential.password ||
-        userParams.credential.password.length === 0)
-    ) {
+    // set default password in case of missing password
+    if (userParams.profile) {
       if (!userParams.credential) {
         userParams.credential = {} as CredentialDto;
       }
-      const defaultPassword = this.configService.get<string>(
-        'DEFAULT_PASSWORD',
-        'default-password',
-      );
-      userParams.credential.password = defaultPassword;
-      this.logger.debug(
-        `[registerUser] Applied default password for social/enterprise registration (provider: ${userParams.profile.provider}).`,
-      );
+      if (!CommonUtils.validateString(userParams.credential.password)) {
+        userParams.credential.password = this.defaultPassword;
+      }
     }
-
-    const credential = userParams.credential;
-    if (!credential?.password) {
-      throw new BadRequestException('Password is required.');
-    }
-    if (credential.password.length < 8) {
+    // perform initial static validations
+    this.validationService.validateUser(userParams);
+    // handle validation
+    const validationResponse: ValidationResponseDto =
+      await this.validationService.validateHandle(userParams.handle);
+    if (!validationResponse.valid) {
       throw new BadRequestException(
-        'Password must be at least 8 characters long.',
+        `Handle validation failed: ${validationResponse.reason}`,
       );
     }
-
-    try {
-      await this.validationService.validateHandle(handle);
-    } catch (error) {
-      this.logger.warn(
-        `Handle validation failed for '${handle}': ${error.message}`,
-      );
-      throw error;
-    }
-    try {
-      await this.validationService.validateEmail(email);
-    } catch (error) {
-      this.logger.warn(
-        `Email validation failed for '${email}': ${error.message}`,
-      );
-      throw error;
-    }
-
+    // email validation
+    await this.validationService.validateEmailViaDB(userParams.email);
+    // country validation
     if (userParams.country != null) {
-      try {
-        await this.validationService.validateCountryAndMutate(
-          userParams.country,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Country validation failed for '${JSON.stringify(userParams.country)}': ${error.message}`,
-        );
-        throw error;
+      const result = await this.validationService.validateCountryAndMutate(
+        userParams.country,
+      );
+      if (result) {
+        // means there is something wrong
+        throw new BadRequestException(result);
       }
     }
-
+    // profile validation
     if (userParams.profile != null) {
-      try {
-        await this.validationService.validateProfile(userParams.profile);
-      } catch (error) {
-        this.logger.warn(
-          `Profile validation failed for '${JSON.stringify(userParams.profile)}': ${error.message}`,
-        );
-        throw error;
+      await this.validationService.validateProfile(userParams.profile);
+    }
+    // referral validation
+    if (userParams.utmCampaign === 'ReferralProgram') {
+      const result = await this.validationService.validateReferral(
+        userParams.utmSource,
+      );
+      if (result) {
+        // means there is something wrong
+        throw new BadRequestException(result);
       }
     }
 
-    if (userParams.regSource == 'ReferralProgram') {
-      try {
-        await this.validationService.validateReferral(userParams.regSource);
-      } catch (error) {
-        this.logger.warn(
-          `Referral validation failed for '${JSON.stringify(userParams.regSource)}': ${error.message}`,
-        );
-        throw error;
-      }
-    }
+    userParams.isActive = false; // new user is inactive initially
+    userParams.status = MemberStatus.UNVERIFIED;
+
+    // -----------------------------------
+    // setAccessToken not implemented yet
+    // issue running auth0 flow in DEV
+    // -----------------------------------
 
     // Generate OTP first, as it will be stored as the activation_code
     const otpForActivation = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
 
     // Step 1: Get the next user ID from the sequence (mimicking Java DAO)
-    let nextUserId: number;
-    try {
-      // Prisma doesn't have a built-in nextval function, use raw query
-      const result: { nextval: bigint }[] = await this.prismaClient
-        .$queryRaw`SELECT nextval('sequence_user_seq'::regclass)`;
-      if (!result || result.length === 0 || !result[0].nextval) {
-        throw new Error('Failed to retrieve next user ID from sequence.');
-      }
-      nextUserId = Number(result[0].nextval);
-      this.logger.debug(
-        `[registerUser] Fetched next user ID from sequence: ${nextUserId}`,
-      );
-    } catch (seqError) {
-      this.logger.error(
-        `[registerUser] Error fetching next user ID: ${seqError.message}`,
-        seqError.stack,
-      );
-      throw new InternalServerErrorException('Failed to generate user ID.');
-    }
-
+    const nextUserId: number = await this.getNextUserId();
     // Step 2: Perform inserts within a transaction using the fetched ID
     let newUser: UserModel;
     try {
       newUser = await this.prismaClient.$transaction(async (prisma) => {
         const userData = {
           user_id: nextUserId,
-          handle: handle,
-          handle_lower: handle.toLowerCase(),
-          status: 'U',
-          first_name: firstName,
-          last_name: lastName,
+          handle: userParams.handle,
+          handle_lower: userParams.handle.toLowerCase(),
+          status: userParams.status,
+          first_name: userParams.firstName,
+          last_name: userParams.lastName,
           create_date: new Date(),
           modify_date: new Date(),
           activation_code: otpForActivation,
+          reg_source: userParams.regSource,
+          utm_source: userParams.utmSource,
+          utm_medium: userParams.utmMedium,
+          utm_campaign: userParams.utmCampaign,
         };
 
         this.logger.debug(
           `[registerUser Transaction] Data for prisma.user.create: ${JSON.stringify(userData)}`,
         );
 
+        // ============
+        // insert user
+        // ============
         const createdUser = await prisma.user.create({
           data: userData,
         });
         this.logger.log(
-          `User record created for ${handle} (ID: ${createdUser.user_id.toNumber()})`,
+          `User record created for ${userParams.handle} (ID: ${createdUser.user_id.toNumber()})`,
         );
 
         // Use the existing service method for consistent password encoding
         const actualEncodedPassword = this.encodePasswordLegacy(
-          credential.password,
+          userParams.credential.password,
         );
 
         this.logger.debug(
-          `[RegisterUser Tx] Encrypted password for handle ${handle} (using encodePasswordLegacy): ${actualEncodedPassword}`,
+          `[RegisterUser Tx] Encrypted password for handle ${userParams.handle} (using encodePasswordLegacy): ${actualEncodedPassword}`,
         );
 
+        // ====================
+        // insert security user
+        // ====================
         await prisma.security_user.create({
           data: {
             login_id: createdUser.user_id, // Use the Decimal user_id directly
-            user_id: handle,
+            user_id: userParams.handle,
             password: actualEncodedPassword, // Use password from service method
           },
         });
         this.logger.log(
-          `Security user record created for user ${handle} (ID: ${nextUserId})`,
+          `Security user record created for user ${userParams.handle} (ID: ${nextUserId})`,
         );
 
-        let emailRecord = await prisma.email.findFirst({
-          where: { address: { equals: email, mode: 'insensitive' } },
-        });
-        if (!emailRecord) {
-          // ADDED: Fetch next email_id explicitly
-          let nextEmailId: number;
-          try {
-            const result: { nextval: bigint }[] =
-              await prisma.$queryRaw`SELECT nextval('sequence_email_seq'::regclass)`;
-            if (!result || result.length === 0 || !result[0].nextval) {
-              throw new Error(
-                'Failed to retrieve next email ID from sequence.',
-              );
-            }
-            nextEmailId = Number(result[0].nextval);
-            this.logger.debug(
-              `[registerUser Transaction] Fetched next email ID: ${nextEmailId}`,
-            );
-          } catch (seqError) {
-            this.logger.error(
-              `[registerUser Transaction] Error fetching next email ID: ${seqError.message}`,
-              seqError.stack,
-            );
-            throw new InternalServerErrorException(
-              'Failed to generate email ID.',
-            );
-          }
+        // ====================
+        // insert Email record
+        // ====================
+        await this.createEmailRecord(prisma, userParams, nextUserId);
 
-          emailRecord = await prisma.email.create({
-            data: {
-              email_id: nextEmailId, // Use fetched ID
-              user_id: nextUserId, // ADDED: Link directly to the user ID
-              address: email, // Use provided email
-              primary_ind: Constants.primaryEmailFlag, // Defaulted based on Java code logic
-              status_id: Constants.unverifiedEmailStatus, // Defaulted based on Java code logic (Inactive/Unverified initially)
-              email_type_id: Constants.standardEmailType, // ADDED: Assume type 1 (Primary) as per Java DAO's email queries
-              create_date: new Date(),
-              modify_date: new Date(),
-            },
-          });
-          this.logger.debug(
-            `Email record created for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
-          );
-        } else {
-          this.logger.debug(
-            `Existing email record found for ${email} (ID: ${emailRecord.email_id.toNumber()})`,
+        // =======================
+        // insert user social/sso
+        // =======================
+        if (userParams.profile) {
+          await this.createSsoSocialLoginDuringRegistration(
+            prisma,
+            userParams,
+            nextUserId,
+            userParams.email,
           );
         }
-        console.log(`originalProviderTypeKey: ${originalProviderTypeKey}`);
-        // If original provider indicates an enterprise provider, create user_sso_login link
-        try {
-          if (originalProviderTypeKey) {
-            const details = getProviderDetails(originalProviderTypeKey);
-            if (details?.isEnterprise) {
-              const providerRecord = await prisma.sso_login_provider.findFirst({
-                where: { name: originalProviderTypeKey },
-              });
-              if (!providerRecord) {
-                this.logger.error(
-                  `[registerUser Transaction] Enterprise provider '${originalProviderTypeKey}' not found in sso_login_provider; skipping user_sso_login creation.`,
-                );
-              } else {
-                const ssoUserId = userParams?.profile?.userId;
-                if (!ssoUserId) {
-                  this.logger.warn(
-                    `[registerUser Transaction] Enterprise profile missing userId for provider '${originalProviderTypeKey}'; skipping user_sso_login creation.`,
-                  );
-                } else {
-                  const data = {
-                    user_id: nextUserId,
-                    provider_id: providerRecord.sso_login_provider_id,
-                    sso_user_id: ssoUserId,
-                    email: userParams?.profile?.email || email,
-                    sso_user_name: userParams?.profile?.name,
-                  };
-                  console.log(
-                    `Creating user_sso_login : ${JSON.stringify(data)}`,
-                  );
 
-                  await prisma.user_sso_login.create({
-                    data,
-                  });
-                  this.logger.log(
-                    `[registerUser Transaction] Created user_sso_login for user ${nextUserId} with provider '${originalProviderTypeKey}'.`,
-                  );
-                }
-              }
-            }
-          }
-        } catch (ssoError) {
-          this.logger.error(
-            `[registerUser Transaction] Error creating user_sso_login for enterprise provider '${originalProviderTypeKey}': ${ssoError.message}`,
-            ssoError.stack,
-          );
-          // Do not fail the whole registration for SSO link issues
-          // TODO: Should we fail here?  I don't know that the user will be able to login without that record...
-        }
+        // add user to initial groups
+        await this.addUserToDefaultGroups();
+
         return createdUser;
       });
     } catch (error) {
@@ -813,9 +692,13 @@ export class UserService {
             `Registration failed due to unique constraint: ${error.message}. Fields: ${JSON.stringify(error.meta?.target)}`,
           );
           if ((error.meta?.target as string[])?.includes('handle_lower')) {
-            throw new ConflictException(`Handle '${handle}' already exists.`);
+            throw new ConflictException(
+              `Handle '${userParams.handle}' already exists.`,
+            );
           } else if ((error.meta?.target as string[])?.includes('address')) {
-            throw new ConflictException(`Email '${email}' already exists.`);
+            throw new ConflictException(
+              `Email '${userParams.email}' already exists.`,
+            );
           }
           throw new ConflictException(
             'User with this handle or email already exists.',
@@ -823,7 +706,7 @@ export class UserService {
         }
       }
       this.logger.error(
-        `Error during user registration transaction for ${handle}: ${error.message}`,
+        `Error during user registration transaction for ${userParams.handle}: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException(
@@ -831,66 +714,213 @@ export class UserService {
       );
     }
 
+    // ==============
+    // insert member
+    // ==============
+    await this.createMemberData(nextUserId, userParams);
+
+    // =============
+    // insert otp
+    // =============
+    // when not active yet
+    if (newUser.status != MemberStatus.ACTIVE) {
+      const expiresAt = addMinutes(new Date(), ACTIVATION_OTP_EXPIRY_MINUTES);
+      // we insert a new one
+      await this.prismaClient.user_otp_email.create({
+        data: {
+          user_id: newUser.user_id,
+          mode: OTP_ACTIVATION_MODE,
+          otp: otpForActivation,
+          resend: false,
+          fail_count: 0,
+          expire_at: expiresAt,
+        },
+      });
+      await this.resendActivationEmailEvent(
+        {
+          handle: newUser.handle,
+          otp: otpForActivation,
+          userId: Number(newUser.user_id),
+        },
+        userParams.email,
+      );
+    } else {
+      // add Topcoder User role if the user was auto-activated
+      await this.assignDefaultUserRole(Number(newUser.user_id));
+    }
+
+    // ================================
+    // assign additional roles to user
+    // ================================
+    await this.assignRolesForNewUser(
+      userParams.regSource,
+      Number(newUser.user_id),
+      userParams.primaryRole,
+    );
+
+    // ==========================
+    // publish user created event
+    // ==========================
+    await this.publishUserCreatedEvent(newUser, userParams, otpForActivation);
+
+    this.logger.log(
+      `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
+    );
+    return newUser;
+  }
+
+  private async addUserToDefaultGroups() {
+    // FIXME to be implemented
+    // at the moment, sequence_user_group_seq does not exist in schema, this needs to be added
+  }
+
+  private async assignRolesForNewUser(
+    regSource: string,
+    userId: number,
+    userPrimaryRole: string,
+  ) {
+    // add business user role if needed
+    if (
+      CommonUtils.validateString(regSource) &&
+      regSource.match(/^tcBusiness$/)
+    ) {
+      await this.roleService.assignRoleByName('Business User', userId, userId);
+    }
+    // add self-service customer role if needed
+    if (
+      CommonUtils.validateString(regSource) &&
+      regSource.match(/^selfService$/)
+    ) {
+      await this.roleService.assignRoleByName(
+        'Self-Service Customer',
+        userId,
+        userId,
+      );
+    }
+
+    let primaryRole = 'Topcoder Talent';
+    // if userPrimaryRole is null, primaryRole stays as 'Topcoder Talent'
+    // if userPrimaryRole is 'Topcoder Customer', replace primaryRole as 'Topcoder Customer'
+    this.logger.log('User Primary Role from request: ' + userPrimaryRole);
+    if (
+      CommonUtils.validateString(userPrimaryRole) &&
+      userPrimaryRole.toLowerCase() === 'topcoder customer'
+    ) {
+      primaryRole = 'Topcoder Customer';
+    }
+
+    this.logger.log('Primary Role to be saved: ' + primaryRole);
+    // assign primary role
+    await this.roleService.assignRoleByName(primaryRole, userId, userId);
+  }
+
+  private async getNextUserId(): Promise<number> {
+    try {
+      // Prisma doesn't have a built-in nextval function, use raw query
+      const result: { nextval: bigint }[] = await this.prismaClient
+        .$queryRaw`SELECT nextval('sequence_user_seq'::regclass)`;
+      if (!result || result.length === 0 || !result[0].nextval) {
+        throw new Error('Failed to retrieve next user ID from sequence.');
+      }
+      const nextUserId = Number(result[0].nextval);
+      this.logger.debug(
+        `[registerUser] Fetched next user ID from sequence: ${nextUserId}`,
+      );
+      return nextUserId;
+    } catch (seqError) {
+      this.logger.error(
+        `[registerUser] Error fetching next user ID: ${seqError.message}`,
+        seqError.stack,
+      );
+      throw new InternalServerErrorException('Failed to generate user ID.');
+    }
+  }
+
+  private async createMemberData(
+    nextUserId: number,
+    userParams: UserParamBaseDto,
+  ) {
     // Create the member record outside of the interactive transaction
     // to avoid cross-client work while a Prisma transaction is open
     try {
       await this.memberPrisma.member.create({
         data: {
           userId: Number(nextUserId),
-          handle: handle,
-          handleLower: handle.toLowerCase(),
-          email,
+          handle: userParams.handle,
+          handleLower: userParams.handle.toLowerCase(),
+          email: userParams.email,
           tracks: [],
           createdBy: String(nextUserId),
-          firstName: firstName ?? null,
-          lastName: lastName ?? null,
+          firstName: userParams.firstName ?? null,
+          lastName: userParams.lastName ?? null,
           status: 'UNVERIFIED',
         },
       });
     } catch (err) {
       this.logger.error(
         { err },
-        `Failed to create member record for new user ${String(nextUserId)} / ${handle}`,
+        `Failed to create member record for new user ${String(nextUserId)} / ${userParams.handle}`,
       );
       // Intentionally not throwing to keep registration flow consistent
     }
+  }
 
-    const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${newUser.user_id.toNumber()}`;
-    const otpExpiry =
-      this.configService.get<number>(
-        'ACTIVATION_OTP_EXPIRY_SECONDS',
-        ACTIVATION_OTP_EXPIRY_SECONDS,
-      ) * 1000;
-    try {
-      await this.cacheManager.set(otpCacheKey, otpForActivation, otpExpiry);
-      this.logger.log(
-        `Activation OTP ${otpForActivation} generated and cached for user ${newUser.user_id.toNumber()} (key: ${otpCacheKey})`,
+  private async createEmailRecord(
+    prisma: any,
+    userParams: UserParamBaseDto,
+    nextUserId: number,
+  ) {
+    let emailRecord = await prisma.email.findFirst({
+      where: { address: { equals: userParams.email, mode: 'insensitive' } },
+    });
+    if (!emailRecord) {
+      // ADDED: Fetch next email_id explicitly
+      let nextEmailId: number;
+      try {
+        const result: { nextval: bigint }[] =
+          await prisma.$queryRaw`SELECT nextval('sequence_email_seq'::regclass)`;
+        if (!result || result.length === 0 || !result[0].nextval) {
+          throw new Error('Failed to retrieve next email ID from sequence.');
+        }
+        nextEmailId = Number(result[0].nextval);
+        this.logger.debug(
+          `[registerUser Transaction] Fetched next email ID: ${nextEmailId}`,
+        );
+      } catch (seqError) {
+        this.logger.error(
+          `[registerUser Transaction] Error fetching next email ID: ${seqError.message}`,
+          seqError.stack,
+        );
+        throw new InternalServerErrorException('Failed to generate email ID.');
+      }
+
+      emailRecord = await prisma.email.create({
+        data: {
+          email_id: nextEmailId, // Use fetched ID
+          user_id: nextUserId, // ADDED: Link directly to the user ID
+          address: userParams.email, // Use provided email
+          primary_ind: Constants.primaryEmailFlag, // Defaulted based on Java code logic
+          status_id: Constants.unverifiedEmailStatus, // Defaulted based on Java code logic (Inactive/Unverified initially)
+          email_type_id: Constants.standardEmailType, // ADDED: Assume type 1 (Primary) as per Java DAO's email queries
+          create_date: new Date(),
+          modify_date: new Date(),
+        },
+      });
+      this.logger.debug(
+        `Email record created for ${userParams.email} (ID: ${emailRecord.email_id.toNumber()})`,
       );
-    } catch (cacheError) {
-      this.logger.error(
-        `Failed to cache OTP for user ${newUser.user_id.toNumber()}: ${cacheError.message}`,
-        cacheError.stack,
-      );
+    } else {
+      const msg = `Existing email record found for ${userParams.email} (ID: ${emailRecord.email_id.toNumber()})`;
+      this.logger.debug(msg);
+      throw new Error(msg);
     }
+  }
 
-    try {
-      const operatorIdForRoleAssignment = Number(newUser.user_id);
-      // Changed role name to "Topcoder User" to match Java UserResource.assignDefaultUserRole logic
-      await this.roleService.assignRoleByName(
-        'Topcoder User',
-        Number(newUser.user_id),
-        operatorIdForRoleAssignment,
-      );
-      this.logger.log(
-        `Default role(s) assigned to user ${newUser.user_id.toNumber()}`,
-      );
-    } catch (roleError) {
-      this.logger.error(
-        `Failed to assign default roles to user ${newUser.user_id.toNumber()}: ${roleError.message}`,
-        roleError.stack,
-      );
-    }
-
+  private async publishUserCreatedEvent(
+    newUser: UserModel,
+    userParams: UserParamBaseDto,
+    otpForActivation: string,
+  ) {
     try {
       // For 'event.user.created', attributes should be the full camelCased newUser object
       const createdEventAttributes = this.toCamelCase(newUser);
@@ -919,16 +949,16 @@ export class UserService {
         const activationEmailPayload = {
           data: { handle: newUser.handle, code: otpForActivation },
           from: { email: fromEmail },
-          version: 'v3',
+          version: 'v6',
           sendgrid_template_id: sendgridTemplateId,
-          recipients: [email], // The original email used for registration
+          recipients: [userParams.email], // The original email used for registration
         };
         await this.eventService.postDirectBusMessage(
           'external.action.email',
           activationEmailPayload,
         );
         this.logger.log(
-          `Published 'external.action.email' (activation) for ${newUser.user_id.toNumber()} to ${email}. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
+          `Published 'external.action.email' (activation) for ${newUser.user_id.toNumber()} to ${userParams.email}. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
         );
       }
     } catch (eventError) {
@@ -937,11 +967,87 @@ export class UserService {
         eventError.stack,
       );
     }
+  }
 
-    this.logger.log(
-      `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
-    );
-    return newUser;
+  private async createSsoSocialLoginDuringRegistration(
+    prisma: any,
+    userParams: UserParamBaseDto,
+    nextUserId: number,
+    email: string,
+  ) {
+    // Capture original providerType value (e.g., 'adfs', 'wipro', 'tc', etc.) before validation normalizes it
+    const originalProviderTypeKey = userParams.profile.provider;
+
+    try {
+      console.log(`originalProviderTypeKey: ${originalProviderTypeKey}`);
+      if (originalProviderTypeKey) {
+        const details = getProviderDetails(originalProviderTypeKey);
+        if (details?.isSocial) {
+          // do we validate profile parameters for social?
+
+          const providerRecord = await prisma.social_login_provider.findFirst({
+            where: { name: originalProviderTypeKey },
+          });
+          if (!providerRecord) {
+            this.logger.error(
+              `[registerUser Transaction] Enterprise provider '${originalProviderTypeKey}' not found in sso_login_provider; skipping user_sso_login creation.`,
+            );
+          } else {
+            await prisma.user_social_login.create({
+              data: {
+                user_id: nextUserId,
+                social_login_provider_id:
+                  providerRecord.social_login_provider_id,
+                social_user_name: userParams?.profile?.name,
+                social_email: userParams?.profile?.email,
+                social_email_verified: userParams?.profile?.isEmailVerified,
+                social_user_id: userParams?.profile?.userId,
+              },
+            });
+          }
+        } else if (details?.isEnterprise && details?.key !== 'ad') {
+          // not ldap
+          const providerRecord = await prisma.sso_login_provider.findFirst({
+            where: { name: originalProviderTypeKey },
+          });
+          if (!providerRecord) {
+            this.logger.error(
+              `[registerUser Transaction] Enterprise provider '${originalProviderTypeKey}' not found in sso_login_provider; skipping user_sso_login creation.`,
+            );
+          } else {
+            const ssoUserId = userParams?.profile?.userId;
+            if (!ssoUserId) {
+              this.logger.warn(
+                `[registerUser Transaction] Enterprise profile missing userId for provider '${originalProviderTypeKey}'; skipping user_sso_login creation.`,
+              );
+            } else {
+              const data = {
+                user_id: nextUserId,
+                provider_id: providerRecord.sso_login_provider_id,
+                sso_user_id: ssoUserId,
+                email: userParams?.profile?.email || email,
+                sso_user_name: userParams?.profile?.name,
+              };
+              console.log(`Creating user_sso_login : ${JSON.stringify(data)}`);
+
+              await prisma.user_sso_login.create({
+                data,
+              });
+              this.logger.log(
+                `[registerUser Transaction] Created user_sso_login for user ${nextUserId} with provider '${originalProviderTypeKey}'.`,
+              );
+            }
+          }
+        }
+      }
+    } catch (ssoError) {
+      this.logger.error(
+        `[registerUser Transaction] Error creating user_sso_login for enterprise provider '${originalProviderTypeKey}': ${ssoError.message}`,
+        ssoError.stack,
+      );
+      // Do not fail the whole registration for SSO link issues
+      // TODO: Should we fail here?  I don't know that the user will be able to login without that record...
+    }
   }
 
   async updateBasicInfo(
@@ -1076,7 +1182,15 @@ export class UserService {
     );
 
     // Validate format and uniqueness (ValidationService throws on failure)
-    await this.validationService.validateHandle(newHandle, userId);
+    const validationResponse = await this.validationService.validateHandle(
+      newHandle,
+      userId,
+    );
+    if (!validationResponse.valid) {
+      throw new BadRequestException(
+        `Handle validation failed: ${validationResponse.reason}`,
+      );
+    }
 
     // Fetch the user to ensure they exist and get the old handle
     const existingUser = await this.prismaClient.user.findUnique({
@@ -1201,7 +1315,6 @@ export class UserService {
 
     // Validate new email
     await this.validationService.validateEmail(newEmail, userId);
-    // await this.checkEmailAvailabilityForUser(newEmail, userId);
     const updatedUserInTx = await this.prismaClient.$transaction(async (tx) => {
       // Find the user first
       const userInDB = await tx.user.findUnique({
@@ -1230,7 +1343,7 @@ export class UserService {
       const oldEmail = currentPrimaryEmailRecord.address;
 
       // If the new email is the same as current, return user as-is
-      if (oldEmail === newEmail.toLowerCase()) {
+      if (oldEmail.toLowerCase() === newEmail.toLowerCase()) {
         this.logger.log(
           `Email ${newEmail} is already the primary email for user ${userId}. No changes needed.`,
         );
@@ -1257,7 +1370,6 @@ export class UserService {
         where: { email_id: currentPrimaryEmailRecord.email_id },
         data: {
           address: newEmail.toLowerCase(),
-          // status_id: new Decimal(2), // Set to unverified status
           modify_date: new Date(),
         },
       });
@@ -1282,65 +1394,6 @@ export class UserService {
       return updatedUser;
     });
 
-    // v3 java does not genereate otp and send the email
-    /**
-    // Generate OTP and resend token for email verification using the updated email record
-    const updatedEmailRecord = await this.prismaClient.email.findFirst({
-      where: {
-        user_id: userId,
-        primary_ind: Constants.primaryEmailFlag,
-      },
-    });
-
-    if (updatedEmailRecord) {
-      const otpForNewEmail = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
-      const otpCacheKey = `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:UPDATE_EMAIL:${userId}:${updatedEmailRecord.email_id.toNumber()}`;
-      const otpExpiry =
-        this.configService.get<number>(
-          'ACTIVATION_OTP_EXPIRY_SECONDS',
-          ACTIVATION_OTP_EXPIRY_SECONDS,
-        ) * 1000;
-
-      await this.cacheManager.set(otpCacheKey, otpForNewEmail, otpExpiry);
-
-      const resendPayload = {
-        sub: userId.toString(),
-        aud: 'emailupdate_activation',
-        emailId: updatedEmailRecord.email_id.toString(),
-      };
-      const resendTokenExpiry = this.configService.get<string>(
-        'ACTIVATION_RESEND_JWT_EXPIRY',
-        '1h',
-      );
-      const resendTokenForNewEmail = jwt.sign(
-        resendPayload,
-        this.configService.get<string>('JWT_SECRET'),
-        { expiresIn: resendTokenExpiry },
-      );
-
-      // Send verification email
-      try {
-        await this.eventService.postEnvelopedNotification(
-          'email.verification_required',
-          {
-            userId: userIdString,
-            email: newEmail,
-            otp: otpForNewEmail,
-            resendToken: resendTokenForNewEmail,
-            reason: 'PRIMARY_EMAIL_UPDATE',
-          },
-        );
-        this.logger.log(
-          `Published 'email.verification_required' event for updated primary email ${newEmail}, user ${userIdString}`,
-        );
-      } catch (eventError) {
-        this.logger.error(
-          `Failed to publish email.verification_required event for user ${userIdString}: ${eventError.message}`,
-          eventError.stack,
-        );
-      }
-    }
-    **/
     // Publish user updated event
     try {
       const eventAttributes = this.toCamelCase(updatedUserInTx);
@@ -1365,6 +1418,7 @@ export class UserService {
     userIdString: string,
     newStatus: string,
     authUser: AuthenticatedUser,
+    comment: string,
   ): Promise<UserModel> {
     const userId = parseInt(userIdString, 10);
     if (isNaN(userId)) {
@@ -1403,7 +1457,10 @@ export class UserService {
 
     try {
       const updatedUser = await this.prismaClient.user.update({
-        where: { user_id: userId },
+        where: {
+          user_id: userId,
+          status: { not: MemberStatus.INACTIVE_IRREGULAR_ACCOUNT },
+        },
         data: {
           status: normalizedNewStatus,
           modify_date: new Date(),
@@ -1412,6 +1469,25 @@ export class UserService {
       this.logger.log(
         `Successfully updated status for user ${userId} from ${oldStatus} to ${normalizedNewStatus}`,
       );
+
+      // create user achievement
+      if (CommonUtils.validateString(comment)) {
+        await this.createUserAchievement(userId, comment);
+      }
+      // activate email
+      const primaryEmailRecord = await this.prismaClient.email.findFirst({
+        where: {
+          user_id: userId,
+          primary_ind: Constants.primaryEmailFlag,
+        },
+      });
+      if (
+        user.status == MemberStatus.ACTIVE &&
+        primaryEmailRecord &&
+        Number(primaryEmailRecord.status_id) !== Constants.verifiedEmailStatus
+      ) {
+        await this.activateEmail(Number(primaryEmailRecord.email_id));
+      }
 
       // Event Publishing Logic based on Java UserResource.updateStatus
       let notificationType = 'event.user.updated'; // Generic update
@@ -1431,26 +1507,10 @@ export class UserService {
       );
 
       // If status changed from Unverified to Active, send welcome email & assign default role
-      if (oldStatus === 'U' && normalizedNewStatus === 'A') {
-        this.logger.log(
-          `User ${userId} activated (U -> A). Assigning default role and triggering welcome email.`,
-        );
-        try {
-          await this.roleService.assignRoleByName(
-            'Topcoder User',
-            userId,
-            Number(authUser.userId),
-          ); // Operator is admin
-          this.logger.log(
-            `Assigned default role to newly activated user ${userId}.`,
-          );
-        } catch (roleError) {
-          this.logger.error(
-            `Failed to assign default role to newly activated user ${userId}: ${roleError.message}`,
-            roleError.stack,
-          );
-        }
-
+      if (
+        oldStatus === MemberStatus.UNVERIFIED &&
+        normalizedNewStatus === MemberStatus.ACTIVE
+      ) {
         const primaryEmailRecord = await this.prismaClient.email.findFirst({
           where: {
             user_id: userId,
@@ -1459,39 +1519,11 @@ export class UserService {
           }, // Ensure it's verified
         });
 
-        if (primaryEmailRecord?.address && updatedUser?.handle) {
-          const domain =
-            this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
-          const fromEmail = `Topcoder <noreply@${domain}>`;
-          const welcomeTemplateId = this.configService.get<string>(
-            'SENDGRID_WELCOME_EMAIL_TEMPLATE_ID',
-          );
-
-          if (!welcomeTemplateId) {
-            this.logger.error(
-              `SendGrid template ID not configured (SENDGRID_WELCOME_EMAIL_TEMPLATE_ID). Cannot send welcome email for user ${userId} in updateStatus.`,
-            );
-          } else {
-            const welcomeEmailPayload = {
-              data: { handle: updatedUser.handle }, // Use handle from updatedUser
-              from: { email: fromEmail },
-              version: 'v6',
-              sendgrid_template_id: welcomeTemplateId,
-              recipients: [primaryEmailRecord.address],
-            };
-            await this.eventService.postDirectBusMessage(
-              'external.action.email',
-              welcomeEmailPayload,
-            );
-            this.logger.log(
-              `Published 'external.action.email' (welcome via updateStatus) for user ${userId}. Payload: ${JSON.stringify(welcomeEmailPayload, null, 2)}`,
-            );
-          }
-        } else {
-          this.logger.warn(
-            `Could not send welcome email for newly activated user ${userId} (via updateStatus) due to missing primary email or handle.`,
-          );
+        if (primaryEmailRecord?.address) {
+          await this.notifyWelcome(userId, primaryEmailRecord?.address);
         }
+        // assign default role
+        await this.assignDefaultUserRole(userId);
       }
 
       return updatedUser;
@@ -1507,9 +1539,37 @@ export class UserService {
     }
   }
 
+  /**
+   * Activate email of user.
+   * @param emailId Email ID
+   * @throws InternalServerErrorException When an error activating email
+   */
+  async activateEmail(emailId: number) {
+    try {
+      await this.prismaClient.email.update({
+        data: {
+          status_id: Constants.verifiedEmailStatus,
+        },
+        where: {
+          email_id: emailId,
+          email_type_id: Constants.standardEmailType,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error activating email of user: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to activate user email');
+    }
+  }
+
   // --- User Achievements ---
 
-  async getAchievements(userId: number): Promise<AchievementDto[]> {
+  async getAchievements(
+    userId: number,
+    selector?: string,
+  ): Promise<AchievementDto[]> {
     this.logger.debug(`Fetching achievements for user ID: ${userId}`);
     try {
       const achievements = await this.prismaClient.user_achievement.findMany({
@@ -1520,12 +1580,20 @@ export class UserService {
       });
 
       // Map to AchievementDto
-      return achievements.map((ach) => ({
+      const mappedAchievements = achievements.map((ach) => ({
         achievement_type_id: Number(ach.achievement_type_id),
         achievement_desc: ach.achievement_type_lu.achievement_type_desc,
         date: ach.create_date,
         description: ach.description,
       }));
+      if (selector && selector.trim().length > 0) {
+        const keys = selector.split(',');
+        return CommonUtils.pickArray(
+          mappedAchievements,
+          keys,
+        ) as AchievementDto[];
+      }
+      return mappedAchievements;
     } catch (error) {
       this.logger.error(
         `Error fetching achievements for user ${userId}: ${error.message}`,
@@ -1534,6 +1602,27 @@ export class UserService {
       throw new InternalServerErrorException(
         'Failed to retrieve user achievements.',
       );
+    }
+  }
+
+  async createUserAchievement(userId: number, comment: string) {
+    try {
+      const now = new Date();
+      await this.prismaClient.user_achievement.create({
+        data: {
+          user_id: userId,
+          achievement_date: now,
+          achievement_type_id: 2,
+          description: comment,
+          create_date: now,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error saving achievement for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to save user achivement');
     }
   }
 
@@ -1556,10 +1645,7 @@ export class UserService {
     }
 
     // 1. Find Auth0 Provider ID
-    const auth0Provider = await this.prismaClient.sso_login_provider.findFirst({
-      where: { name: this.AUTH0_PROVIDER_NAME },
-    });
-
+    const auth0Provider = getProviderDetails(this.AUTH0_PROVIDER_NAME);
     if (!auth0Provider) {
       // Aligning with Java UserResource behavior: expect provider to be pre-seeded.
       this.logger.error(
@@ -1574,7 +1660,7 @@ export class UserService {
     const existingSsoLogin = await this.prismaClient.user_sso_login.findFirst({
       where: {
         sso_user_id: auth0Profile.sub,
-        provider_id: auth0Provider.sso_login_provider_id,
+        provider_id: new Decimal(auth0Provider.id),
       },
       include: { user: true },
     });
@@ -1616,7 +1702,7 @@ export class UserService {
           data: {
             user_id: userByEmail.user_id,
             sso_user_id: auth0Profile.sub,
-            provider_id: auth0Provider.sso_login_provider_id,
+            provider_id: new Decimal(auth0Provider.id),
           },
         });
         await this.updateLastLoginDate(Number(userByEmail.user_id));
@@ -1669,7 +1755,7 @@ export class UserService {
           data: {
             user_id: newUser.user_id,
             sso_user_id: auth0Profile.sub,
-            provider_id: auth0Provider.sso_login_provider_id,
+            provider_id: new Decimal(auth0Provider.id),
           },
         });
 
@@ -1919,48 +2005,241 @@ export class UserService {
   // async updateDetailedProfile(userId: number, profileDetailsDto, authUser: AuthenticatedUser) { ... }
 
   /**
-   * Insert User OTP similar to java.
-   * @param userId User Id
-   * @param mode Mode. If otpActivationMode or otp2faMode
-   * @param otp The OTP
-   * @param resend If allowed to resend
-   * @param failCount Failure counts
-   * @param expireAt Expires at
+   * Assign default user role to user.
+   * @param userId User ID
    */
-  async insertUserOtp(
-    userId: number,
-    mode: number,
-    otp: string,
-    resend: boolean,
-    failCount: number,
-    expireAt: Date,
-  ): Promise<void> {
+  async assignDefaultUserRole(userId: number) {
+    // Changed role name to "Topcoder User" to match Java UserResource.assignDefaultUserRole logic
+    await this.roleService.assignRoleByName('Topcoder User', userId, userId);
+  }
+
+  /**
+   * Notify welcome.
+   * @param userId User ID
+   * @param emailAddress Email address to send welcome email
+   */
+  async notifyWelcome(userId: number, emailAddress: string) {
     try {
-      await this.prismaClient.user_otp_email.create({
-        data: {
-          user_id: userId,
-          mode: mode,
-          otp: otp,
-          resend: resend,
-          fail_count: failCount,
-          expire_at: expireAt,
+      const user = await this.findUserById(userId);
+      // Use postEnvelopedNotification for standard events
+      // whole user details sent not just userId
+      await this.eventService.postEnvelopedNotification('welcome', {
+        id: userId,
+      });
+      this.logger.log(`Published 'event.user.activated' event for ${userId}`);
+
+      // Send Welcome Email directly, matching legacy Java behavior
+      if (emailAddress && user?.handle) {
+        const domain =
+          this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+        const fromEmail = `Topcoder <noreply@${domain}>`;
+        let welcomeTemplateId = this.configService.get<string>(
+          'SENDGRID_WELCOME_EMAIL_TEMPLATE_ID',
+        );
+        if (
+          CommonUtils.validateString(user.reg_source) &&
+          user.reg_source.match(/^selfService$/)
+        ) {
+          welcomeTemplateId = this.configService.get<string>(
+            'SENDGRID_SELFSERVICE_WELCOME_EMAIL_TEMPLATE_ID',
+          );
+        }
+        if (!welcomeTemplateId) {
+          this.logger.error(
+            `SendGrid template ID not configured (SENDGRID_WELCOME_EMAIL_TEMPLATE_ID). Cannot send welcome email for user ${userId}.`,
+          );
+        } else {
+          const welcomeEmailPayload = {
+            data: {
+              handle: user.handle,
+              // Add other data fields specific to the welcome template if needed
+            },
+            from: { email: fromEmail },
+            version: 'v6',
+            sendgrid_template_id: welcomeTemplateId,
+            recipients: [emailAddress],
+          };
+          await this.eventService.postDirectBusMessage(
+            'external.action.email',
+            welcomeEmailPayload,
+          );
+          this.logger.log(
+            `Published 'external.action.email' (welcome) for user ${userId} to ${emailAddress}. Payload: ${JSON.stringify(welcomeEmailPayload, null, 2)}`,
+          );
+        }
+      } else {
+        this.logger.warn(
+          `Could not send welcome email for user ${userId} due to missing primary email address or handle.`,
+        );
+      }
+    } catch (eventError) {
+      this.logger.error(
+        `Failed to publish events for user activation ${userId}: ${eventError.message}`,
+        eventError.stack,
+      );
+    }
+  }
+
+  /**
+   * Resend email to user.
+   * @param email Email address to identify user
+   * @param handle Handle of user
+   * @returns user details if successful
+   * @throws UnauthorizedException if user not found
+   * @throws BadRequestException if user already activated or no primary email
+   */
+  async resendEmail(email?: string, handle?: string): Promise<UserModel> {
+    // find user
+    let user: UserModel | null = null;
+    // first by handle
+    if (CommonUtils.validateString(handle)) {
+      user = await this.findUserByEmailOrHandle(handle);
+    } else if (CommonUtils.validateString(email)) {
+      // search by email, !!case sensitive!!
+      user = await this.prismaClient.user.findFirst({
+        where: {
+          emails: {
+            some: { address: { equals: email } },
+          },
         },
       });
-    } catch (error) {
-      if (error.code === Constants.prismaUniqueConflictcode) {
-        this.logger.warn(
-          `Attempt to create otp for user ${userId} which already exists in mode ${mode}.`,
-        );
-        throw new ConflictException(
-          `OTP email already exist for user ${userId} in mode ${mode}.`,
+    }
+    if (!user) {
+      throw new UnauthorizedException('Credentials are incorrect'); // match java code
+    }
+    if (user.status != MemberStatus.UNVERIFIED) {
+      throw new BadRequestException('User has been activated');
+    }
+
+    // make sure we get primary email
+    const emailRecord = await this.prismaClient.email.findFirst({
+      where: {
+        user_id: user.user_id,
+        primary_ind: Constants.primaryEmailFlag,
+        email_type_id: Constants.standardEmailType,
+      },
+    });
+    // check if there is primary email
+    if (!emailRecord) {
+      throw new BadRequestException('No primary email for user');
+    }
+    // send email event
+    await this.sendActivationEmailEvent(
+      user.handle,
+      user.activation_code,
+      emailRecord.address, // send to primary email
+      user.reg_source,
+    );
+    // return user as per java code
+    return user;
+  }
+
+  /**
+   * Send activation email event.
+   * @param handle User handle
+   * @param activationCode The activation code
+   * @param email Email address to send to
+   * @param regSource Registration source if available
+   */
+  private async sendActivationEmailEvent(
+    handle: string,
+    activationCode: string,
+    email: string,
+    regSource?: string,
+  ) {
+    const domain =
+      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const fromEmail = `Topcoder <noreply@${domain}>`;
+    const sendGridTemplateId = this.configService.get<string>(
+      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
+    const sendGridSelfServiceTemplateId = this.configService.get<string>(
+      'SENDGRID_SELFSERVICE_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+    );
+
+    const data: any = {
+      handle: handle,
+      code: activationCode,
+      domain: domain,
+      subDomain: 'www',
+      path: '/home',
+      redirectUrl: `https%3A%2F%2Fwww.${domain}%2Fhome`,
+      version: 'v6',
+      sendgrid_template_id: sendGridTemplateId,
+    };
+
+    if (CommonUtils.validateString(regSource)) {
+      if (regSource.match(/^tcBusiness$/)) {
+        data.subDomain = 'connect';
+        data.path = '/';
+        data.redirectUrl = `https%3A%2F%2Fconnect.${domain}%2F`;
+      }
+      if (regSource.match(/^selfService$/)) {
+        data.subDomain = 'platform';
+        data.path = '/self-service';
+        data.redirectUrl = `https%3A%2F%2Fplatform.${domain}%2Fself-service`;
+        data.sendgrid_template_id = sendGridSelfServiceTemplateId;
+      }
+    }
+
+    try {
+      await this.eventService.postDirectBusMessage('external.action.email', {
+        data: data,
+        from: { email: fromEmail },
+        recipients: [email], // The original email used for registration
+      });
+      this.logger.log(
+        `Published 'external.action.email' event for user ${handle}`,
+      );
+    } catch (eventError) {
+      this.logger.error(
+        `Failed to publish resend email event for user ${handle}: ${eventError.message}`,
+        eventError.stack,
+      );
+    }
+  }
+
+  /**
+   * Resend activation email event.
+   * @param userOtp User OTP details
+   * @param primaryEmail Primary email address
+   */
+  async resendActivationEmailEvent(userOtp: UserOtpDto, primaryEmail: string) {
+    try {
+      // For activation email (resend), use postDirectBusMessage to match legacy Java structure
+      const domain =
+        this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+      const fromEmail = `Topcoder <noreply@${domain}>`;
+      // Use the specific template ID for resending activation emails
+      const sendgridTemplateId = this.configService.get<string>(
+        'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
+      );
+
+      if (!sendgridTemplateId) {
+        this.logger.error(
+          `SendGrid template ID not configured (SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID). Cannot send activation email resend.`,
         );
       } else {
-        this.logger.error(
-          `Failed to create otp for user ${userId} in mode ${mode}: ${error.message}`,
-          error.stack,
+        const activationEmailPayload = {
+          data: { handle: userOtp.handle, code: userOtp.otp },
+          from: { email: fromEmail },
+          version: 'v6',
+          sendgrid_template_id: sendgridTemplateId,
+          recipients: [primaryEmail], // The user's primary email
+        };
+        await this.eventService.postDirectBusMessage(
+          'external.action.email',
+          activationEmailPayload,
         );
-        throw error;
+        this.logger.log(
+          `Published 'external.action.email' (activation resend) for ${userOtp.userId} with new OTP. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
+        );
       }
+    } catch (eventError) {
+      this.logger.error(
+        `Failed to publish resend activation event for user ${userOtp.userId}: ${eventError.message}`,
+        eventError.stack,
+      );
     }
   }
 }

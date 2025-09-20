@@ -154,10 +154,10 @@ export class UserProfileHelper {
         where: { name: profile.provider },
       },
     );
-    const ssoProviderId = providerRecord?.sso_login_provider_id;
-    if (ssoProviderId == null) {
+    if (!providerRecord) {
       throw new Error(`Unsupported SSO provider: ${profile.provider}`);
     }
+    const ssoProviderId: number = Number(providerRecord.sso_login_provider_id);
     let userId = null;
     let userRecord = await this.prismaClient.user_sso_login.findFirst({
       where: {

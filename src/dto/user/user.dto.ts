@@ -18,6 +18,7 @@ import {
   Length,
   IsInt,
   Min,
+  IsDate,
 } from 'class-validator';
 import { Constants } from '../../core/constant/constants';
 
@@ -48,6 +49,14 @@ export class CountryDto {
   @IsString()
   @IsOptional()
   name?: string;
+
+  @IsString()
+  @IsOptional()
+  isoAlpha2Code?: string;
+
+  @IsString()
+  @IsOptional()
+  isoAlpha3Code?: string;
 }
 
 export class UserProfileDto {
@@ -82,7 +91,7 @@ export class UserProfileDto {
 
 // --- Request Body Wrapper (Common Pattern) ---
 
-class UserParamBaseDto {
+export class UserParamBaseDto {
   @IsString()
   @IsOptional()
   @MaxLength(64)
@@ -94,6 +103,7 @@ class UserParamBaseDto {
 
   @IsEmail()
   @IsOptional()
+  @MaxLength(100)
   email?: string;
 
   @IsString()
@@ -276,17 +286,45 @@ export class ResetPasswordBodyDto {
 
 export class UserOtpDto {
   @IsNumber()
+  @IsOptional()
+  id?: number; // otp id
+
+  @IsNumber()
   @IsOptional() // Not always required in request
   userId?: number;
+
+  @IsString()
+  @IsOptional()
+  handle?: string;
+
+  @IsString()
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
 
   @IsString()
   @IsOptional()
   @Length(6, 6)
   otp?: string;
 
+  @IsDate()
+  @IsOptional()
+  expireAt?: Date;
+
   @IsString()
   @IsOptional()
   resendToken?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  resend?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  failCount?: number;
 }
 
 // PUT /users/activate
@@ -400,6 +438,15 @@ export class DiceStatusWebhookBodyDto {
 
 // --- Response DTOs ---
 
+export class UserCredentialDto {
+  activationCode?: string;
+  resetToken?: string;
+  resendToken?: string;
+  activationBlocked?: boolean;
+  canResend?: boolean;
+  hasPassword?: boolean;
+}
+
 export class UserResponseDto {
   id: string;
   handle: string;
@@ -413,8 +460,30 @@ export class UserResponseDto {
   mfaEnabled?: boolean;
   emailVerified?: boolean;
   createdAt?: string;
-  updatedAt?: string;
+  modifiedAt?: string; // should use modifiedAt to match legacy
   // Add other fields as needed based on FieldSelector
+
+  // the following fields were added to match legacy user response, made optional so not to mess with existing logic
+  regSource?: string;
+  diceEnabled?: boolean;
+  last_login?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  active?: boolean;
+  country?: string;
+  profile?: any; // what should be the type
+  credential?: UserCredentialDto;
+}
+
+export class User2faResponseDto {
+  id?: number;
+  userId?: number;
+  mfaEnabled?: boolean;
+  createdBy?: number;
+  createdAt?: string;
+  modifiedBy?: number;
+  modifiedAt?: string;
 }
 
 export class ValidationResponseDto {
@@ -499,7 +568,14 @@ export class UserSearchQueryDto {
   })
   offset?: number = 0;
 
-  // Add other potential search fields: status, role, etc.
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'selector',
+    type: String,
+    description: 'comma-separated list of fields to include in response',
+  })
+  selector?: string;
 }
 
 // --- Added for UserController.deleteSSOUserLogin ---
@@ -512,8 +588,4 @@ export class DeleteSSOUserLoginQueryDto {
   @IsOptional()
   @Type(() => Number) // Ensure transformation from string query param
   providerId?: number; // Provider ID (numeric)
-
-  @IsString()
-  @IsNotEmpty() // ssoUserId is crucial for identifying the specific link
-  ssoUserId: string; // The user's ID on the external provider system
 }

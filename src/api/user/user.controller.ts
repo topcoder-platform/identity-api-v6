@@ -53,6 +53,9 @@ import { ValidationExceptionFilter } from '../../shared/filters/validation-excep
 // import { AuthGuard } from '@nestjs/passport';
 import { PrismaClient } from '@prisma/client'; // Import PrismaClient
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module'; // Import injection token
+import { MachineScopes } from '../../core/constant/constants';
+import { CommonUtils } from '../../shared/util/common.utils';
+import { MemberStatus } from '../../dto/member';
 
 // Helper function to map UserModel to UserResponseDto
 /**
@@ -108,8 +111,21 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
   }
   // Map other fields as needed from UserModel to UserResponseDto
   dto.createdAt = user.create_date?.toISOString();
-  dto.updatedAt = user.modify_date?.toISOString();
+  dto.modifiedAt = user.modify_date?.toISOString();
   // ... map other fields defined in UserResponseDto
+  dto.emailActive = user.email_active;
+  dto.status = user.status;
+  dto.mfaEnabled = user.user_2fa?.mfa_enabled ?? false;
+  dto.last_login = user.last_login?.toISOString();
+  dto.regSource = user.reg_source;
+  dto.utmSource = user.utm_source;
+  dto.utmMedium = user.utm_medium;
+  dto.utmCampaign = user.utm_campaign;
+  dto.active = user.status == MemberStatus.ACTIVE;
+  // dto.country = null, // FIXME where to map
+  // dto.profile = null,
+  // dto.profiles = null,
+
   return dto;
 }
 
@@ -150,10 +166,16 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
   }
 
   // Basic check for essential properties. Adjust as per your AuthenticatedUser interface definition from jwt.strategy.ts
+  // if user is machine, no userId, handle, or roles, should ignore the following
+  /**
   if (!user.userId || !user.handle || !user.roles) {
     throw new InternalServerErrorException(
       'Authenticated user object is incomplete.',
     );
+  }
+  */
+  if (user.isMachine && !user.scopes) {
+    throw new InternalServerErrorException('Machine token is missing scopes');
   }
   return user;
 }
@@ -176,67 +198,68 @@ export class UserController {
   ) {}
 
   /**
-   * Checks user permissions for accessing resources.
-   * @param user The AuthenticatedUser object.
-   * @param requiredUserId The user ID that is required for access.
-   * @param isAdminRequired Whether admin privileges are required.
-   * @param allowedScopes The list of allowed scopes for access.
-   * @throws ForbiddenException if permissions are insufficient.
+   * Checks param existence in the request body.
+   * @param obj The request body object.
+   * @throws BadRequestException if param is missing.
    */
-  private checkPermission(
+  private checkParam(obj: any) {
+    if (!obj || !obj.param) {
+      throw new BadRequestException('The request does not contain param data.');
+    }
+  }
+
+  private checkAccess(
     user: AuthenticatedUser | undefined,
-    requiredUserId?: number | string,
     isAdminRequired: boolean = false,
     allowedScopes?: string[],
   ) {
-    this.logger.debug(
-      `[UserController.checkPermission] Entry. User: ${JSON.stringify(user)}, requiredUserId: ${requiredUserId}, isAdminRequired: ${isAdminRequired}, allowedScopes: ${JSON.stringify(allowedScopes)}`,
-    );
     if (!user) {
       this.logger.warn(
-        `[UserController.checkPermission] User object is undefined. Throwing ForbiddenException.`,
+        `[UserController.checkAccess] User object is undefined. Throwing BadRequestException.`,
       );
-      throw new ForbiddenException('Authentication required.');
+      // bad request is returned instead of forbidden in java
+      throw new BadRequestException('Authentication user is required');
     }
-    const userIdNum =
-      typeof requiredUserId === 'string'
-        ? parseInt(requiredUserId, 10)
-        : requiredUserId;
-    const isSelf =
-      userIdNum !== undefined &&
-      !isNaN(userIdNum) &&
-      user.userId === userIdNum.toString();
-
-    if (isAdminRequired && !user.isAdmin) {
-      throw new ForbiddenException('Admin privileges required.');
-    }
-
-    this.logger.debug(
-      `[checkPermission] About to check non-admin resource access. ` +
-        `isAdminRequired: ${isAdminRequired}, requiredUserId: ${requiredUserId}(${typeof requiredUserId}), ` +
-        `isSelf: ${isSelf}, user.isAdmin: ${user.isAdmin}, user.userId: ${user.userId}`,
-    );
-
-    if (
-      !isAdminRequired &&
-      requiredUserId !== undefined &&
-      !isSelf &&
-      !user.isAdmin
-    ) {
-      throw new ForbiddenException(
-        'Permission denied to access this resource.',
-      );
-    }
-    if (
-      allowedScopes &&
-      !user.scopes?.some((scope) => allowedScopes.includes(scope))
-    ) {
-      if (!user.isAdmin) {
-        throw new ForbiddenException(
-          `Missing required scope(s): ${allowedScopes.join(', ')}`,
-        );
+    // checking for machine goes first
+    // if machine, scopes are required to be checked
+    if (user.isMachine) {
+      if (Array.isArray(allowedScopes) && allowedScopes.length > 0) {
+        if (!user.scopes?.some((scope) => allowedScopes.includes(scope))) {
+          throw new ForbiddenException(
+            `Missing required scope(s): ${allowedScopes.join(', ')}`,
+          );
+        }
+      }
+    } else {
+      if (isAdminRequired && !user.isAdmin) {
+        throw new ForbiddenException(`Administrator access is required`);
       }
     }
+  }
+
+  private checkResourceIdAndAccess(
+    user: AuthenticatedUser | undefined,
+    isAdminRequired: boolean = false,
+    resourceId: number | null | string,
+    allowedScopes?: string[],
+  ) {
+    if (!user) {
+      this.logger.warn(
+        `[UserController.checkResourceIdAndAccess] User object is undefined. Throwing BadRequestException.`,
+      );
+      throw new BadRequestException('Authentication user is required');
+    }
+    // check resource id
+    if (!resourceId || Number(resourceId) <= 0) {
+      throw new BadRequestException(
+        'resourceId is required and should be a positive value',
+      );
+    }
+    // check if self, then should be fine
+    if (resourceId + '' === user.userId) {
+      return;
+    }
+    this.checkAccess(user, isAdminRequired, allowedScopes);
   }
 
   // --- Public Endpoints (No Auth Required) ---
@@ -263,6 +286,12 @@ export class UserController {
     description:
       'Base URL for the reset link, e.g., http://localhost:3001/reset?token=',
   })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    type: String,
+    description: 'Where request came from',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Reset token sent (simulated)',
@@ -282,7 +311,8 @@ export class UserController {
     @Query('email') email?: string,
     @Query('handle') handle?: string,
     @Query('resetPasswordUrlPrefix') resetPasswordUrlPrefix?: string,
-  ): Promise<{ message: string }> {
+    @Query('source') source?: string,
+  ): Promise<{ message: string } | DTOs.UserResponseDto> {
     this.logger.log(
       `Initiating password reset request for email: ${email}, handle: ${handle}`,
     );
@@ -291,11 +321,25 @@ export class UserController {
         'Either email or handle query param is required.',
       );
     }
-
-    await this.authFlowService.initiatePasswordReset(
+    // other validations done in service layer
+    const user = await this.authFlowService.initiatePasswordReset(
       email || handle,
       resetPasswordUrlPrefix,
+      source,
     );
+    if (user) {
+      const userResponse = mapUserToDto(user);
+      // add profiles
+      const userId = Number(userResponse.id);
+      let profiles = await this.userProfileService.findSocialProfiles(userId);
+      if (!(Array.isArray(profiles) && profiles.length > 0)) {
+        // try SSO profiles
+        profiles =
+          await this.userProfileService.findSSOUserLoginsByUserId(userId);
+      }
+      userResponse.profiles = profiles;
+      return userResponse; // return user as in legacy java
+    }
     return { message: 'Password reset token has been sent (simulated).' };
   }
 
@@ -426,6 +470,32 @@ export class UserController {
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
   @ApiOperation({ summary: 'Find users based on query parameters' })
+  @ApiQuery({
+    name: 'selector',
+    type: String,
+    required: false,
+    description: 'Comma-separated list of fields to include in the response',
+  })
+  @ApiQuery({
+    name: 'filter',
+    type: String,
+    required: false,
+    description: `Request query filter, e.g.: /api/va1/stories?filter=URLENCODE(param1=filter_a&param2=filter_b&....).
+      Supported filters are: id, handle, firstName, lastName, email, status, regSource, utmSource, utmMedium, utmCampaign.
+      `,
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Limit. Default 20.',
+  })
+  @ApiQuery({
+    name: 'offset',
+    type: Number,
+    required: false,
+    description: 'Offset. Default 0.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'List of users found',
@@ -446,15 +516,16 @@ export class UserController {
   ): Promise<DTOs.UserResponseDto[]> {
     // AuthZ: admin-only endpoint
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, undefined, true);
-    // Log the Authorization header
-    this.logger.debug(
-      `[findUsers] Incoming Request Headers: ${JSON.stringify(req.headers)}`,
-    );
+    this.checkAccess(authUser, true, MachineScopes.readScopes);
     this.logger.debug(`[findUsers] auth user: ${JSON.stringify(authUser)}`);
     this.logger.log('Finding users with query:', query);
     const users = await this.userService.findUsers(query);
-    return users.map(mapUserToDto);
+    const mappedUsers = users.map(mapUserToDto);
+    if (query.selector && query.selector.trim().length > 0) {
+      const keys = query.selector.split(',');
+      return CommonUtils.pickArray(mappedUsers, keys) as DTOs.UserResponseDto[];
+    }
+    return mappedUsers;
   }
 
   /**
@@ -470,6 +541,12 @@ export class UserController {
   @SelfOrAdmin('resourceId')
   @ApiOperation({ summary: 'Get a specific user by ID' })
   @ApiParam({ name: 'resourceId', type: Number })
+  @ApiQuery({
+    name: 'selector',
+    type: String,
+    required: false,
+    description: 'Comma-separated list of fields to include in the response',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'User found',
@@ -489,17 +566,28 @@ export class UserController {
   async findUserById(
     @Param('resourceId') resourceId: string,
     @Req() req: Request,
+    @Query('selector') selector?: string, // Optional selector query param
   ): Promise<DTOs.UserResponseDto> {
     // AuthZ: self or admin
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, resourceId, false);
     const idNum = parseInt(resourceId, 10);
     if (isNaN(idNum)) {
       throw new BadRequestException('Invalid user ID format.');
     }
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.readScopes,
+    );
     this.logger.log(`Finding user by ID: ${idNum}`);
     const user = await this.userService.findUserById(idNum);
-    return mapUserToDto(user);
+    const mappedUser = mapUserToDto(user);
+    if (selector && selector.trim().length > 0) {
+      const keys = selector.split(',');
+      return CommonUtils.pick(mappedUser, keys) as DTOs.UserResponseDto;
+    }
+    return mappedUser;
   }
 
   /**
@@ -531,6 +619,7 @@ export class UserController {
   async registerUser(
     @Body() createUserDto: DTOs.CreateUserBodyDto,
   ): Promise<DTOs.UserResponseDto> {
+    this.checkParam(createUserDto);
     this.logger.log(`Registering new user: ${createUserDto.param.handle}`);
     const user = await this.userService.registerUser(createUserDto);
     return mapUserToDto(user);
@@ -571,7 +660,12 @@ export class UserController {
   ): Promise<DTOs.UserResponseDto> {
     // AuthZ: self or admin
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, resourceId, false);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.updateScopes,
+    );
     this.logger.log(`Updating user: ${resourceId}`);
     const user = await this.userService.updateBasicInfo(
       resourceId,
@@ -666,12 +760,16 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      userId,
+      MachineScopes.createScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} creating SSO login for user: ${userId}, provider: ${createSSODto.param?.provider}`,
     );
-    if (!createSSODto.param) {
-      throw new BadRequestException('Request body param is required.');
-    }
+    this.checkParam(createSSODto);
     return this.userProfileService.createSSOUserLogin(
       userId,
       createSSODto.param,
@@ -729,6 +827,12 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      userId,
+      MachineScopes.updateScopes,
+    );
     this.logger.log(
       `User ${authUser.userId} updating SSO login for user: ${userId}, provider: ${updateSSODto.param.provider}`,
     );
@@ -772,12 +876,6 @@ export class UserController {
     required: false,
     description: 'SSO Provider Numeric ID',
   })
-  @ApiQuery({
-    name: 'ssoUserId',
-    type: String,
-    required: true,
-    description: 'User ID from the external SSO provider',
-  })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
     description: 'SSO login link deleted successfully',
@@ -808,53 +906,58 @@ export class UserController {
     this.logger.debug(
       `[deleteSSOUserLogin] Authenticated user from getAuthenticatedUser: ${JSON.stringify(authUser)}`,
     );
+    this.checkAccess(authUser, true, MachineScopes.deleteScopes);
 
-    const { provider: providerNameQuery, providerId, ssoUserId } = query;
+    const { provider: providerName } = query;
+    let providerId = query.providerId;
 
-    if (!ssoUserId) {
-      throw new BadRequestException('ssoUserId query parameter is required.');
+    // validate parameters
+    if (userId <= 0) {
+      throw new BadRequestException(`userId should be positive: ${userId}`);
     }
-
-    let providerName = providerNameQuery;
+    if (!providerName && !providerId) {
+      throw new BadRequestException(
+        'One of provider and providerId should be provided',
+      );
+    }
+    if (!providerId && !CommonUtils.validateString(providerName)) {
+      throw new BadRequestException('The provider should be non-empty string');
+    }
 
     this.logger.log(
-      `User ${authUser.userId} deleting SSO login for user: ${userId}, providerNameQuery: ${providerNameQuery}, providerId: ${providerId}, ssoUserId: ${ssoUserId}`,
+      `User ${authUser.userId} deleting SSO login for user: ${userId}, providerNameQuery: ${providerName}, providerId: ${providerId}`,
     );
 
-    if (!providerName && providerId) {
-      this.logger.debug(
-        `Provider name not given, looking up by providerId: ${providerId}`,
-      );
-      const providerRecord =
-        await this.prismaClient.sso_login_provider.findUnique({
-          where: { sso_login_provider_id: providerId },
-        });
-      if (!providerRecord) {
+    // check if provider is supplied and not providerId
+    if (providerName && !providerId) {
+      const selProviderId =
+        await this.userProfileService.findProviderIdByName(providerName);
+      if (!selProviderId) {
         throw new BadRequestException(
-          `SSO Provider with ID ${providerId} not found.`,
+          `The provider id not found for the provider: ${providerName}`,
         );
       }
-      providerName = providerRecord.name;
-      this.logger.debug(
-        `Found provider name: ${providerName} for ID: ${providerId}`,
-      );
-    } else if (!providerName && !providerId) {
-      throw new BadRequestException(
-        'Either provider name or providerId must be specified.',
-      );
+      providerId = selProviderId;
     }
-
-    // Ensure target user exists
-    const targetUser = await this.userService.findUserById(userId);
-    if (!targetUser) {
-      throw new NotFoundException(`User with ID ${userId} not found.`);
+    // at this point, providerId should have a value if it is initially null
+    // validate if userId and providerId exists
+    const count =
+      await this.userProfileService.countLoginsByProviderIdAndUserId(
+        providerId,
+        userId,
+      );
+    if (count == 0) {
+      if (providerName) {
+        throw new NotFoundException(
+          `The user and provider do not exist, userId: ${userId}, provider: ${providerName}`,
+        );
+      } else {
+        throw new NotFoundException(
+          `The user and provider do not exist, userId: ${userId}, providerId: ${providerId}`,
+        );
+      }
     }
-
-    await this.userProfileService.deleteSSOUserLogin(
-      userId,
-      providerName,
-      ssoUserId,
-    );
+    await this.userProfileService.deleteSSOUserLogin(userId, providerId);
   }
 
   /**
@@ -894,6 +997,7 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto[]> {
     const authUser = getAuthenticatedUser(req);
+    this.checkAccess(authUser, true, MachineScopes.readScopes);
     this.logger.log(
       `Admin ${authUser.userId} getting SSO logins for user: ${userId}`,
     );
@@ -954,11 +1058,24 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.createScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} adding profile for user: ${resourceId}, provider: ${createProfileDto.param?.provider}`,
     );
-    if (!createProfileDto.param)
-      throw new BadRequestException('Profile data is required.');
+    if (!createProfileDto.param) {
+      throw new BadRequestException('The request does not contain param data');
+    }
+    // validate complete profile (when validation fails, it throws BadRequestException)
+    await this.validationService.validateProfile(
+      createProfileDto.param,
+      resourceId,
+    );
+    // other validations done in userprofile service layer
     return this.userProfileService.addExternalProfile(
       resourceId,
       createProfileDto.param,
@@ -988,7 +1105,12 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserProfileDto[]> {
     const authUser = getAuthenticatedUser(req);
-    this.checkPermission(authUser, resourceId, false);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.readScopes,
+    );
     this.logger.log(
       `User ${authUser.userId} fetching external profiles for user: ${resourceId}`,
     );
@@ -1043,6 +1165,12 @@ export class UserController {
     @Req() req: Request,
   ): Promise<void> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.deleteScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} deleting profiles for user: ${resourceId}, provider: ${providerName}`,
     );
@@ -1211,42 +1339,6 @@ export class UserController {
 
   // --- Password/Activation Flows (Public) ---
 
-  // @Post('resetPassword')
-  // @ApiOperation({ summary: 'Reset user password using a valid reset token' })
-  // @ApiBody({ type: DTOs.ResetPasswordBodyDto })
-  // @ApiResponse({
-  //   status: HttpStatus.OK,
-  //   description: 'Password has been reset successfully.',
-  // })
-  // @ApiResponse({
-  //   status: HttpStatus.BAD_REQUEST,
-  //   description: 'Invalid input, token, or password format.',
-  // })
-  // @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or expired reset token.' })
-  // @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
-  // async resetPassword(
-  //   @Body() resetPasswordDto: DTOs.ResetPasswordBodyDto,
-  // ): Promise<{ message: string }> {
-  //   this.logger.log(`Attempting to reset password.`);
-  //   // The DTO structure is { param: { handleOrEmail?, credential: { resetToken, password } } }
-  //   // AuthFlowService.resetPassword expects { handleOrEmail?, resetToken, newPassword }
-  //   if (
-  //     !resetPasswordDto.param?.credential?.resetToken ||
-  //     !resetPasswordDto.param?.credential?.password
-  //   ) {
-  //     throw new BadRequestException(
-  //       'Reset token and new password are required within credential parameter.',
-  //     );
-  //   }
-  //   await this.authFlowService.resetPassword({
-  //     handleOrEmail:
-  //       resetPasswordDto.param.handle || resetPasswordDto.param.email, // Use handle or email from param
-  //     resetToken: resetPasswordDto.param.credential.resetToken,
-  //     newPassword: resetPasswordDto.param.credential.password,
-  //   });
-  //   return { message: 'Password has been reset successfully.' };
-  // }
-
   /**
    * Activates a new user account using the provided OTP (One-Time Password) and resend token.
    * This endpoint is part of the user registration flow, verifying the user's identity
@@ -1292,9 +1384,11 @@ export class UserController {
   async activateUser(
     @Body() activateUserDto: DTOs.ActivateUserBodyDto,
   ): Promise<DTOs.UserResponseDto> {
+    this.checkParam(activateUserDto);
     this.logger.log(
       `Attempting to activate user: ${activateUserDto.param.userId}`,
     );
+    // other validations in activateUser()
     const activatedUser =
       await this.authFlowService.activateUser(activateUserDto);
     // Ensure mapUserToDto can handle the potentially different structure returned by activateUser
@@ -1354,12 +1448,15 @@ export class UserController {
     description: 'Internal server error.',
   })
   async resendActivationEmail(
-    @Body() resendActivationDto: DTOs.UserOtpDto,
+    @Body() resendActivationDto: DTOs.ActivateUserBodyDto,
   ): Promise<{ message: string }> {
+    this.checkParam(resendActivationDto);
     this.logger.log(
-      `Attempting to resend activation email for user: ${resendActivationDto.userId}`,
+      `Attempting to resend activation email for user: ${resendActivationDto.param.userId}`,
     );
-    return this.authFlowService.requestResendActivation(resendActivationDto);
+    return this.authFlowService.requestResendActivation(
+      resendActivationDto.param,
+    );
   }
 
   // --- Profile Updates (Require Auth) ---
@@ -1416,6 +1513,12 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      parseInt(resourceId),
+      MachineScopes.updateScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} attempting to update handle for user ${resourceId}`,
     );
@@ -1481,19 +1584,27 @@ export class UserController {
     description: 'Email already in use by another account',
   })
   async updatePrimaryEmail(
-    @Param('resourceId') resourceId: string,
+    @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() updateEmailDto: DTOs.UpdateEmailBodyDto,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.updateScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} attempting to update primary email for user ${resourceId}`,
     );
-    if (!updateEmailDto.param?.email) {
+    this.checkParam(updateEmailDto);
+    if (!updateEmailDto.param.email) {
+      // other validations for email done in updatePrimaryEmail()
       throw new BadRequestException('email parameter is required.');
     }
     const updatedUser = await this.userService.updatePrimaryEmail(
-      resourceId,
+      resourceId + '',
       updateEmailDto.param.email,
       authUser,
     );
@@ -1691,21 +1802,31 @@ export class UserController {
     description: 'Internal server error.',
   })
   async updateStatus(
-    @Param('resourceId') resourceId: string,
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Query('comment') comment: string,
     @Body() updateStatusDto: DTOs.UpdateStatusBodyDto,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.updateScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} attempting to update status for user ${resourceId}`,
     );
-    if (!updateStatusDto.param?.status) {
+    this.checkParam(updateStatusDto);
+    if (!updateStatusDto.param.status) {
       throw new BadRequestException('Status parameter is required.');
     }
+    // other validations done ins updateStatus()
     const updatedUser = await this.userService.updateStatus(
-      resourceId,
+      resourceId + '',
       updateStatusDto.param.status,
       authUser,
+      comment,
     );
     return mapUserToDto(updatedUser);
   }
@@ -1807,6 +1928,7 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.User2faDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(authUser, true, resourceId);
     this.logger.log(
       `Getting 2FA status for user: ${resourceId} by ${authUser.userId}`,
     );
@@ -1852,6 +1974,7 @@ export class UserController {
     @Req() req: Request,
   ): Promise<DTOs.User2faDto> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(authUser, true, resourceId);
     this.logger.log(
       `Updating 2FA status for user: ${resourceId} by ${authUser.userId}`,
     );
@@ -1894,8 +2017,10 @@ export class UserController {
     @Body() sendOtpDto: DTOs.SendOtpBodyDto,
   ): Promise<DTOs.UserOtpResponseDto> {
     this.logger.log(`Sending 2FA OTP for user: ${sendOtpDto.param?.userId}`);
-    if (!sendOtpDto.param?.userId)
-      throw new BadRequestException('UserId required in param.');
+    this.checkParam(sendOtpDto);
+    if (!sendOtpDto.param.userId) {
+      throw new BadRequestException('userId is required');
+    }
     // How to get authContext or ensure this is called in a valid state needs consideration
     // For now, assuming userId is trusted from a prior step (e.g. after password auth before full login)
     return this.twoFactorAuthService.sendOtpFor2fa(
@@ -1927,23 +2052,29 @@ export class UserController {
   })
   async resendOtpEmail(
     @Body() resendOtpDto: DTOs.ResendOtpEmailBodyDto,
-  ): Promise<{ message: string }> {
+  ): Promise<string> {
     this.logger.log(`Resending 2FA OTP email.`);
-    if (!resendOtpDto.param?.resendToken)
-      throw new BadRequestException('Resend token required in param.');
+    this.checkParam(resendOtpDto);
+    if (!resendOtpDto.param.userId) {
+      throw new BadRequestException('userId is required');
+    }
+    if (!resendOtpDto.param.resendToken) {
+      throw new BadRequestException('resendToken is required');
+    }
     return this.twoFactorAuthService.resendOtpEmailFor2fa(
+      resendOtpDto.param.userId,
       resendOtpDto.param.resendToken,
     );
   }
 
-  @Post('checkOtp') // 2FA Check OTP - requires partial auth state
+  @Post('checkOtp')
   @ApiOperation({ summary: 'Check 2FA OTP and complete login.' })
   @ApiBody({ type: DTOs.CheckOtpBodyDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description:
       'OTP verified, returns login completion details (e.g. user/JWTs).',
-  }) // Actual type depends on what AuthFlowService.completeLoginAfter2fa returns
+  })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'OTP invalid or expired, or missing params.',
@@ -1953,13 +2084,19 @@ export class UserController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
-  async checkOtp(@Body() checkOtpDto: DTOs.CheckOtpBodyDto): Promise<any> {
+  async checkOtp(
+    @Body() checkOtpDto: DTOs.CheckOtpBodyDto,
+  ): Promise<DTOs.UserOtpResponseDto> {
     this.logger.log(`Checking 2FA OTP for user: ${checkOtpDto.param?.userId}`);
-    if (!checkOtpDto.param?.userId || !checkOtpDto.param?.otp)
-      throw new BadRequestException('UserId and OTP required in param.');
-    // Needs authContext or similar to know which user's login to complete
-    return this.twoFactorAuthService.checkOtpAndCompleteLogin(
-      checkOtpDto.param.userId.toString(),
+    this.checkParam(checkOtpDto);
+    if (!checkOtpDto.param.userId) {
+      throw new BadRequestException('userId is required');
+    }
+    if (!checkOtpDto.param.otp) {
+      throw new BadRequestException('otp is required');
+    }
+    return this.twoFactorAuthService.checkOtp(
+      checkOtpDto.param.userId,
       checkOtpDto.param.otp,
     );
   }
@@ -1982,6 +2119,12 @@ export class UserController {
     name: 'resourceId',
     description: 'User ID (string representation of number)',
   })
+  @ApiQuery({
+    name: 'selector',
+    type: String,
+    required: false,
+    description: 'Comma-separated list of fields to include in the response',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'List of user achievements',
@@ -1996,11 +2139,100 @@ export class UserController {
   async getAchievements(
     @Param('resourceId') resourceId: string,
     @Req() req: Request,
+    @Query('selector') selector?: string, // Optional selector query param
   ): Promise<DTOs.AchievementDto[]> {
     const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      resourceId,
+      MachineScopes.readScopes,
+    );
     this.logger.log(
       `Admin ${authUser.userId} getting achievements for user: ${resourceId}`,
     );
-    return this.userService.getAchievements(parseInt(resourceId, 10));
+    return this.userService.getAchievements(parseInt(resourceId, 10), selector);
+  }
+
+  /**
+   * Resets a user's password using a reset token.
+   * This endpoint allows users to set a new password after verifying their identity through a reset token,
+   * typically sent via email during the password recovery process.
+   * @param passUserDto The passwod reset data transfer object.
+   * @returns user details
+   * @throws BadRequestException If the input is invalid (e.g., missing userId, token, or new password).
+   * @throws NotFoundException If the user associated with the ID is not found.
+   * @throws UnauthorizedException If the reset token is invalid or expired.
+   * @throws InternalServerErrorException For any other server-side errors.
+   */
+  @Put('resetPassword')
+  @ApiOperation({
+    summary: 'Resets user password',
+  })
+  @ApiBody({ type: DTOs.ResetPasswordBodyDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Password reset successfully',
+    type: DTOs.UserResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() passUserDto: DTOs.ResetPasswordBodyDto,
+  ): Promise<DTOs.UserResponseDto> {
+    this.checkParam(passUserDto);
+    this.logger.log(`Resetting password for: ${passUserDto.param.handle}`);
+    const user = await this.authFlowService.resetPassword(passUserDto);
+    return mapUserToDto(user);
+  }
+
+  @Post('resendEmail')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'API to resend activation email. This is used in Auth0 password change flow.',
+  })
+  @ApiConsumes('application/x-www-form-urlencoded')
+  @ApiBody({
+    description: 'Form data: email, handle',
+    schema: {
+      type: 'object',
+      properties: { email: { type: 'string' }, handle: { type: 'string' } },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Email resent successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Missing or invalid parameters',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error.',
+  })
+  async resendEmail(
+    @Body() resendData: { email?: string; handle?: string },
+  ): Promise<DTOs.UserResponseDto> {
+    this.logger.log('Resend email request');
+    if (!resendData?.email && !resendData?.handle) {
+      throw new BadRequestException('email/handle is required');
+    }
+    // only one is typically expected, either handle or email
+    const user = await this.userService.resendEmail(
+      resendData.email,
+      resendData.handle,
+    );
+    return mapUserToDto(user);
   }
 }

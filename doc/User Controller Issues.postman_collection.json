@@ -1,0 +1,1119 @@
+{
+	"info": {
+		"_postman_id": "609bbaa5-915b-4074-8708-7fea8d8bd9ba",
+		"name": "User Controller Issues",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "46836291",
+		"_collection_link": "https://pinoydream.postman.co/workspace/Pinoydream's-Workspace~f0c1fd49-90ba-45d1-852b-c1b0eabc86f7/collection/46836291-609bbaa5-915b-4074-8708-7fea8d8bd9ba?action=share&source=collection_link&creator=46836291"
+	},
+	"item": [
+		{
+			"name": "#2 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test Delete SSOUserLogin - Machine (read)-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{readMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test Delete SSOUserLogin - Machine (update)-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(3) Test Delete SSOUserLogin - Machine (create)-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{createMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(4) Test Delete SSOUserLogin - Machine (delete)-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{deleteMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(5) Test Delete SSOUserLogin - Administrator-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(6) Test Delete SSOUserLogin - Non-Admin-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{nonAdminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(7) Test Delete SSOUserLogin - No auth",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/44/SSOUserLogin?provider=&providerId=3",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"44",
+								"SSOUserLogin"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": ""
+								},
+								{
+									"key": "providerId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#3 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test findUsers - Admin - no params-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test findUsers - Admin - with filter-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users?filter=firstName=Ghost",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							],
+							"query": [
+								{
+									"key": "filter",
+									"value": "firstName=Ghost"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(3) Test findUsers - Admin - with filter and selector-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users?filter=firstName=Ghost&selector=firstName,lastName,status",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							],
+							"query": [
+								{
+									"key": "filter",
+									"value": "firstName=Ghost"
+								},
+								{
+									"key": "selector",
+									"value": "firstName,lastName,status"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(4) Test findUsers - Non-Admin-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{nonAdminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(5) Test findUsers - No auth-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#4 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test RegisterUser - minimum required-",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"email\": \"great7@email.com\",\r\n        \"handle\": \"pong\",\r\n        \"credential\": {\r\n            \"password\": \"niceone1\"\r\n        }\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test RegisterUser - email used already-",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"email\": \"jmgasper@email.com\",\r\n        \"handle\": \"what\",\r\n        \"credential\": {\r\n            \"password\": \"niceone1\"\r\n        }\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#5 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test addExternalProfiles - Admin-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"provider\": \"facebook\",\r\n        \"userId\": \"hello\",\r\n        \"name\": \"myname\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/11/profiles",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"11",
+								"profiles"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test addExternalProfiles - machine (update)-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"provider\": \"facebook\",\r\n        \"userId\": \"hello\",\r\n        \"name\": \"myname\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/11/profiles",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"11",
+								"profiles"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#12 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test resetToken-",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"provider\": \"facebook\",\r\n        \"userId\": \"hello\",\r\n        \"name\": \"myname\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/resetToken?handle=gundam&resetPasswordUrlPrefix=https://www.topcoder-dev.com",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"resetToken"
+							],
+							"query": [
+								{
+									"key": "handle",
+									"value": "gundam"
+								},
+								{
+									"key": "email",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "resetPasswordUrlPrefix",
+									"value": "https://www.topcoder-dev.com"
+								},
+								{
+									"key": "source",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#7 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test resetPassword-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"handle\": \"gundam\",\r\n        \"credential\": {\r\n            \"password\": \"newPass31\",\r\n            \"resetToken\": \"qgZgMy\"\r\n        }\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/resetPassword",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"resetPassword"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test resendEmail-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "handle",
+									"value": "gunggong",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{appURL}}/users/resendEmail",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"resendEmail"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#9 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test roles-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "handle",
+									"value": "pong",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{appURL}}/users/roles",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"roles"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test activate-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ODc3MDAwNyIsInVzZXJJZCI6Ijg4NzcwMDA3IiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwiaWF0IjoxNzU3NTMwNjExLCJleHAiOjE3NTc1MzQyMTF9.oJN5UcR9gQs6cjo4qFoBB2J4w2ozhvUcuflJBSeFYWo\",\r\n        \"userId\": 88770007,\r\n        \"otp\": \"724424\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/activate",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"activate"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#8 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test resendActivationEmail-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ODc3MDAwOCIsInVzZXJJZCI6Ijg4NzcwMDA4IiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwiaWF0IjoxNzU3NTMxMjA2LCJleHAiOjE3NTc1MzQ4MDZ9.X6ZPKnz2MIjnnXnnJxhRebzJL5m-nhSEm6xWQr03Tdo\",\r\n        \"userId\": 88770008\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/resendActivationEmail",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"resendActivationEmail"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#10 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test updatePrimaryEmail-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"email\": \"verynewemail@email.com\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/22/email",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"22",
+								"email"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#11 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test updateStatus-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"status\": \"A\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/55/status?comment=This is my comment",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"55",
+								"status"
+							],
+							"query": [
+								{
+									"key": "comment",
+									"value": "This is my comment"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#13 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test validateHandle-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/validateHandle?handle=mess",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"validateHandle"
+							],
+							"query": [
+								{
+									"key": "handle",
+									"value": "mess"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#14 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test getUser2faStatus-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{updateMachToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/33/2fa",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"33",
+								"2fa"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#15 - anonymous-",
+			"item": [
+				{
+					"name": "(1) Test getUser2faStatus-",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"param\": {\r\n        \"userId\": 55\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{appURL}}/users/sendOtp",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"sendOtp"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "#16 - authenticated-",
+			"item": [
+				{
+					"name": "(1) Test findUsers - Admin - with selector-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users?selector=firstName,lastName",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users"
+							],
+							"query": [
+								{
+									"key": "selector",
+									"value": "firstName,lastName"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "(2) Test achievements - Admin - with selector-",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{appURL}}/users/88774396/achievements?selector=typeId,achievementDate,type",
+							"host": [
+								"{{appURL}}"
+							],
+							"path": [
+								"users",
+								"88774396",
+								"achievements"
+							],
+							"query": [
+								{
+									"key": "selector",
+									"value": "typeId,achievementDate,type"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "appURL",
+			"value": "http://localhost:3000/v6"
+		},
+		{
+			"key": "adminToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiMTEyMjMzIiwicm9sZXMiOiJhZG1pbmlzdHJhdG9yLFRvcGNvZGVyIFVzZXIiLCJoYW5kbGUiOiJndW5kYW0iLCJlbWFpbCI6Imd1bmRhbUBlbWFpbC5jb20iLCJzY29wZSI6IiIsImd0eSI6ImF1dGhvcml6YXRpb25fY29kZSIsInN1YiI6ImFkbWluIHVzZXIiLCJpYXQiOjE3NTc1MTY0MTQsImV4cCI6MTc1NzU0NTIxNH0.-gFSwXeeFzdW4KG1yYJMDgj3C_JrjowGOVQCGj41TFk"
+		},
+		{
+			"key": "readMachToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJyZWFkOnVzZXJfcHJvZmlsZXMiLCJndHkiOiJjbGllbnRfY3JlZGVudGlhbHMiLCJzdWIiOiJyZWFkIG1hY2hpbmUiLCJpYXQiOjE3NTc1MTY0MTQsImV4cCI6MTc1NzU0NTIxNH0.cyHD9mzznxNWuxf3vkdPNyGQb0dhb8_krtpQUzZ714Y"
+		},
+		{
+			"key": "createMachToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJjcmVhdGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6ImNyZWF0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.1T8vATPXM1ScOaKHAAGH-nAOgnjMjcbz5xpXgc49oz8"
+		},
+		{
+			"key": "updateMachToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJ1cGRhdGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6InVwZGF0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.uO5-v-fSyjADGjokDI2xD5Z578ObDFqqLbLe6cacWA4"
+		},
+		{
+			"key": "deleteMachToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJkZWxldGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6ImRlbGV0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.rgS7cNSB-RXdrwtSz5VmHC9og5Jbd-EIvePjcG7f0bw"
+		},
+		{
+			"key": "nonAdminToken",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiODg3NzQzOTYiLCJyb2xlcyI6IlRvcGNvZGVyIFVzZXIiLCJoYW5kbGUiOiJqbWdhc3BlciIsImVtYWlsIjoiam1nYXNwZXJAZW1haWwuY29tIiwic2NvcGUiOiIiLCJndHkiOiJhdXRob3JpemF0aW9uX2NvZGUiLCJzdWIiOiJub25hZG1pbiB1c2VyIiwiaWF0IjoxNzU3NTE2OTYzLCJleHAiOjE3NTc1NDU3NjN9.SiKY4n7W2Cs7fE8dlafDMM5zXz2Qk3Qc32satX9Iu6M"
+		}
+	]
+}

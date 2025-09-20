@@ -21,6 +21,7 @@ export interface JwtPayload {
   aud?: string | string[];
   iat?: number;
   exp?: number;
+  gty?: string;
   // From HS256 examples
   userId?: string;
   roles?: string[];
@@ -145,17 +146,61 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       )}`,
     );
 
-    const userId = payload.userId || payload.sub;
-    if (!userId) {
+    // !!Note!!
+    // machine tokens do not have userId, so we should not throw an error if it is missing
+
+    let dbRoles: string[] = [];
+    let isAdmin = false;
+    const userId = payload.userId;
+    const sub = payload.sub;
+    const ck = userId || sub;
+
+    const cacheKey = this.getCacheKey(ck);
+    try {
+      // 1. Check cache first
+      const cachedUser =
+        await this.cacheManager.get<AuthenticatedUser>(cacheKey);
+      if (cachedUser) {
+        this.logger.debug(`Returning cached auth data for user/sub ${ck}`);
+        // Ensure the payload is attached if returning from cache
+        // (Payload isn't essential for authorization checks but good to have consistency)
+        return { ...cachedUser, payload: payload };
+      }
+    } catch (error) {
       this.logger.error(
-        '[JwtStrategy] JWT payload missing user identifier (userId or sub claim).',
+        `Error reading auth cache for user/sub ${ck}: ${error.message}`,
+        error.stack,
       );
-      throw new UnauthorizedException(
-        'JWT payload missing user identifier (userId or sub claim).',
-      );
+      // Proceed without cache if error occurs
     }
 
-    this.logger.debug(`[JwtStrategy] Extracted userId: ${userId}`); // Log extracted userId
+    this.logger.debug(`[JwtStrategy] Cache miss for user/sub ${ck}.`);
+
+    if (userId) {
+      // handling if userId is present
+      this.logger.debug(
+        `[JwtStrategy] Extracted userId: ${userId}. Fetching roles from DB.`,
+      ); // Log extracted userId
+
+      // 2. Fetch roles and determine admin status from DB (if not cached)
+      try {
+        const result = await this.fetchUserRolesAndAdminStatusFromDb(userId);
+        dbRoles = result.roles;
+        isAdmin = result.isAdmin;
+        this.logger.debug(
+          `[JwtStrategy] Roles for user ${userId} from DB: ${dbRoles.join(', ')}. isAdmin: ${isAdmin}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `[JwtStrategy] Error fetching roles/admin status for user ${userId} from DB: ${error.message}`,
+          error.stack,
+        );
+        // If we cannot fetch roles, authentication fails
+        throw new UnauthorizedException(
+          `Failed to fetch authorization details for user ${userId}`,
+        );
+      }
+    }
 
     if (this.validationMode === 'HS256' && payload.roles) {
       this.logger.debug(
@@ -163,62 +208,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    const cacheKey = this.getCacheKey(userId);
-
-    try {
-      // 1. Check cache first
-      const cachedUser =
-        await this.cacheManager.get<AuthenticatedUser>(cacheKey);
-      if (cachedUser) {
-        this.logger.debug(`Returning cached auth data for user ${userId}`);
-        // Ensure the payload is attached if returning from cache
-        // (Payload isn't essential for authorization checks but good to have consistency)
-        return { ...cachedUser, payload: payload };
-      }
-    } catch (error) {
-      this.logger.error(
-        `Error reading auth cache for user ${userId}: ${error.message}`,
-        error.stack,
-      );
-      // Proceed without cache if error occurs
-    }
-
-    this.logger.debug(
-      `[JwtStrategy] Cache miss for user ${userId}. Fetching roles from DB.`,
-    );
-
-    // 2. Fetch roles and determine admin status from DB (if not cached)
-    let dbRoles: string[] = [];
-    let isAdmin = false;
-    try {
-      const result = await this.fetchUserRolesAndAdminStatusFromDb(userId);
-      this.logger.debug(`[JwtStrategy] DB fetch result for user ${userId}: ${JSON.stringify(result)}`);
-      dbRoles = result.roles;
-      isAdmin = result.isAdmin;
-      this.logger.debug(
-        `[JwtStrategy] Roles for user ${userId} from DB: ${dbRoles.join(', ')}. isAdmin: ${isAdmin}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[JwtStrategy] Error fetching roles/admin status for user ${userId} from DB: ${error.message}`,
-        error.stack,
-      );
-      // If we cannot fetch roles, authentication fails
-      throw new UnauthorizedException(
-        `Failed to fetch authorization details for user ${userId}`,
-      );
-    }
-
     // Extract scopes from token payload
+    let isMachine = false;
     let scopes: string[] = [];
     if (payload.scope && typeof payload.scope === 'string') {
       scopes = payload.scope.split(' ');
-    } else if (payload.permissions && Array.isArray(payload.permissions)) {
-      scopes = payload.permissions;
-    }
 
-    // Check if this is a machine token
-    const isMachine = payload.azp === 'machine' || payload.aud === 'machine';
+      // isMachine is only considered when there are scopes in the token
+      // Check if this is a machine token
+      isMachine =
+        (payload.gty === 'client-credentials' ||
+          payload.gty === 'client_credentials') &&
+        !userId &&
+        dbRoles.length === 0;
+
+      // logic to determine isMachine consistent with tc-core-library-js
+      // https://github.com/appirio-tech/tc-core-library-js/blob/1d5111da652289b3f03bbb1a30e145ce07bde957/lib/middleware/jwtAuthenticator.js#L78
+    }
 
     // 3. Construct the AuthenticatedUser object
     const authenticatedUser: AuthenticatedUser = {
