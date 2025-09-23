@@ -37,7 +37,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
-import { Constants } from '../../core/constant/constants';
+import { Constants, DefaultGroups } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus } from '../../dto/member';
 import { CommonUtils } from '../../shared/util/common.utils';
@@ -183,9 +183,10 @@ export class UserService {
     }
   }
 
-  private extractSearchFilters(
-    query: UserSearchQueryDto,
-  ): { handle?: string; email?: string } {
+  private extractSearchFilters(query: UserSearchQueryDto): {
+    handle?: string;
+    email?: string;
+  } {
     const parsedFilters = this.parseFilterString(query.filter);
     const handle =
       query.handle ??
@@ -681,7 +682,7 @@ export class UserService {
         }
 
         // add user to initial groups
-        await this.addUserToDefaultGroups();
+        await this.addUserToDefaultGroups(prisma, nextUserId);
 
         return createdUser;
       });
@@ -767,11 +768,6 @@ export class UserService {
       `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
     );
     return newUser;
-  }
-
-  private async addUserToDefaultGroups() {
-    // FIXME to be implemented
-    // at the moment, sequence_user_group_seq does not exist in schema, this needs to be added
   }
 
   private async assignRolesForNewUser(
@@ -2240,6 +2236,58 @@ export class UserService {
         `Failed to publish resend activation event for user ${userOtp.userId}: ${eventError.message}`,
         eventError.stack,
       );
+    }
+  }
+
+  /**
+   * Add user to default groups.
+   * @param prisma Prisma client
+   * @param userId The user ID to add.
+   */
+  private async addUserToDefaultGroups(prisma: any, userId: number) {
+    this.logger.log(`Adding user: ${userId} to default groups`);
+    const defaultGroups: number[] = [
+      DefaultGroups.MANAGER,
+      DefaultGroups.CODERS,
+      DefaultGroups.LEVEL_TWO_ADMINS,
+      DefaultGroups.ANONYMOUS,
+    ];
+    for (const groupId of defaultGroups) {
+      await this.addUserToGroup(prisma, userId, groupId);
+    }
+  }
+
+  /**
+   * Add user to group.
+   * @param prisma Prisma client
+   * @param userId The user ID
+   * @param groupId The group ID
+   */
+  private async addUserToGroup(prisma: any, userId: number, groupId: number) {
+    try {
+      const result: { nextval: bigint }[] =
+        await prisma.$queryRaw`SELECT nextval('sequence_user_group_seq'::regclass)`;
+      if (!result || result.length === 0 || !result[0].nextval) {
+        throw new Error('Failed to retrieve next user group ID from sequence.');
+      }
+      const nextUserGroupId = Number(result[0].nextval);
+      this.logger.log(`Next userGroupXref ID: ${nextUserGroupId}`);
+      await prisma.user_group_xref.create({
+        data: {
+          user_group_id: nextUserGroupId,
+          group_id: groupId,
+          login_id: userId,
+          create_user_id: Constants.DEFAULT_CREATE_USER_ID,
+          security_status_id: Constants.DEFAULT_SECURITY_STATUS_ID,
+        },
+      });
+      this.logger.log(`User: ${userId} assigned to groupId: ${groupId}`);
+    } catch (error) {
+      this.logger.error(
+        `Unable to assign userId: ${userId} to groupId: ${groupId}`,
+        error,
+      );
+      // should we fail when an error occurs?
     }
   }
 }

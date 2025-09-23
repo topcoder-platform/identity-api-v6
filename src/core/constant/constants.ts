@@ -62,6 +62,10 @@ export const Constants = {
   MAX_LENGTH_FIRST_NAME: 64,
   MAX_LENGTH_LAST_NAME: 64,
   MAX_LENGTH_EMAIL: 100,
+
+  // user_group_xref
+  DEFAULT_CREATE_USER_ID: 1,
+  DEFAULT_SECURITY_STATUS_ID: 1,
 };
 
 export const MachineScopes = {
@@ -70,3 +74,10 @@ export const MachineScopes = {
   deleteScopes: ['delete:user_profiles', 'all:user_profiles'],
   updateScopes: ['update:user_profiles', 'all:user_profiles'],
 };
+
+export enum DefaultGroups {
+  MANAGER = 2,
+  CODERS = 10,
+  LEVEL_TWO_ADMINS = 14,
+  ANONYMOUS = 2000118,
+}
