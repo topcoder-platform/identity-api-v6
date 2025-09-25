@@ -208,7 +208,7 @@ model user_achievement {
 }
 
 model user_group_xref {
-  user_group_id      Decimal             @id(map: "pk_user_group_xref") @db.Decimal(12, 0)
+  user_group_id      Decimal             @id(map: "pk_user_group_xref") @default(dbgenerated("nextval('sequence_user_group_seq'::regclass)")) @db.Decimal(12, 0)
   login_id           Decimal?            @db.Decimal(12, 0)
   group_id           Decimal?            @db.Decimal(12, 0)
   create_user_id     Decimal?            @db.Decimal(12, 0)

@@ -187,6 +187,9 @@ async function loadData() {
 async function clearTables() {
   console.log('Clearing contents of tables...');
 
+  await identityDb.user_group_xref.deleteMany({});
+  await identityDb.security_groups.deleteMany({});
+  await identityDb.security_status_lu.deleteMany({});
   await identityDb.user_email_xref.deleteMany({});
   await identityDb.user_otp_email.deleteMany({});
   await identityDb.security_user.deleteMany({});
@@ -210,6 +213,40 @@ async function clearTables() {
 
 async function loadDataToTables() {
   console.log('Loading data to tables...');
+
+  await identityDb.security_status_lu.createMany({
+    data: [
+      {
+        security_status_id: 1,
+        status_desc: 'default status',
+      },
+    ],
+  });
+
+  await identityDb.security_groups.createMany({
+    data: [
+      {
+        group_id: 2,
+        description: 'Manager',
+        challenge_group_ind: 1,
+      },
+      {
+        group_id: 10,
+        description: 'Coders',
+        challenge_group_ind: 1,
+      },
+      {
+        group_id: 14,
+        description: 'Level Two Admins',
+        challenge_group_ind: 1,
+      },
+      {
+        group_id: 2000118,
+        description: 'Anonymous',
+        challenge_group_ind: 1,
+      },
+    ],
+  });
 
   await identityDb.achievement_type_lu.createMany({
     data: [
@@ -599,6 +636,9 @@ async function verifyMigration() {
   const roleAssignmentCount = await identityDb.$queryRaw<
     { count: bigint }[]
   >`SELECT COUNT(*) as count FROM "role_assignment";`;
+  const securityGroups = await identityDb.$queryRaw<
+    { count: bigint }[]
+  >`SELECT COUNT(*) as count FROM "security_groups";`;
 
   console.log(`Data load verification:
     - Users: ${userCount[0].count}
@@ -608,6 +648,7 @@ async function verifyMigration() {
     - User Social Login: ${socialLoginUserCount[0].count}
     - Roles: ${rolesCount[0].count}
     - Role Assignment: ${roleAssignmentCount[0].count}
+    - Security Groups: ${securityGroups[0].count}
   `);
 }
 

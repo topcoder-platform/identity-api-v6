@@ -32,6 +32,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 import { describeAccess } from '../../shared/swagger/access-description.util';
+import { CommonUtils } from '../../shared/util/common.utils';
 
 @Controller('roles')
 @UseGuards(AuthRequiredGuard)
@@ -71,7 +72,7 @@ export class RoleController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Internal server error.',
   })
-  findAll(
+  async findAll(
     @Query() query: RoleQueryDto,
     @Req() req: Request,
   ): Promise<RoleResponseDto[]> {
@@ -83,9 +84,7 @@ export class RoleController {
     this.logger.debug(`findAll received query: ${JSON.stringify(query)}`);
 
     if (!isAdmin && !isMachine) {
-      throw new ForbiddenException(
-        'Only administrators can search roles.',
-      );
+      throw new ForbiddenException('Only administrators can search roles.');
     }
 
     if (query.filter) {
@@ -108,7 +107,8 @@ export class RoleController {
     }
 
     const isMachineWithReadScope =
-      isMachine && this.hasAnyScope(user, [SCOPES.READ_ROLES, SCOPES.ALL_ROLES]);
+      isMachine &&
+      this.hasAnyScope(user, [SCOPES.READ_ROLES, SCOPES.ALL_ROLES]);
 
     if (isMachine && !isMachineWithReadScope) {
       throw new ForbiddenException(
@@ -116,7 +116,12 @@ export class RoleController {
       );
     }
 
-    return this.roleService.findAll(subjectId);
+    const result = await this.roleService.findAll(subjectId);
+    if (query.selector && query.selector.trim().length > 0) {
+      const keys = query.selector.split(',');
+      return CommonUtils.pickArray(result, keys) as RoleResponseDto[];
+    }
+    return result;
   }
 
   /**
@@ -144,7 +149,7 @@ export class RoleController {
   async findOne(
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
-    @Query('fields') fields?: string,
+    @Query('selector') selector?: string,
   ): Promise<RoleResponseDto> {
     const user = this.getAuthenticatedUser(req);
     const isAdmin = Boolean(user?.isAdmin);
@@ -168,9 +173,13 @@ export class RoleController {
       }
     }
 
-    const result = await this.roleService.findOne(roleId, fields);
+    const result = await this.roleService.findOne(roleId, selector);
     if (!result) {
       throw new NotFoundException(`Role with ID ${roleId} not found.`);
+    }
+    if (selector && selector.trim().length > 0) {
+      const keys = selector.split(',');
+      return CommonUtils.pick(result, keys) as RoleResponseDto;
     }
     return result;
   }
@@ -348,7 +357,7 @@ export class RoleController {
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
   ): Promise<any> {
-    const user = (req as any).authUser || (req as any).user;
+    const user = this.getAuthenticatedUser(req);
     if (!user?.isAdmin) {
       throw new ForbiddenException('Only administrators can assign roles.');
     }
@@ -385,13 +394,28 @@ export class RoleController {
       );
     }
 
+    // before assigning, check first if subject has role already
+    const roleDetails = await this.roleService.checkSubjectHasRole(
+      roleId,
+      subjectId,
+    );
+    if (roleDetails) {
+      this.logger.debug('No need to assign role as subject already has role');
+      // means subject has role already
+      return {
+        id: roleId,
+      }; // same as java, line RoleResource line 399
+    }
+    // assign if does not yet exist for subject
     await this.roleService.assignRoleToSubject(
       roleId,
       subjectId,
       Number(user.userId),
     );
 
-    return { message: `Role ${roleId} assigned to subject ${subjectId}.` };
+    return {
+      id: roleId,
+    }; // same as java, line RoleResource line 401
   }
 
   /**
@@ -432,7 +456,7 @@ export class RoleController {
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
   ): Promise<any> {
-    const user: any = (req as any).authUser || (req as any).user;
+    const user = this.getAuthenticatedUser(req);
     if (!user?.isAdmin) {
       throw new ForbiddenException('Only administrators can deassign roles.');
     }
@@ -468,9 +492,24 @@ export class RoleController {
       );
     }
 
+    // before deassigning, check first if subject has role already
+    const roleDetails = await this.roleService.checkSubjectHasRole(
+      roleId,
+      subjectId,
+    );
+    if (!roleDetails) {
+      this.logger.debug(
+        'No need to deassign role as subject does not have role',
+      );
+      // means subject does not have role
+      return {
+        id: roleId,
+      }; // same as java, line RoleResource line 430
+    }
+
     await this.roleService.deassignRoleFromSubject(roleId, subjectId);
 
-    return { message: `Role ${roleId} unassigned from subject ${subjectId}.` };
+    return { id: roleId }; // same as java, line RoleResource line 432
   }
 
   /**
@@ -508,8 +547,8 @@ export class RoleController {
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
     @Query('filter') filter: string,
-  ): Promise<RoleResponseDto> {
-    const user: any = (req as any).authUser || (req as any).user;
+  ): Promise<{ id: number }> {
+    const user = this.getAuthenticatedUser(req);
 
     if (roleId <= 0) {
       throw new BadRequestException('roleId must be a positive number.');
@@ -560,13 +599,13 @@ export class RoleController {
       throw new NotFoundException('Subject does not have the specified role.');
     }
 
-    return roleDetails;
+    return { id: roleId }; // same as RoleResource.java  line 460
   }
 
   private getAuthenticatedUser(req: Request): any {
-    const result:any = (req as any).authUser || (req as any).user;
-    if(result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
-      result.isAdmin=true;
+    const result: any = (req as any).authUser || (req as any).user;
+    if (result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+      result.isAdmin = true;
     }
     return result;
   }

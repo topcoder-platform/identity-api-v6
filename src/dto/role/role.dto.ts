@@ -167,12 +167,12 @@ export class RoleQueryDto {
   @IsString()
   filter?: string;
 
-  // Add other potential query params like 'fields' if needed
+  // Add other potential query params like 'selector' if needed
   @ApiPropertyOptional({
     description: "Comma-separated list of fields to include (e.g., 'subjects')",
     example: 'subjects',
   })
   @IsOptional()
   @IsString()
-  fields?: string;
+  selector?: string;
 }

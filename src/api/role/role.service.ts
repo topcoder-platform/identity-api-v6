@@ -68,10 +68,10 @@ export class RoleService {
 
   async findOne(
     roleId: number,
-    fields?: string,
+    selector?: string,
   ): Promise<RoleResponseDto | null> {
-    this.logger.debug(`Finding role by id: ${roleId}, fields: ${fields}`);
-    const includeSubjects = fields?.toLowerCase().includes('subjects');
+    this.logger.debug(`Finding role by id: ${roleId}, selector: ${selector}`);
+    const includeSubjects = selector?.toLowerCase().includes('subjects');
 
     const role = await this.prismaClient.role.findUnique({
       where: { id: roleId },
