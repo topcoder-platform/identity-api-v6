@@ -27,6 +27,7 @@ import { SCOPES } from '../../auth/constants';
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { ModifyUserRoleDto } from '../../dto/user-role/user-role.dto';
 import { UserRolesService } from '../user-role/user-roles.service';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 interface AuthenticatedRequest extends Request {
   authUser?: any;
@@ -47,6 +48,13 @@ export class TopgearUserRolesController {
   @Get(':identifier')
   @ApiOperation({
     summary: 'List roles assigned to a Topgear user by ID or handle',
+    description: describeAccess({
+      summary:
+        'Retrieves Topgear-specific role assignments for the supplied member.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m:
+        'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+    }),
   })
   @ApiParam({
     name: 'identifier',
@@ -66,6 +74,13 @@ export class TopgearUserRolesController {
   @Get(':identifier/:roleId')
   @ApiOperation({
     summary: 'Get a single role assigned to a Topgear user by role id',
+    description: describeAccess({
+      summary:
+        'Returns the details of a single Topgear role assignment for the member.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m:
+        'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+    }),
   })
   @ApiParam({
     name: 'identifier',
@@ -94,7 +109,16 @@ export class TopgearUserRolesController {
   }
 
   @Patch(':identifier')
-  @ApiOperation({ summary: 'Assign a role to the specified Topgear user' })
+  @ApiOperation({
+    summary: 'Assign a role to the specified Topgear user',
+    description: describeAccess({
+      summary:
+        'Assigns the provided role id to the target member, limited to Topgear contexts.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m:
+        'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+    }),
+  })
   @ApiParam({
     name: 'identifier',
     description: 'Numeric user id or handle',
@@ -121,6 +145,12 @@ export class TopgearUserRolesController {
   @Delete(':identifier/:roleId')
   @ApiOperation({
     summary: 'Remove a role from the specified Topgear user',
+    description: describeAccess({
+      summary: 'Removes the specified Topgear role assignment from the member.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m:
+        'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+    }),
   })
   @ApiParam({
     name: 'identifier',

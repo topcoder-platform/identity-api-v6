@@ -27,6 +27,7 @@ import { SCOPES } from '../../auth/constants';
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { ModifyUserRoleDto } from '../../dto/user-role/user-role.dto';
 import { UserRolesService } from './user-roles.service';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 interface AuthenticatedRequest extends Request {
   authUser?: any;
@@ -45,6 +46,12 @@ export class UserRolesController {
   @Get(':identifier')
   @ApiOperation({
     summary: 'List roles assigned to a user by ID or Topcoder member handle',
+    description: describeAccess({
+      summary:
+        'Retrieves all role assignments for the identified member.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['read:usersRole', 'all:usersRole'],
+    }),
   })
   @ApiParam({
     name: 'identifier',
@@ -64,6 +71,12 @@ export class UserRolesController {
   @Get(':identifier/:roleId')
   @ApiOperation({
     summary: 'Get a single role assigned to a user by role id',
+    description: describeAccess({
+      summary:
+        'Retrieves a specific role assignment for the given member and role id.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['read:usersRole', 'all:usersRole'],
+    }),
   })
   @ApiParam({
     name: 'identifier',
@@ -88,7 +101,15 @@ export class UserRolesController {
   }
 
   @Patch(':identifier')
-  @ApiOperation({ summary: 'Assign a role to the specified user' })
+  @ApiOperation({
+    summary: 'Assign a role to the specified user',
+    description: describeAccess({
+      summary:
+        'Adds the provided role id to the user identified by id or handle.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['update:usersRole', 'all:usersRole'],
+    }),
+  })
   @ApiParam({
     name: 'identifier',
     description: 'Numeric user id or handle',
@@ -112,7 +133,15 @@ export class UserRolesController {
   }
 
   @Delete(':identifier/:roleId')
-  @ApiOperation({ summary: 'Remove a role from the specified user' })
+  @ApiOperation({
+    summary: 'Remove a role from the specified user',
+    description: describeAccess({
+      summary:
+        'Deletes the specified role assignment from the target member.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['delete:usersRole', 'all:usersRole'],
+    }),
+  })
   @ApiParam({
     name: 'identifier',
     description: 'Numeric user id or handle',

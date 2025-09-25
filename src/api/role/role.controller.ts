@@ -31,6 +31,7 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 @Controller('roles')
 @UseGuards(AuthRequiredGuard)
@@ -48,7 +49,17 @@ export class RoleController {
    * @returns Array of matching RoleResponseDto objects
    */
   @Get()
-  @ApiOperation({ summary: 'Search roles with given parameters' })
+  @ApiOperation({
+    summary: 'Search roles with given parameters',
+    description: describeAccess({
+      summary:
+        'Searches existing roles using optional filter parameters (e.g. subjectId).',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['read:roles', 'all:roles'],
+      notes:
+        'M2M tokens without the read scope receive HTTP 403 (Forbidden).',
+    }),
+  })
   @ApiResponse({ status: HttpStatus.OK, type: [RoleResponseDto] })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
   @ApiResponse({
@@ -115,7 +126,14 @@ export class RoleController {
    * @returns RoleResponseDto object if found, otherwise throws NotFoundException
    */
   @Get(':roleId')
-  @ApiOperation({ summary: 'Get role by role id' })
+  @ApiOperation({
+    summary: 'Get role by role id',
+    description: describeAccess({
+      summary: 'Fetches a single role, optionally filtering response fields.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['read:roles', 'all:roles'],
+    }),
+  })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({ status: HttpStatus.OK, type: RoleResponseDto })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Not Found' })
@@ -165,7 +183,14 @@ export class RoleController {
    * @returns Created RoleResponseDto object
    */
   @Post()
-  @ApiOperation({ summary: 'Create role' })
+  @ApiOperation({
+    summary: 'Create role',
+    description: describeAccess({
+      summary: 'Creates a new role record.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiResponse({ status: HttpStatus.OK, type: RoleResponseDto })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
   @ApiResponse({
@@ -201,7 +226,14 @@ export class RoleController {
    * @returns Updated RoleResponseDto object
    */
   @Put(':roleId')
-  @ApiOperation({ summary: 'Update role with id and parameters' })
+  @ApiOperation({
+    summary: 'Update role with id and parameters',
+    description: describeAccess({
+      summary: 'Updates the name of an existing role.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({ status: HttpStatus.OK, type: RoleResponseDto })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request.' })
@@ -238,7 +270,14 @@ export class RoleController {
    * @param roleId Numeric ID of the role to delete
    */
   @Delete(':roleId')
-  @ApiOperation({ summary: 'Delete role with id' })
+  @ApiOperation({
+    summary: 'Delete role with id',
+    description: describeAccess({
+      summary: 'Deletes an existing role.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
@@ -282,6 +321,12 @@ export class RoleController {
   @Post(':roleId/assign')
   @ApiOperation({
     summary: 'Assign role to subject id. Subject id is in filter parameter',
+    description: describeAccess({
+      summary:
+        'Assigns an existing role to a subject identified via `filter=subjectId=<id>`.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Operation successful' })
@@ -360,6 +405,12 @@ export class RoleController {
   @Delete(':roleId/deassign')
   @ApiOperation({
     summary: 'Deassign role for subject id. Subject id is in filter parameter',
+    description: describeAccess({
+      summary:
+        'Removes an assigned role from a subject identified via `filter=subjectId=<id>`.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Operation successful' })
@@ -434,6 +485,12 @@ export class RoleController {
   @ApiOperation({
     summary:
       'Check role has been assigned to subject id or not. Subject id is in filter parameter',
+    description: describeAccess({
+      summary:
+        'Determines whether a subject currently holds the specified role.',
+      jwt: 'Administrators can inspect any subject. Other users can only check their own subject id.',
+      m2m: 'Not supported; use a member JWT.',
+    }),
   })
   @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Operation successful' })

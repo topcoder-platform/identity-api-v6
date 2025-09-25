@@ -61,10 +61,26 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter()); // Apply the validation filter
 
+  const swaggerDescription = [
+    'Topcoder Identity API v6 manages member authentication, profiles, groups, and roles.',
+    'Authenticate with a bearer token; each endpoint description details the required member roles for JWTs and the scopes expected for M2M tokens.',
+    'The service replaces the legacy v5 implementation and uses consistent envelope responses for backwards compatibility.',
+  ].join('\n\n');
+
   const config = new DocumentBuilder()
-    .setTitle('TopCoder Identity Service')
-    .setDescription('validate username / password logins, lookup roles, etc')
+    .setTitle('Topcoder Identity Service')
+    .setDescription(swaggerDescription)
     .setVersion('v6')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Pass a member JWT or an M2M token in the Authorization header. Refer to the endpoint notes for required roles and scopes.',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

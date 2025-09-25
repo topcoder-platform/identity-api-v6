@@ -46,6 +46,7 @@ import {
   createBaseResponse,
 } from '../../shared/util/responseBuilder';
 import { Constants } from '../../core/constant/constants';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 /**
  * Check if request body and param are present. Throw 400 Bad Request if not.
@@ -75,7 +76,15 @@ export class GroupController {
    * @returns Created group details with appropriate HTTP status
    */
   @Post()
-  @ApiOperation({ summary: 'Create a new group' })
+  @ApiOperation({
+    summary: 'Create a new group',
+    description: describeAccess({
+      summary:
+        'Creates a group record. If flags are omitted, the group is private and self-registration is disabled.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'The group has been successfully created.',
@@ -115,7 +124,15 @@ export class GroupController {
    * @returns Created security group details with appropriate HTTP status
    */
   @Post('securityGroups')
-  @ApiOperation({ summary: 'Create a new security group' })
+  @ApiOperation({
+    summary: 'Create a new security group',
+    description: describeAccess({
+      summary:
+        'Creates a security group mapping for authorization services.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'The security group has been successfully created.',
@@ -157,7 +174,15 @@ export class GroupController {
    * @returns Member details if found, otherwise throws an error
    */
   @Get(':groupId/singleMember/:memberId')
-  @ApiOperation({ summary: 'Get a single member from a group' })
+  @ApiOperation({
+    summary: 'Get a single member from a group',
+    description: describeAccess({
+      summary:
+        'Fetch a specific membership record for the supplied group and member IDs.',
+      jwt: 'Any authenticated user.',
+      m2m: 'No additional scope requirement beyond authentication.',
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The member has been successfully retrieved.',
@@ -206,7 +231,15 @@ export class GroupController {
    * @returns Member count for the group
    */
   @Get(':groupId/membersCount')
-  @ApiOperation({ summary: 'Get the count of members in a group' })
+  @ApiOperation({
+    summary: 'Get the count of members in a group',
+    description: describeAccess({
+      summary:
+        'Returns a count of member-type memberships for the specified group, optionally including sub-groups.',
+      jwt: 'Any authenticated user.',
+      m2m: 'No additional scope requirement beyond authentication.',
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The member count has been successfully retrieved.',
@@ -247,7 +280,14 @@ export class GroupController {
    * @returns Updated group details with appropriate HTTP status
    */
   @Put(':groupId')
-  @ApiOperation({ summary: 'Update an existing group' })
+  @ApiOperation({
+    summary: 'Update an existing group',
+    description: describeAccess({
+      summary: 'Updates the metadata for an existing group.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
+  })
   @ApiBody({
     type: GroupDto,
     description: 'Data to update the group. All fields are optional.',
@@ -302,7 +342,14 @@ export class GroupController {
    * @returns Deleted group details with appropriate HTTP status
    */
   @Delete(':groupId')
-  @ApiOperation({ summary: 'Delete a group' })
+  @ApiOperation({
+    summary: 'Delete a group',
+    description: describeAccess({
+      summary: 'Deletes a group and all of its memberships.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
+  })
   @ApiParam({
     name: 'groupId',
     description: 'The ID of the group to delete',
@@ -352,7 +399,17 @@ export class GroupController {
    * @returns Group details if found, otherwise throws an error
    */
   @Get(':groupId')
-  @ApiOperation({ summary: 'Get a specific group by its ID' })
+  @ApiOperation({
+    summary: 'Get a specific group by its ID',
+    description: describeAccess({
+      summary:
+        'Returns the metadata for a single group. Private group visibility follows membership and admin rules.',
+      jwt: 'Requires the `administrator` role for private groups; members of the group can access their own private groups. Public groups are available to any authenticated user.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
+      notes:
+        'Authorization failures result in HTTP 403 rather than leaking the existence of the group.',
+    }),
+  })
   @ApiParam({
     name: 'groupId',
     description: 'The ID of the group to retrieve',
@@ -406,7 +463,15 @@ export class GroupController {
    * @returns Added membership details with appropriate HTTP status
    */
   @Post(':groupId/members')
-  @ApiOperation({ summary: 'Add a member to a group' })
+  @ApiOperation({
+    summary: 'Add a member to a group',
+    description: describeAccess({
+      summary:
+        'Adds a membership record to the target group for the supplied member.',
+      jwt: 'Requires the `administrator` role. If the group allows self-registration, members may add themselves with their own JWT.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
+  })
   @ApiParam({
     name: 'groupId',
     description: 'The ID of the group to add a member to',
@@ -477,6 +542,12 @@ export class GroupController {
   @Delete(':groupId/members/:membershipId')
   @ApiOperation({
     summary: 'Remove a member from a group using the membership ID',
+    description: describeAccess({
+      summary:
+        'Deletes a specific membership row for the provided group and membership identifiers.',
+      jwt: 'Requires the `administrator` role. Members can remove themselves when the group allows self-registration.',
+      m2m: ['write:groups', 'all:groups'],
+    }),
   })
   @ApiParam({
     name: 'groupId',
@@ -541,7 +612,17 @@ export class GroupController {
    * @returns A response containing the group and its subgroups.
    */
   @Get(':groupId/getSubGroups')
-  @ApiOperation({ summary: 'Get a group and its subgroups' })
+  @ApiOperation({
+    summary: 'Get a group and its subgroups',
+    description: describeAccess({
+      summary:
+        'Returns the group tree for the requested group, optionally including nested levels.',
+      jwt: 'Any authenticated user.',
+      m2m: 'No additional scope requirement beyond authentication.',
+      notes:
+        'Private group visibility currently mirrors legacy behaviour and does not enforce additional role checks for this endpoint.',
+    }),
+  })
   @ApiParam({
     name: 'groupId',
     description: 'The ID of the parent group',
@@ -625,6 +706,12 @@ export class GroupController {
   @Get(':groupId/getParentGroup')
   @ApiOperation({
     summary: "Get a group's primary parent or ultimate ancestor",
+    description: describeAccess({
+      summary:
+        'Retrieves the direct parent group or the full ancestry chain for the supplied group.',
+      jwt: 'Any authenticated user.',
+      m2m: 'No additional scope requirement beyond authentication.',
+    }),
   })
   @ApiParam({
     name: 'groupId',
@@ -688,6 +775,15 @@ export class GroupController {
    * @returns A response containing the list of group members.
    */
   @Get(':groupId/members')
+  @ApiOperation({
+    summary: 'List members of a group',
+    description: describeAccess({
+      summary:
+        'Lists member-type memberships for the requested group.',
+      jwt: 'Requires the `administrator` role for private groups; group members can access their own private groups. Public groups are available to any authenticated user.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Group members retrieved successfully.',
@@ -728,6 +824,15 @@ export class GroupController {
    * @returns A response containing the list of groups associated with the member.
    */
   @Get()
+  @ApiOperation({
+    summary: 'List groups for a member',
+    description: describeAccess({
+      summary:
+        'Returns groups associated with a member and membership type. Non-admin JWT callers are restricted to their own user id and the `user` membership type.',
+      jwt: 'Administrators can query any member. Other users are limited to their own memberships.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Groups retrieved successfully by member.',

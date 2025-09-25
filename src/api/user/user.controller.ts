@@ -56,6 +56,7 @@ import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module'; // Import inj
 import { MachineScopes } from '../../core/constant/constants';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { MemberStatus } from '../../dto/member';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 // Helper function to map UserModel to UserResponseDto
 /**
@@ -276,6 +277,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Generates a password reset token and sends it via email (Simulated)',
+    description: describeAccess({
+      summary:
+        'Provides a reset token for password recovery workflows. Authentication is not required; the caller must supply an email or handle.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiQuery({ name: 'email', required: false, type: String })
   @ApiQuery({ name: 'handle', required: false, type: String })
@@ -350,7 +357,15 @@ export class UserController {
    * @throws BadRequestException if handle is missing.
    */
   @Get('validateHandle')
-  @ApiOperation({ summary: 'Validate if a user handle is available' })
+  @ApiOperation({
+    summary: 'Validate if a user handle is available',
+    description: describeAccess({
+      summary:
+        'Checks whether the supplied handle is available for registration.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiQuery({ name: 'handle', required: true, type: String })
   @ApiResponse({ status: HttpStatus.OK, type: DTOs.ValidationResponseDto })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
@@ -376,7 +391,14 @@ export class UserController {
    * @throws BadRequestException if email is missing.
    */
   @Get('validateEmail')
-  @ApiOperation({ summary: 'Validate if an email address is available' })
+  @ApiOperation({
+    summary: 'Validate if an email address is available',
+    description: describeAccess({
+      summary: 'Determines whether an email can be used for a new member.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiQuery({ name: 'email', required: true, type: String })
   @ApiResponse({ status: HttpStatus.OK, type: DTOs.ValidationResponseDto })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
@@ -405,6 +427,12 @@ export class UserController {
   @Get('validateSocial')
   @ApiOperation({
     summary: 'Validate social provider and user ID availability',
+    description: describeAccess({
+      summary:
+        'Checks if a social provider identity (provider + user id) is already linked to a Topcoder account.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiQuery({
     name: 'socialUserId',
@@ -469,7 +497,15 @@ export class UserController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
-  @ApiOperation({ summary: 'Find users based on query parameters' })
+  @ApiOperation({
+    summary: 'Find users based on query parameters',
+    description: describeAccess({
+      summary:
+        'Searches for users using legacy filter syntax, returning v3-compatible envelopes.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiQuery({
     name: 'selector',
     type: String,
@@ -539,7 +575,15 @@ export class UserController {
   @Get(':resourceId')
   @UseGuards(SelfOrAdminGuard)
   @SelfOrAdmin('resourceId')
-  @ApiOperation({ summary: 'Get a specific user by ID' })
+  @ApiOperation({
+    summary: 'Get a specific user by ID',
+    description: describeAccess({
+      summary:
+        'Retrieves the user profile for the requested resource id, enforcing the legacy envelope structure.',
+      jwt: 'Requires the `administrator` role or a JWT for the user being queried.',
+      m2m: 'Not supported; use a member JWT.',
+    }),
+  })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiQuery({
     name: 'selector',
@@ -599,6 +643,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Register a new user (Placeholder - actual registration flow might be different)',
+    description: describeAccess({
+      summary:
+        'Creates a new member record using the legacy param envelope. This endpoint mirrors the old v3 behaviour and does not require authentication.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiBody({ type: DTOs.CreateUserBodyDto })
   @ApiResponse({
@@ -635,7 +685,15 @@ export class UserController {
   @Patch(':resourceId')
   @UseGuards(SelfOrAdminGuard)
   @SelfOrAdmin('resourceId')
-  @ApiOperation({ summary: 'Update basic user information' })
+  @ApiOperation({
+    summary: 'Update basic user information',
+    description: describeAccess({
+      summary:
+        'Updates core profile fields for the specified user using the legacy envelope payload.',
+      jwt: 'Requires the `administrator` role or a JWT for the user being updated.',
+      m2m: ['update:user_profiles', 'all:user_profiles'],
+    }),
+  })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiBody({ type: DTOs.UpdateUserBodyDto })
   @ApiResponse({
@@ -685,6 +743,12 @@ export class UserController {
   @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Delete a user - NOT IMPLEMENTED as per legacy system.',
+    description: describeAccess({
+      summary:
+        'Reserved for parity with the legacy API. The operation is not implemented and always returns HTTP 501.',
+      jwt: 'Would require a JWT with the `administrator` role.',
+      m2m: 'Not supported.',
+    }),
   })
   @ApiParam({
     name: 'resourceId',
@@ -724,7 +788,15 @@ export class UserController {
   @Post(':userId/SSOUserLogin')
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
-  @ApiOperation({ summary: 'Link an SSO profile to a user (Admin only).' })
+  @ApiOperation({
+    summary: 'Link an SSO profile to a user (Admin only).',
+    description: describeAccess({
+      summary:
+        'Creates or links an SSO identity (provider + user id) to the specified user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({
     name: 'userId',
     description: 'Numeric User ID to link the SSO profile to',
@@ -788,6 +860,12 @@ export class UserController {
   @SelfOrAdmin('userId')
   @ApiOperation({
     summary: 'Update an existing SSO profile linked to a user (Admin only).',
+    description: describeAccess({
+      summary:
+        'Updates metadata for an existing SSO identity associated with a user.',
+      jwt: 'Requires the `administrator` role or a JWT for the user owning the SSO link.',
+      m2m: ['update:user_profiles', 'all:user_profiles'],
+    }),
   })
   @ApiParam({
     name: 'userId',
@@ -858,7 +936,15 @@ export class UserController {
   @Delete(':userId/SSOUserLogin')
   @UseGuards(SelfOrAdminGuard)
   @SelfOrAdmin('userId')
-  @ApiOperation({ summary: 'Delete an SSO login link for a user' })
+  @ApiOperation({
+    summary: 'Delete an SSO login link for a user',
+    description: describeAccess({
+      summary:
+        'Removes an existing SSO link for the specified user and provider.',
+      jwt: 'Requires the `administrator` role or a JWT for the user owning the SSO link.',
+      m2m: ['delete:user_profiles', 'all:user_profiles'],
+    }),
+  })
   @ApiParam({
     name: 'userId',
     type: Number,
@@ -975,6 +1061,12 @@ export class UserController {
   @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Get all SSO profiles linked to a user (Admin only).',
+    description: describeAccess({
+      summary:
+        'Lists all SSO identities associated with the specified user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({ name: 'userId', description: 'Numeric User ID', type: Number })
   @ApiResponse({
@@ -1023,6 +1115,12 @@ export class UserController {
   @Roles(ADMIN_ROLE)
   @ApiOperation({
     summary: 'Add an external profile (social, etc.) to a user (Admin only).',
+    description: describeAccess({
+      summary:
+        'Creates a new external profile entry (e.g., social account) for the specified user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({
     name: 'resourceId',
@@ -1090,7 +1188,14 @@ export class UserController {
    * @returns A list of UserProfileDto objects.
    */
   @Get(':resourceId/profiles')
-  @ApiOperation({ summary: 'Get all external profiles for a user.' })
+  @ApiOperation({
+    summary: 'Get all external profiles for a user.',
+    description: describeAccess({
+      summary: 'Lists the external profiles associated with the specified user.',
+      jwt: 'Requires the `administrator` role or a JWT for the user being queried.',
+      m2m: ['read:user_profiles', 'all:user_profiles'],
+    }),
+  })
   @ApiParam({
     name: 'resourceId',
     description: 'Numeric User ID',
@@ -1133,6 +1238,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Delete all external profiles for a user under a specific provider (Admin only).',
+    description: describeAccess({
+      summary:
+        'Removes the external profiles for the supplied provider from the target user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({
     name: 'resourceId',
@@ -1194,6 +1305,12 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Authenticate user for Auth0 Custom Database script.',
+    description: describeAccess({
+      summary:
+        'Validates credentials for Auth0 Custom DB login flows. Intended for Auth0 to call without a bearer token.',
+      jwt: 'Not required (used by Auth0).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
   @ApiBody({
@@ -1250,6 +1367,12 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get user profile and roles for Auth0 Rules/Actions.',
+    description: describeAccess({
+      summary:
+        'Returns a simplified profile/role payload used by Auth0 Rules and Actions. Intended for server-to-server calls without a bearer token.',
+      jwt: 'Not required (used by Auth0).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
   @ApiBody({
@@ -1296,6 +1419,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Change password for Auth0 Action (typically called by Auth0 post-password-reset flow).',
+    description: describeAccess({
+      summary:
+        'Allows Auth0 post-password-reset flows to set a new password for a member.',
+      jwt: 'Not required (used by Auth0).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
   @ApiBody({
@@ -1360,6 +1489,12 @@ export class UserController {
   @Put('activate')
   @ApiOperation({
     summary: 'Activate a new user account using OTP and a resend token.',
+    description: describeAccess({
+      summary:
+        'Activates a pending user by validating an OTP and resend token issued during registration.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiBody({ type: DTOs.ActivateUserBodyDto })
   @ApiResponse({
@@ -1427,6 +1562,12 @@ export class UserController {
   @Post('resendActivationEmail')
   @ApiOperation({
     summary: 'Resend activation email/OTP using a resend token.',
+    description: describeAccess({
+      summary:
+        'Triggers another activation email/OTP for a pending user when provided a valid resend token.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiBody({ type: DTOs.UserOtpDto }) // UserOtpDto contains userId and resendToken for this flow
   @ApiResponse({
@@ -1481,7 +1622,15 @@ export class UserController {
   @Patch(':resourceId/handle')
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
-  @ApiOperation({ summary: 'Update user handle (Admin only).' })
+  @ApiOperation({
+    summary: 'Update user handle (Admin only).',
+    description: describeAccess({
+      summary:
+        'Changes the handle for a user and triggers related downstream updates.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateHandleBodyDto })
   @ApiResponse({
@@ -1557,6 +1706,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Update user primary email (Admin only). This will set the new email to unverified and trigger verification.',
+    description: describeAccess({
+      summary:
+        'Changes the primary email for a user and sends verification to the new address.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
   })
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateEmailBodyDto })
@@ -1631,6 +1786,12 @@ export class UserController {
   @ApiOperation({
     summary:
       'Request a one-time token for email update, requires user credentials.',
+    description: describeAccess({
+      summary:
+        'Generates a one-time token after validating the member password. Designed for client-side flows; no bearer token is required.',
+      jwt: 'Not required; the endpoint uses submitted credentials.',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiBody({
     schema: {
@@ -1700,6 +1861,12 @@ export class UserController {
   @Post(':resourceId/email/:email')
   @ApiOperation({
     summary: 'Update user primary email using a one-time token.',
+    description: describeAccess({
+      summary:
+        'Consumes a one-time token generated via `oneTimeToken` to update the user\'s primary email.',
+      jwt: 'Not supported; supply the one-time token in the Authorization header instead.',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiParam({ name: 'resourceId', type: 'string', description: 'User ID' })
   @ApiParam({ name: 'email', type: 'string', description: 'New email address' })
@@ -1779,7 +1946,14 @@ export class UserController {
   @Patch(':resourceId/status')
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
-  @ApiOperation({ summary: 'Update user status (Admin only).' })
+  @ApiOperation({
+    summary: 'Update user status (Admin only).',
+    description: describeAccess({
+      summary: 'Changes the activation status for the specified user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({ name: 'resourceId', description: 'User ID' })
   @ApiBody({ type: DTOs.UpdateStatusBodyDto })
   @ApiResponse({
@@ -1849,6 +2023,12 @@ export class UserController {
   @UseGuards(AuthRequiredGuard)
   @ApiOperation({
     summary: 'Update the primary role for the authenticated user (Self only).',
+    description: describeAccess({
+      summary:
+        'Sets which of the caller\'s roles is marked as primary. Only the user themselves may invoke it.',
+      jwt: 'Requires a JWT for the member making the request.',
+      m2m: 'Not supported.',
+    }),
   })
   @ApiBody({ type: DTOs.UpdatePrimaryRoleBodyDto })
   @ApiResponse({
@@ -1906,7 +2086,14 @@ export class UserController {
   @Get(':resourceId/2fa')
   @UseGuards(SelfOrAdminGuard)
   @SelfOrAdmin('resourceId')
-  @ApiOperation({ summary: "Get user's 2FA status (MFA and DICE)." })
+  @ApiOperation({
+    summary: "Get user's 2FA status (MFA and DICE).",
+    description: describeAccess({
+      summary: 'Retrieves MFA and DICE settings for the target user.',
+      jwt: 'Requires the `administrator` role or a JWT for the user being queried.',
+      m2m: 'Not supported.',
+    }),
+  })
   @ApiParam({
     name: 'resourceId',
     description: 'User ID (string representation of number)',
@@ -1950,7 +2137,15 @@ export class UserController {
   @Patch(':resourceId/2fa')
   @UseGuards(SelfOrAdminGuard)
   @SelfOrAdmin('resourceId')
-  @ApiOperation({ summary: "Update user's 2FA status (MFA and DICE)." })
+  @ApiOperation({
+    summary: "Update user's 2FA status (MFA and DICE).",
+    description: describeAccess({
+      summary:
+        'Enables or disables MFA/DICE for the specified user.',
+      jwt: 'Requires the `administrator` role or a JWT for the user being updated.',
+      m2m: 'Not supported.',
+    }),
+  })
   @ApiParam({
     name: 'resourceId',
     description: 'User ID (string representation of number)',
@@ -1997,7 +2192,15 @@ export class UserController {
    * @throws NotFoundException If the specified user is not found.
    */
   @Post('sendOtp') // 2FA OTP for login flow - requires partial auth state (user identified)
-  @ApiOperation({ summary: 'Send 2FA OTP for a partially authenticated user.' })
+  @ApiOperation({
+    summary: 'Send 2FA OTP for a partially authenticated user.',
+    description: describeAccess({
+      summary:
+        'Issues a 2FA OTP during the login flow once the user has partially authenticated.',
+      jwt: 'Not required; this endpoint is used within the login flow.',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiBody({
     type: DTOs.SendOtpBodyDto,
     description: 'Requires userId of the user who needs OTP for 2FA.',
@@ -2038,7 +2241,15 @@ export class UserController {
    * @throws NotFoundException If the token is invalid or expired.
    */
   @Post('/resendOtpEmail') // 2FA Resend OTP
-  @ApiOperation({ summary: 'Resend 2FA OTP email using a resend token.' })
+  @ApiOperation({
+    summary: 'Resend 2FA OTP email using a resend token.',
+    description: describeAccess({
+      summary:
+        'Resends the 2FA OTP email when provided a valid resend token from the login flow.',
+      jwt: 'Not required; used during the login flow.',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiBody({ type: DTOs.ResendOtpEmailBodyDto })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -2068,7 +2279,15 @@ export class UserController {
   }
 
   @Post('checkOtp')
-  @ApiOperation({ summary: 'Check 2FA OTP and complete login.' })
+  @ApiOperation({
+    summary: 'Check 2FA OTP and complete login.',
+    description: describeAccess({
+      summary:
+        'Validates the provided 2FA OTP and finalizes the login process.',
+      jwt: 'Not required; used during the login flow.',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiBody({ type: DTOs.CheckOtpBodyDto })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -2114,7 +2333,14 @@ export class UserController {
   @Get(':resourceId/achievements')
   @UseGuards(RolesGuard)
   @Roles(ADMIN_ROLE)
-  @ApiOperation({ summary: 'Get achievements for a user (Admin only).' })
+  @ApiOperation({
+    summary: 'Get achievements for a user (Admin only).',
+    description: describeAccess({
+      summary: 'Returns the achievements associated with the target user.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: 'Not supported; use an administrator JWT.',
+    }),
+  })
   @ApiParam({
     name: 'resourceId',
     description: 'User ID (string representation of number)',
@@ -2168,6 +2394,12 @@ export class UserController {
   @Put('resetPassword')
   @ApiOperation({
     summary: 'Resets user password',
+    description: describeAccess({
+      summary:
+        'Completes the password reset flow using an emailed reset token and new password.',
+      jwt: 'Not required; the reset token in the payload authorizes the operation.',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiBody({ type: DTOs.ResetPasswordBodyDto })
   @ApiResponse({

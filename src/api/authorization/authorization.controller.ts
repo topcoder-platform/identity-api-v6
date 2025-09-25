@@ -33,6 +33,7 @@ import {
 // import { AuthGuard } from '@nestjs/passport';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { Constants } from '../../core/constant/constants';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 @ApiTags('authorizations')
 @Controller('authorizations')
@@ -51,6 +52,12 @@ export class AuthorizationController {
   @HttpCode(HttpStatus.FOUND)
   @ApiOperation({
     summary: 'User Login. Will return a 302 response with redirect url.',
+    description: describeAccess({
+      summary:
+        'Initiates the Auth0 login flow by redirecting the browser to the configured authorize endpoint.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiQuery({
     name: 'next',
@@ -82,6 +89,12 @@ export class AuthorizationController {
   @HttpCode(HttpStatus.FOUND)
   @ApiOperation({
     summary: 'Get the access token by the authorization code and redirect url',
+    description: describeAccess({
+      summary:
+        'Handles the OAuth callback by exchanging the authorization code before redirecting the browser to the configured application URL.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiResponse({
     status: HttpStatus.FOUND,
@@ -105,7 +118,15 @@ export class AuthorizationController {
    * @returns Promise<AuthorizationResponse>
    */
   @Post()
-  @ApiOperation({ summary: 'create authorization' })
+  @ApiOperation({
+    summary: 'create authorization',
+    description: describeAccess({
+      summary:
+        'Creates an authorization record for a Topcoder member or service account using JSON or form submissions.',
+      jwt: 'Not required; client authentication happens through the request payload.',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiConsumes('application/json', 'application/x-www-form-urlencoded')
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -147,7 +168,15 @@ export class AuthorizationController {
   @Delete('/:targetId')
   @UseGuards(AuthRequiredGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete access token and refresh token' })
+  @ApiOperation({
+    summary: 'Delete access token and refresh token',
+    description: describeAccess({
+      summary:
+        'Revokes the active access token (and refresh token, if present) associated with the Authorization header for the provided target id.',
+      jwt: 'Any authenticated user may revoke their own token.',
+      m2m: 'No additional scope requirement beyond presenting the token to revoke.',
+    }),
+  })
   @ApiParam({
     name: 'targetId',
     description: 'target id',
@@ -180,7 +209,15 @@ export class AuthorizationController {
   @Delete()
   @UseGuards(AuthRequiredGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete access token of logged in user' })
+  @ApiOperation({
+    summary: 'Delete access token of logged in user',
+    description: describeAccess({
+      summary:
+        'Revokes the access token associated with the Authorization header for the logged in caller.',
+      jwt: 'Any authenticated user may revoke their own token.',
+      m2m: 'No additional scope requirement beyond presenting the token to revoke.',
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'operation successful',
@@ -201,7 +238,15 @@ export class AuthorizationController {
    * @returns Promise<string> Validation result message
    */
   @Get('/validateClient')
-  @ApiOperation({ summary: 'Validate client with client id and redirect url' })
+  @ApiOperation({
+    summary: 'Validate client with client id and redirect url',
+    description: describeAccess({
+      summary:
+        'Confirms that the supplied client id exists and the redirect URI is registered.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     type: String,
@@ -227,9 +272,16 @@ export class AuthorizationController {
    * @returns Promise<AuthorizationResponse> Authorization object response
    */
   @Get(':resourceId')
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Returns ASP token from given Authorization Bearer header. Bearer can hold either of 2 token, (a) Appirio Service Platform JWT or (b) Auth0 JWT',
+    description: describeAccess({
+      summary:
+        'Retrieves the authorization payload associated with the supplied target id using the bearer token provided in the request.',
+      jwt: 'Any authenticated user may retrieve their own record; no specific role is enforced.',
+      m2m: 'Any authenticated M2M token can retrieve its own authorization record.',
+    }),
   })
   @ApiParam({
     name: 'resourceId',

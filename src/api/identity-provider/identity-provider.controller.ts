@@ -16,6 +16,7 @@ import {
   BaseResponse,
   createBaseResponse,
 } from '../../shared/util/responseBuilder';
+import { describeAccess } from '../../shared/swagger/access-description.util';
 
 @ApiTags('identity-providers')
 @Controller('identityproviders')
@@ -35,8 +36,12 @@ export class IdentityProviderController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Fetch identity provider information for a user',
-    description:
-      'Returns the identity provider information based on handle or email',
+    description: describeAccess({
+      summary:
+        'Returns identity provider information for a user identified by handle or email.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
   })
   @ApiQuery({
     name: 'handle',
