@@ -10,6 +10,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
+import { SCOPES } from '../../auth/constants';
 import {
   ForbiddenException,
   BadRequestException,
@@ -121,6 +122,24 @@ const mockRegularUser: AuthenticatedUser = {
   payload: { sub: 'auth0|user2' },
   handle: 'regularUser',
   email: 'regular@example.com',
+};
+
+const mockMachineUser: AuthenticatedUser = {
+  userId: 'machine',
+  roles: [],
+  scopes: [SCOPES.READ_USER],
+  isAdmin: false,
+  isMachine: true,
+  payload: { sub: 'client|machine', scope: SCOPES.READ_USER } as any,
+};
+
+const mockMachineUserWithoutScope: AuthenticatedUser = {
+  userId: 'machine',
+  roles: [],
+  scopes: [],
+  isAdmin: false,
+  isMachine: true,
+  payload: { sub: 'client|machine', scope: '' } as any,
 };
 
 // --- Helper to create mock request ---
@@ -385,6 +404,30 @@ describe('UserController', () => {
     it('should forbid non-admin from finding users', async () => {
       const mockReq = createMockRequest(mockRegularUser, {
         authorization: 'Bearer user-token',
+      });
+      await expect(controller.findUsers({}, mockReq)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should allow machine user with read:user scope to find users', async () => {
+      const mockReq = createMockRequest(mockMachineUser, {
+        authorization: 'Bearer m2m-token',
+      });
+      const query: DTOs.UserSearchQueryDto = { filter: 'handle=mess' };
+      const mockRawUsers = [
+        createMockUserModel(4, 'machineUser', 'machine@example.com') as UserModel,
+      ];
+      mockUserService.findUsers.mockResolvedValue(mockRawUsers);
+
+      const result = await controller.findUsers(query, mockReq);
+      expect(mockUserService.findUsers).toHaveBeenCalledWith(query);
+      expect(result[0].handle).toBe('machineUser');
+    });
+
+    it('should forbid machine user without read:user scope from finding users', async () => {
+      const mockReq = createMockRequest(mockMachineUserWithoutScope, {
+        authorization: 'Bearer m2m-token',
       });
       await expect(controller.findUsers({}, mockReq)).rejects.toThrow(
         ForbiddenException,

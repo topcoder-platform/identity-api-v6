@@ -32,7 +32,7 @@ import { ValidationService } from './validation.service';
 import { AuthenticatedUser, JwtStrategy } from '../../core/auth/jwt.strategy'; // For type hints
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
-import { ADMIN_ROLE } from '../../auth/constants';
+import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 import { SelfOrAdmin } from '../../auth/decorators/self-or-admin.decorator';
 import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
@@ -495,15 +495,14 @@ export class UserController {
    * @throws ForbiddenException if the user is not an admin.
    */
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles(ADMIN_ROLE)
+  @UseGuards(AuthRequiredGuard)
   @ApiOperation({
     summary: 'Find users based on query parameters',
     description: describeAccess({
       summary:
         'Searches for users using legacy filter syntax, returning v3-compatible envelopes.',
       jwt: 'Requires a JWT with the `administrator` role.',
-      m2m: 'Not supported; use an administrator JWT.',
+      m2m: 'Requires an M2M token with the `read:user` or `all:user` scope.',
     }),
   })
   @ApiQuery({
@@ -550,9 +549,14 @@ export class UserController {
     @Query() query: DTOs.UserSearchQueryDto,
     @Req() req: Request,
   ): Promise<DTOs.UserResponseDto[]> {
-    // AuthZ: admin-only endpoint
+    // AuthZ: admin role or machine token with required scope(s)
     const authUser = getAuthenticatedUser(req);
-    this.checkAccess(authUser, true, MachineScopes.readScopes);
+    const allowedScopes = [
+      ...MachineScopes.readScopes,
+      SCOPES.READ_USER,
+      SCOPES.ALL_USERS,
+    ];
+    this.checkAccess(authUser, true, allowedScopes);
     this.logger.debug(`[findUsers] auth user: ${JSON.stringify(authUser)}`);
     this.logger.log('Finding users with query:', query);
     const users = await this.userService.findUsers(query);
