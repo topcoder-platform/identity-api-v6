@@ -218,7 +218,7 @@ export class RoleController {
     @Req() req: Request,
     @Body() createRoleBody: CreateRoleBodyDto,
   ): Promise<RoleResponseDto> {
-    const user = (req as any).authUser || (req as any).user;
+    const user = this.getAuthenticatedUser(req);
     if (!user?.isAdmin) {
       throw new ForbiddenException('Only administrators can create roles.');
     }
@@ -264,7 +264,7 @@ export class RoleController {
     @Param('roleId', ParseIntPipe) roleId: number,
     @Body() updateRoleBody: UpdateRoleBodyDto,
   ): Promise<RoleResponseDto> {
-    const user = (req as any).authUser || (req as any).user;
+    const user = this.getAuthenticatedUser(req);
     if (!user?.isAdmin) {
       throw new ForbiddenException('Only administrators can update roles.');
     }
@@ -310,7 +310,7 @@ export class RoleController {
     @Req() req: Request,
     @Param('roleId', ParseIntPipe) roleId: number,
   ): Promise<void> {
-    const user: any = (req as any).authUser || (req as any).user;
+    const user: any = this.getAuthenticatedUser(req);
     if (!user?.isAdmin) {
       throw new ForbiddenException('Only administrators can delete roles.');
     }
@@ -603,10 +603,32 @@ export class RoleController {
   }
 
   private getAuthenticatedUser(req: Request): any {
-    const result: any = (req as any).authUser || (req as any).user;
-    if (result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+    const result: any = (req as any).authUser || (req as any).user || {};
+
+    // Normalize roles to an array of lowercase strings
+    const rawRoles = (result.roles ?? result.role) as string[] | string | undefined;
+    let roles: string[] = [];
+    if (Array.isArray(rawRoles)) {
+      roles = rawRoles.map((r) => String(r).trim()).filter(Boolean);
+    } else if (typeof rawRoles === 'string') {
+      roles = rawRoles
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean);
+    }
+
+    // Determine admin via configured admin role name (case-insensitive)
+    const adminRole = (ADMIN_ROLE || 'administrator').toLowerCase();
+    const hasAdmin = roles.some((r) => r.toLowerCase() === adminRole);
+    if (hasAdmin) {
       result.isAdmin = true;
     }
+
+    // Preserve normalized roles back to user object for consistency
+    if (roles.length) {
+      result.roles = roles;
+    }
+
     return result;
   }
 

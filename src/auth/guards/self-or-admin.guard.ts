@@ -37,6 +37,22 @@ export class SelfOrAdminGuard implements CanActivate {
         (r) => String(r).toLowerCase() === adminRoleName,
       );
       if (hasAdmin) return true;
+
+      // Also accept admin if JWT payload contains the admin role
+      const payloadRolesRaw = (user as any)?.payload?.roles as
+        | string[]
+        | string
+        | undefined;
+      const payloadRoles: string[] = Array.isArray(payloadRolesRaw)
+        ? payloadRolesRaw
+        : String(payloadRolesRaw || '')
+            .split(',')
+            .map((r) => r.trim())
+            .filter(Boolean);
+      const hasAdminFromPayload = payloadRoles.some(
+        (r) => String(r).toLowerCase() === adminRoleName,
+      );
+      if (hasAdminFromPayload) return true;
     } catch (_) {
       // ignore and continue with self check
     }
