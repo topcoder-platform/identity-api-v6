@@ -37,7 +37,8 @@ async function bootstrap() {
           /\.localhost:3000$/,
           'https://topcoder.com',
           'https://topcoder-dev.com',
-          /\.topcoder-dev\.com$/,
+          // Allow subdomains like local.topcoder-dev.com with optional port
+          /\.topcoder-dev\.com(?::\d+)?$/,
           /\.topcoder\.com$/,
         ],
     methods: 'GET, POST, OPTIONS, PUT, DELETE, PATCH',
