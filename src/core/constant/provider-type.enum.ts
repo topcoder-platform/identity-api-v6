@@ -5,6 +5,7 @@ export enum ProviderId {
   TWITTER = 3,
   GITHUB = 4,
   SFDC = 5, // Assuming SFDC maps to a specific string like 'salesforce' if needed for comparison
+  OKTA = 6,
   DRIBBBLE = 10,
   BEHANCE = 11,
   STACKOVERFLOW = 12,
@@ -30,6 +31,12 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     key: 'facebook',
     isSocial: true,
     isEnterprise: false,
+  },
+  'okta-customer':{
+    id: ProviderId.OKTA,
+    key: 'okta-customer',
+    isSocial: false,
+    isEnterprise: true,
   },
   'google-oauth2': {
     id: ProviderId.GOOGLE,
