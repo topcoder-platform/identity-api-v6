@@ -544,7 +544,7 @@ describe('UserService', () => {
 
       expect(result).toEqual(mockUsers);
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
-        where: { handle_lower: 'testuser' },
+        where: { AND: [{ handle_lower: 'testuser' }] },
         skip: 0,
         take: 20,
       });
@@ -573,16 +573,81 @@ describe('UserService', () => {
 
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
         where: {
-          user_email_xref: {
-            some: {
-              email: {
-                address: {
-                  equals: 'legacy@example.com',
-                  mode: 'insensitive',
+          AND: [
+            {
+              OR: [
+                {
+                  user_email_xref: {
+                    some: {
+                      email: {
+                        address: {
+                          equals: 'legacy@example.com',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
                 },
-              },
+                {
+                  emails: {
+                    some: {
+                      address: {
+                        equals: 'legacy@example.com',
+                        mode: 'insensitive',
+                      },
+                    },
+                  },
+                },
+              ],
             },
-          },
+          ],
+        },
+        skip: 0,
+        take: 20,
+      });
+      expect(prismaOltp.email.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should combine handle and email filters using AND logic', async () => {
+      const query: UserSearchQueryDto = {
+        filter: 'handle=TestUser,email=legacy@example.com',
+      } as any;
+      prismaOltp.user.findMany.mockResolvedValue([]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+
+      await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { handle_lower: 'testuser' },
+            {
+              OR: [
+                {
+                  user_email_xref: {
+                    some: {
+                      email: {
+                        address: {
+                          equals: 'legacy@example.com',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+                {
+                  emails: {
+                    some: {
+                      address: {
+                        equals: 'legacy@example.com',
+                        mode: 'insensitive',
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
         skip: 0,
         take: 20,

@@ -114,24 +114,54 @@ export class UserService {
 
   // --- Core User Methods ---
 
-  async findUsers(query: UserSearchQueryDto): Promise<UserModel[]> {
+  async findUsers(
+    query: UserSearchQueryDto,
+  ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
     const { handle, email } = this.extractSearchFilters(query);
-    const whereClause: Prisma.userWhereInput = {};
+    const filters: Prisma.userWhereInput[] = [];
+
     if (handle) {
-      whereClause.handle_lower = handle.toLowerCase();
-    }
-    if (email) {
-      whereClause.user_email_xref = {
-        some: {
-          email: {
-            address: { equals: email, mode: 'insensitive' },
-          },
-        },
-      };
+      filters.push({ handle_lower: handle.toLowerCase() });
     }
 
+    if (email?.trim()) {
+      const normalizedEmail = email.trim();
+      filters.push({
+        OR: [
+          {
+            user_email_xref: {
+              some: {
+                email: {
+                  address: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          },
+          {
+            emails: {
+              some: {
+                address: {
+                  equals: normalizedEmail,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const whereClause: Prisma.userWhereInput = filters.length
+      ? { AND: filters }
+      : {};
+
     try {
+      const total = await this.prismaClient.user.count({ where: whereClause });
+
       const users = await this.prismaClient.user.findMany({
         where: whereClause,
         skip: query.offset ?? 0,
@@ -139,7 +169,7 @@ export class UserService {
       });
 
       if (!users.length) {
-        return users;
+        return { users, total };
       }
 
       const userIds = users.map((user) => user.user_id);
@@ -176,7 +206,7 @@ export class UserService {
         }
       }
 
-      return users;
+      return { users, total };
     } catch (error) {
       this.logger.error(`Error finding users: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to search users.');

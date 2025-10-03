@@ -177,7 +177,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/home/jmgasper/Documents/Git/identity-api-v6/prisma/member/generated/member",
+      "value": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/generated/member",
       "fromEnvVar": null
     },
     "config": {
@@ -191,7 +191,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/home/jmgasper/Documents/Git/identity-api-v6/prisma/member/schema.prisma",
+    "sourceFilePath": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

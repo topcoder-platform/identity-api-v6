@@ -22,8 +22,9 @@ import {
   NotFoundException,
   Inject,
   NotImplementedException,
+  Res,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { UserService } from './user.service';
 import { UserProfileService } from './user-profile.service';
 import { AuthFlowService } from './auth-flow.service';
@@ -57,6 +58,7 @@ import { MachineScopes } from '../../core/constant/constants';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { MemberStatus } from '../../dto/member';
 import { describeAccess } from '../../shared/swagger/access-description.util';
+import { setPaginationHeaders } from '../../shared/util/pagination.util';
 
 // Helper function to map UserModel to UserResponseDto
 /**
@@ -548,6 +550,7 @@ export class UserController {
   async findUsers(
     @Query() query: DTOs.UserSearchQueryDto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<DTOs.UserResponseDto[]> {
     // AuthZ: admin role or machine token with required scope(s)
     const authUser = getAuthenticatedUser(req);
@@ -559,8 +562,12 @@ export class UserController {
     this.checkAccess(authUser, true, allowedScopes);
     this.logger.debug(`[findUsers] auth user: ${JSON.stringify(authUser)}`);
     this.logger.log('Finding users with query:', query);
-    const users = await this.userService.findUsers(query);
+    const { users, total } = await this.userService.findUsers(query);
     const mappedUsers = users.map(mapUserToDto);
+    // derive page/perPage from offset/limit and set headers
+    const perPage = query.limit ?? Constants.defaultPageSize;
+    const page = Math.floor((query.offset ?? 0) / perPage) + 1;
+    setPaginationHeaders(res, req, total, page, perPage);
     if (query.selector && query.selector.trim().length > 0) {
       const keys = query.selector.split(',');
       return CommonUtils.pickArray(mappedUsers, keys) as DTOs.UserResponseDto[];
