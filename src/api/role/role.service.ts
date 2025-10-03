@@ -45,6 +45,79 @@ export class RoleService {
     return dto;
   }
 
+  /**
+   * List members (subjects) assigned to a given role, with optional filters and pagination.
+   */
+  async listRoleMembers(
+    roleId: number,
+    opts?: { userId?: number; userHandle?: string; email?: string },
+    page: number = 1,
+    perPage: number = Constants.defaultPageSize,
+  ): Promise<{ members: MemberInfoResponseDto[]; total: number }> {
+    this.logger.debug(
+      `Listing role members for roleId=${roleId} with filters ${JSON.stringify(
+        opts || {},
+      )}`,
+    );
+
+    // Ensure role exists
+    const existing = await this.prismaClient.role.findUnique({ where: { id: roleId } });
+    if (!existing) {
+      throw new NotFoundException(`Role with ID ${roleId} not found.`);
+    }
+
+    // Build base query for assignments
+    const whereClause: any = {
+      roleId,
+      subjectType: Constants.memberSubjectType,
+    };
+
+    if (opts?.userId && Number.isFinite(opts.userId) && opts.userId > 0) {
+      whereClause.subjectId = opts.userId;
+    }
+
+    const assignments = await this.prismaClient.roleAssignment.findMany({
+      where: whereClause,
+      select: { subjectId: true },
+    });
+
+    if (!assignments.length) {
+      return { members: [], total: 0 };
+    }
+
+    const subjectIds = assignments.map((a) => a.subjectId);
+
+    // When filtering by handle/email, we must fetch then filter to compute total correctly
+    if (opts?.userHandle || opts?.email) {
+      let members = (await this.memberApiService.getUserInfoList(
+        subjectIds,
+      )) as MemberInfoResponseDto[];
+      if (opts.userHandle) {
+        members = members.filter((m) => m.handle === opts.userHandle);
+      }
+      if (opts.email) {
+        members = members.filter((m) => m.email === opts.email);
+      }
+      const total = members.length;
+      const start = Math.max(0, (page - 1) * perPage);
+      const end = start + perPage;
+      return { members: members.slice(start, end), total };
+    }
+
+    // Otherwise paginate subjectIds first, then fetch only the required page
+    const total = subjectIds.length;
+    const start = Math.max(0, (page - 1) * perPage);
+    const end = start + perPage;
+    const pageIds = subjectIds.slice(start, end);
+    if (pageIds.length === 0) {
+      return { members: [], total };
+    }
+    const pageMembers = (await this.memberApiService.getUserInfoList(
+      pageIds,
+    )) as MemberInfoResponseDto[];
+    return { members: pageMembers, total };
+  }
+
   async findAll(subjectId?: number): Promise<RoleResponseDto[]> {
     this.logger.debug(`Finding all roles, subjectId: ${subjectId}`);
 

@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   ParseIntPipe,
   NotFoundException,
   ForbiddenException,
@@ -23,8 +24,9 @@ import {
   CreateRoleBodyDto,
   UpdateRoleBodyDto,
   RoleQueryDto,
+  RoleMembersQueryDto,
 } from '../../dto/role/role.dto';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 // import { AuthGuard } from '@nestjs/passport';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -32,7 +34,10 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 import { describeAccess } from '../../shared/swagger/access-description.util';
+import { Constants } from '../../core/constant/constants';
 import { CommonUtils } from '../../shared/util/common.utils';
+import { MemberInfoResponseDto } from '../../dto/member/member.dto';
+import { setPaginationHeaders } from '../../shared/util/pagination.util';
 
 @Controller('roles')
 @UseGuards(AuthRequiredGuard)
@@ -182,6 +187,64 @@ export class RoleController {
       return CommonUtils.pick(result, keys) as RoleResponseDto;
     }
     return result;
+  }
+
+  /**
+   * List users (subjects) that have the specified role.
+   * Supports optional filters: userId, userHandle, email.
+   */
+  @Get(':roleId/subjects')
+  @ApiOperation({
+    summary: 'List users assigned to a role',
+    description: describeAccess({
+      summary:
+        'Returns the list of members who have the specified role. Supports filters by userId, userHandle, and email.',
+      jwt: 'Requires a JWT with the `administrator` role.',
+      m2m: ['read:roles', 'all:roles'],
+    }),
+  })
+  @ApiParam({ name: 'roleId', description: 'role id', type: 'number' })
+  @ApiResponse({ status: HttpStatus.OK, type: [MemberInfoResponseDto] })
+  async listRoleMembers(
+    @Req() req: Request,
+    @Param('roleId', ParseIntPipe) roleId: number,
+    @Query() query: RoleMembersQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<any[]> {
+    const user = this.getAuthenticatedUser(req);
+    const isAdmin = Boolean(user?.isAdmin);
+    const isMachine = Boolean(user?.isMachine);
+
+    if (!isAdmin && !isMachine) {
+      throw new ForbiddenException('Only administrators can list role members.');
+    }
+
+    if (isMachine) {
+      const hasScope = this.hasAnyScope(user, [
+        SCOPES.READ_ROLES,
+        SCOPES.ALL_ROLES,
+      ]);
+      if (!hasScope) {
+        throw new ForbiddenException(
+          'M2M tokens must include the read:roles scope to list role members.',
+        );
+      }
+    }
+
+    const page = query.page ?? 1;
+    const perPage = query.perPage ?? Constants.defaultPageSize;
+    const { members, total } = await this.roleService.listRoleMembers(
+      roleId,
+      {
+        userId: query.userId,
+        userHandle: query.userHandle,
+        email: query.email,
+      },
+      page,
+      perPage,
+    );
+    setPaginationHeaders(res, req, total, page, perPage);
+    return members;
   }
 
   /**

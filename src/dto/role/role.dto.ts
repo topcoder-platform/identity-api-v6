@@ -11,9 +11,11 @@ import {
   ValidateNested,
   IsPositive,
   IsIn,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MemberInfoResponseDto } from '../member/member.dto';
+import { Constants } from '../../core/constant/constants';
 
 // Input DTO for the nested 'param' object in POST/PUT requests, matching swagger Role definition
 class RoleParamDto {
@@ -154,6 +156,39 @@ export class RoleAssignmentResponseDto {
   })
   @IsInt()
   modifiedBy: number;
+}
+
+// Query params for listing role members (subjects)
+export class RoleMembersQueryDto {
+  @ApiPropertyOptional({ description: 'Filter by numeric user id', example: 12345 })
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  userId?: number;
+
+  @ApiPropertyOptional({ description: 'Filter by Topcoder handle (exact match)', example: 'someuser' })
+  @IsOptional()
+  @IsString()
+  userHandle?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by email (exact match)', example: 'user@example.com' })
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Page number (starts at 1)', example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page', example: 25 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  perPage?: number = Constants.defaultPageSize;
 }
 
 // --- NEW DTO ---
