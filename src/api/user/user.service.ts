@@ -118,7 +118,9 @@ export class UserService {
     query: UserSearchQueryDto,
   ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const { handle, email, id, active } = this.extractSearchFilters(query);
+    const { handle, email, id, active, like } = this.extractSearchFilters(
+      query,
+    );
     const filters: Prisma.userWhereInput[] = [];
 
     // If ID is provided, enforce exact match by user_id
@@ -127,37 +129,68 @@ export class UserService {
     }
 
     if (handle) {
-      filters.push({ handle_lower: handle.toLowerCase() });
+      const wildcard = this.parseWildcard(handle);
+      if (like || wildcard.hasWildcard) {
+        const value = wildcard.value;
+        if (value.length > 0) {
+          if (wildcard.type === 'startsWith') {
+            filters.push({ handle: { startsWith: value, mode: 'insensitive' } });
+          } else if (wildcard.type === 'endsWith') {
+            filters.push({ handle: { endsWith: value, mode: 'insensitive' } });
+          } else {
+            // contains (default)
+            filters.push({ handle: { contains: value, mode: 'insensitive' } });
+          }
+        }
+      } else {
+        // exact match on lowered handle for performance/index usage
+        filters.push({ handle_lower: handle.toLowerCase() });
+      }
     }
 
     if (email?.trim()) {
-      const normalizedEmail = email.trim();
-      filters.push({
-        OR: [
-          {
-            user_email_xref: {
-              some: {
-                email: {
-                  address: {
-                    equals: normalizedEmail,
-                    mode: 'insensitive',
+      const wildcard = this.parseWildcard(email.trim());
+      const buildEmailAddressFilter = () => {
+        if (like || wildcard.hasWildcard) {
+          const value = wildcard.value;
+          if (value.length === 0) {
+            // If wildcard resolves to empty, skip adding a filter
+            return undefined as any;
+          }
+          if (wildcard.type === 'startsWith') {
+            return { startsWith: value, mode: 'insensitive' } as const;
+          } else if (wildcard.type === 'endsWith') {
+            return { endsWith: value, mode: 'insensitive' } as const;
+          }
+          return { contains: value, mode: 'insensitive' } as const;
+        }
+        // exact match by default
+        return { equals: wildcard.value, mode: 'insensitive' } as const;
+      };
+
+      const addressFilter = buildEmailAddressFilter();
+      if (addressFilter) {
+        filters.push({
+          OR: [
+            {
+              user_email_xref: {
+                some: {
+                  email: {
+                    address: addressFilter as any,
                   },
                 },
               },
             },
-          },
-          {
-            emails: {
-              some: {
-                address: {
-                  equals: normalizedEmail,
-                  mode: 'insensitive',
+            {
+              emails: {
+                some: {
+                  address: addressFilter as any,
                 },
               },
             },
-          },
-        ],
-      });
+          ],
+        });
+      }
     }
 
     // Filter by active flag (derived from status)
@@ -232,6 +265,7 @@ export class UserService {
     handle?: string;
     email?: string;
     active?: boolean;
+    like: boolean;
   } {
     const parsedFilters = this.parseFilterString(query.filter);
     // id filter: support `id` and `userId`
@@ -258,7 +292,15 @@ export class UserService {
       else if (v === 'false' || v === '0') active = false;
     }
 
-    return { id: validId, handle, email, active };
+    // like filter: enable wildcard-like semantics
+    const likeRaw = this.getFirstFilterValue(parsedFilters, ['like']);
+    let like = false;
+    if (typeof likeRaw === 'string') {
+      const v = likeRaw.trim().toLowerCase();
+      like = v === 'true' || v === '1';
+    }
+
+    return { id: validId, handle, email, active, like };
   }
 
   private parseFilterString(filter?: string): Record<string, string> {
@@ -274,8 +316,9 @@ export class UserService {
         continue;
       }
 
+      // Support both comma-separated and ampersand-separated (e.g., 'handle=dev*&like=true')
       const expressions = rawFilter
-        .split(',')
+        .split(/[,&]/)
         .map((expression) => expression.trim())
         .filter(Boolean);
 
@@ -317,6 +360,40 @@ export class UserService {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Parse a potential wildcard string using '*' semantics.
+   * - 'abc*' => startsWith 'abc'
+   * - '*abc' => endsWith 'abc'
+   * - 'a*b' or contains '*' internally => contains 'ab' (collapsed)
+   * - no '*' => exact with value
+   */
+  private parseWildcard(value: string): {
+    hasWildcard: boolean;
+    type: 'startsWith' | 'endsWith' | 'contains' | 'exact';
+    value: string;
+  } {
+    const idxFirst = value.indexOf('*');
+    if (idxFirst === -1) {
+      return { hasWildcard: false, type: 'exact', value };
+    }
+    const idxLast = value.lastIndexOf('*');
+    // Remove all '*'
+    const stripped = value.replace(/\*/g, '');
+    if (!stripped) {
+      return { hasWildcard: true, type: 'contains', value: '' };
+    }
+    if (idxFirst === 0 && idxLast === value.length - 1) {
+      return { hasWildcard: true, type: 'contains', value: stripped };
+    }
+    if (idxFirst === 0) {
+      return { hasWildcard: true, type: 'endsWith', value: stripped };
+    }
+    if (idxLast === value.length - 1) {
+      return { hasWildcard: true, type: 'startsWith', value: stripped };
+    }
+    return { hasWildcard: true, type: 'contains', value: stripped };
   }
 
   async findUserById(userId: number): Promise<UserModel | null> {
