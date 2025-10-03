@@ -144,8 +144,25 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
   const logger = new Logger('getAuthenticatedUser'); // It's a global helper, so create a local logger.
   logger.debug(`[getAuthenticatedUser] User user: ${JSON.stringify(user, null, 5)}`);
 
-  if(user.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
-    user.isAdmin=true;
+  // Ensure admin detection accounts for both DB roles and JWT-embedded roles
+  try {
+    const adminRoleName = (process.env.ADMIN_ROLE_NAME || 'administrator').toLowerCase();
+    const dbRoles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+    const jwtRoles: string[] =
+      (user?.payload?.['https://topcoder-dev.com/claims/roles'] as string[]) ||
+      (user?.payload?.roles as string[]) ||
+      [];
+
+    const hasAdminInDb = dbRoles.some((r) => String(r).toLowerCase() === adminRoleName);
+    const hasAdminInJwt = Array.isArray(jwtRoles)
+      ? jwtRoles.some((r) => String(r).toLowerCase() === adminRoleName)
+      : false;
+
+    if (!user.isAdmin && (hasAdminInDb || hasAdminInJwt)) {
+      user.isAdmin = true;
+    }
+  } catch (e) {
+    logger.warn(`[getAuthenticatedUser] Failed to evaluate admin from roles: ${(e as Error).message}`);
   }
 
   logger.debug(
@@ -1003,7 +1020,13 @@ export class UserController {
     this.logger.debug(
       `[deleteSSOUserLogin] Authenticated user from getAuthenticatedUser: ${JSON.stringify(authUser)}`,
     );
-    this.checkAccess(authUser, true, MachineScopes.deleteScopes);
+    // Allow self or admin to delete (consistent with decorator SelfOrAdmin)
+    this.checkResourceIdAndAccess(
+      authUser,
+      true,
+      userId,
+      MachineScopes.deleteScopes,
+    );
 
     const { provider: providerName } = query;
     let providerId = query.providerId;

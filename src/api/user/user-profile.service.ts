@@ -172,11 +172,9 @@ export class UserProfileService {
    * @returns the provider id if it is found
    */
   async findProviderIdByName(providerName: string): Promise<number | null> {
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
-      {
-        where: { name: providerName },
-      },
-    );
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
+      where: { name: { equals: providerName, mode: 'insensitive' } },
+    });
     return providerRecord?.sso_login_provider_id
       ? Number(providerRecord?.sso_login_provider_id)
       : null;
