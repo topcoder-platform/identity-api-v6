@@ -118,8 +118,13 @@ export class UserService {
     query: UserSearchQueryDto,
   ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const { handle, email } = this.extractSearchFilters(query);
+    const { handle, email, id, active } = this.extractSearchFilters(query);
     const filters: Prisma.userWhereInput[] = [];
+
+    // If ID is provided, enforce exact match by user_id
+    if (typeof id === 'number' && Number.isFinite(id)) {
+      filters.push({ user_id: id });
+    }
 
     if (handle) {
       filters.push({ handle_lower: handle.toLowerCase() });
@@ -153,6 +158,15 @@ export class UserService {
           },
         ],
       });
+    }
+
+    // Filter by active flag (derived from status)
+    if (typeof active === 'boolean') {
+      if (active) {
+        filters.push({ status: MemberStatus.ACTIVE });
+      } else {
+        filters.push({ status: { not: MemberStatus.ACTIVE } });
+      }
     }
 
     const whereClause: Prisma.userWhereInput = filters.length
@@ -214,10 +228,16 @@ export class UserService {
   }
 
   private extractSearchFilters(query: UserSearchQueryDto): {
+    id?: number;
     handle?: string;
     email?: string;
+    active?: boolean;
   } {
     const parsedFilters = this.parseFilterString(query.filter);
+    // id filter: support `id` and `userId`
+    const idRaw = this.getFirstFilterValue(parsedFilters, ['id', 'userId']);
+    const id = idRaw != null && idRaw !== '' ? parseInt(idRaw, 10) : undefined;
+    const validId = id != null && !Number.isNaN(id) && id > 0 ? id : undefined;
     const handle =
       query.handle ??
       this.getFirstFilterValue(parsedFilters, ['handle', 'handleLower']);
@@ -229,7 +249,16 @@ export class UserService {
         'primaryEmail',
       ]);
 
-    return { handle, email };
+    // active filter: true/false or 1/0
+    const activeRaw = this.getFirstFilterValue(parsedFilters, ['active']);
+    let active: boolean | undefined = undefined;
+    if (typeof activeRaw === 'string') {
+      const v = activeRaw.trim().toLowerCase();
+      if (v === 'true' || v === '1') active = true;
+      else if (v === 'false' || v === '0') active = false;
+    }
+
+    return { id: validId, handle, email, active };
   }
 
   private parseFilterString(filter?: string): Record<string, string> {

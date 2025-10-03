@@ -517,9 +517,9 @@ export class UserController {
     name: 'filter',
     type: String,
     required: false,
-    description: `Request query filter, e.g.: /api/va1/stories?filter=URLENCODE(param1=filter_a&param2=filter_b&....).
-      Supported filters are: id, handle, firstName, lastName, email, status, regSource, utmSource, utmMedium, utmCampaign.
-      `,
+    description: `Request query filter, e.g.: filter=field=value[,field=value].
+      Supported filters: id, handle, firstName, lastName, email, status, regSource, utmSource, utmMedium, utmCampaign, active.
+      Example: filter=active=true` ,
   })
   @ApiQuery({
     name: 'limit',
