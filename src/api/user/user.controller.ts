@@ -129,6 +129,16 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
   // dto.profile = null,
   // dto.profiles = null,
 
+  // credential fields expected by platform-ui (activation code display)
+  // Map activation_code from DB into response credential.activationCode
+  // Keep undefined if not present
+  const activationCode = user.activation_code ?? undefined;
+  const hasPassword = typeof user.password === 'string' && user.password.length > 0;
+  dto.credential = {
+    activationCode,
+    hasPassword,
+  } as DTOs.UserCredentialDto;
+
   return dto;
 }
 
