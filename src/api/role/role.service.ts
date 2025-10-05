@@ -115,7 +115,17 @@ export class RoleService {
     const pageMembers = (await this.memberApiService.getUserInfoList(
       pageIds,
     )) as MemberInfoResponseDto[];
-    return { members: pageMembers, total };
+
+    // Fallback: ensure all assigned subject IDs are represented even if
+    // Member API does not return info for some IDs. This guarantees the
+    // identity API returns all role members regardless of audit field values.
+    const returnedIds = new Set<number>(pageMembers.map((m) => m.userId));
+    const missingIds = pageIds.filter((id) => !returnedIds.has(id));
+    const placeholders: MemberInfoResponseDto[] = missingIds.map((id) =>
+      ({ userId: id, handle: null as any, email: null as any }) as unknown as MemberInfoResponseDto,
+    );
+
+    return { members: [...pageMembers, ...placeholders], total };
   }
 
   async findAll(subjectId?: number): Promise<RoleResponseDto[]> {
@@ -175,7 +185,13 @@ export class RoleService {
         `Fetching member info for ${subjectIds.length} subject IDs.`,
       );
       try {
-        memberInfos = await this.memberApiService.getUserInfoList(subjectIds);
+        const infos = await this.memberApiService.getUserInfoList(subjectIds);
+        const returnedIds = new Set<number>(infos.map((m) => m.userId));
+        const missingIds = subjectIds.filter((id) => !returnedIds.has(id));
+        const placeholders = missingIds.map((id) =>
+          ({ userId: id, handle: null as any, email: null as any }) as unknown as MemberInfoResponseDto,
+        );
+        memberInfos = [...infos, ...placeholders];
       } catch (error) {
         this.logger.error(
           `Failed to fetch member info for role ${roleId}: ${error.message}`,
@@ -338,13 +354,16 @@ export class RoleService {
     }
 
     try {
+      const now = new Date();
       await this.prismaClient.roleAssignment.create({
         data: {
           roleId: roleId,
           subjectId: subjectId,
           subjectType: Constants.memberSubjectType,
           createdBy: operatorId,
+          createdAt: now,
           modifiedBy: operatorId,
+          modifiedAt: now,
         },
       });
     } catch (error) {
