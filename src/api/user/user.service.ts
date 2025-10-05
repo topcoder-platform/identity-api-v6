@@ -1591,7 +1591,6 @@ export class UserService {
       const updatedUser = await this.prismaClient.user.update({
         where: {
           user_id: userId,
-          status: { not: MemberStatus.INACTIVE_IRREGULAR_ACCOUNT },
         },
         data: {
           status: normalizedNewStatus,
@@ -1614,7 +1613,7 @@ export class UserService {
         },
       });
       if (
-        user.status == MemberStatus.ACTIVE &&
+        normalizedNewStatus === MemberStatus.ACTIVE &&
         primaryEmailRecord &&
         Number(primaryEmailRecord.status_id) !== Constants.verifiedEmailStatus
       ) {
