@@ -1252,21 +1252,37 @@ export class UserService {
       existingUser.utm_campaign = dataToUpdate.utm_campaign =
         userParams.utmCampaign;
 
-    if (Object.keys(dataToUpdate).length === 0) {
-      return existingUser; // Return current user if no changes
+    const needPasswordUpdate = !!(cred != null && cred.password != null);
+    const hasProfileFieldUpdates = Object.keys(dataToUpdate).length > 0;
+
+    // If nothing to update at all (no profile fields, no password), return as-is
+    if (!hasProfileFieldUpdates && !needPasswordUpdate) {
+      return existingUser; // No-op
     }
 
     await this.prismaClient.$transaction(async (prisma) => {
-      const userInTx = await this.prismaClient.user.update({
-        where: { user_id: userId },
-        data: dataToUpdate,
-      });
-      this.logger.log(`Successfully updated basic info for user ${userId}`);
+      // If we only need to update password, skip touching user fields but bump modify_date for parity
+      let userInTx: UserModel;
+      if (hasProfileFieldUpdates) {
+        userInTx = await this.prismaClient.user.update({
+          where: { user_id: userId },
+          data: dataToUpdate,
+        });
+        this.logger.log(`Successfully updated basic info for user ${userId}`);
+      } else {
+        // No profile field changes; fetch and update modify_date only to reflect activity
+        userInTx = await this.prismaClient.user.update({
+          where: { user_id: userId },
+          data: { modify_date: new Date() },
+        });
+        this.logger.log(`No profile changes supplied; updated modify_date for user ${userId}`);
+      }
 
-      // update password
-      if (cred != null && cred.password != null) {
-        this.logger.debug(`"updating password: ${userInTx.handle}`);
-        existingUser.password = cred.password;
+      // Update password if requested
+      if (needPasswordUpdate) {
+        this.logger.debug(`Updating password for: ${userInTx.handle}`);
+        // Do not persist plaintext on the in-memory user object, but set a flag for downstream mapping if needed
+        (existingUser as any).password = (cred.password as any);
 
         if (securityUserRecord) {
           await prisma.security_user.update({

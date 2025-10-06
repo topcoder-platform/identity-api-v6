@@ -285,8 +285,8 @@ export class UserController {
         'resourceId is required and should be a positive value',
       );
     }
-    // check if self, then should be fine
-    if (resourceId + '' === user.userId) {
+    // check if self, then should be fine (normalize both sides to string)
+    if (String(resourceId) === String(user.userId)) {
       return;
     }
     this.checkAccess(user, isAdminRequired, allowedScopes);
