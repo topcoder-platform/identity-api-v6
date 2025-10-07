@@ -195,8 +195,8 @@ export class RoleMembersQueryDto {
 export class RoleQueryDto {
   @ApiPropertyOptional({
     description:
-      "Filter criteria (e.g., 'subjectId=12345'). Used by findAll to get roles for a specific subject.",
-    example: 'subjectId=12345',
+      "Filter criteria (e.g., 'subjectId=12345' or 'roleName=copilot').",
+    example: 'roleName=copilot',
   })
   @IsOptional()
   @IsString()

@@ -128,19 +128,26 @@ export class RoleService {
     return { members: [...pageMembers, ...placeholders], total };
   }
 
-  async findAll(subjectId?: number): Promise<RoleResponseDto[]> {
-    this.logger.debug(`Finding all roles, subjectId: ${subjectId}`);
+  async findAll(
+    subjectId?: number,
+    roleName?: string,
+  ): Promise<RoleResponseDto[]> {
+    this.logger.debug(
+      `Finding all roles, subjectId: ${subjectId}, roleName: ${roleName}`,
+    );
 
-    const whereClause: any = subjectId
-      ? {
-          roleAssignments: {
-            some: {
-              subjectId: subjectId,
-              subjectType: Constants.memberSubjectType,
-            },
-          },
-        }
-      : {};
+    const whereClause: any = {};
+    if (subjectId) {
+      whereClause.roleAssignments = {
+        some: {
+          subjectId: subjectId,
+          subjectType: Constants.memberSubjectType,
+        },
+      };
+    }
+    if (roleName && roleName.trim().length > 0) {
+      whereClause.name = roleName;
+    }
 
     const roles = await this.prismaClient.role.findMany({
       where: whereClause,

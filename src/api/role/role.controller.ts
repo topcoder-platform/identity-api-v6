@@ -59,7 +59,7 @@ export class RoleController {
     summary: 'Search roles with given parameters',
     description: describeAccess({
       summary:
-        'Searches existing roles using optional filter parameters (e.g. subjectId).',
+        'Searches existing roles using optional filter parameters (e.g., subjectId, roleName).',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: ['read:roles', 'all:roles'],
       notes:
@@ -85,6 +85,7 @@ export class RoleController {
     const isAdmin = Boolean(user?.isAdmin);
     const isMachine = Boolean(user?.isMachine);
     let subjectId: number | undefined;
+    let roleName: string | undefined;
 
     this.logger.debug(`findAll received query: ${JSON.stringify(query)}`);
 
@@ -95,18 +96,21 @@ export class RoleController {
     if (query.filter) {
       this.logger.debug(`findAll received filter: ${query.filter}`);
       const filterParts = query.filter.split('=');
-      if (
-        filterParts.length === 2 &&
-        filterParts[0].toLowerCase() === 'subjectid'
-      ) {
-        const parsedId = parseInt(filterParts[1], 10);
-        // subject id should be > 0 as in v3 java code
-        if (!isNaN(parsedId) && parsedId > 0) {
-          subjectId = parsedId;
-        } else {
-          throw new BadRequestException(
-            'Invalid format for subjectId in filter parameter.',
-          );
+      if (filterParts.length === 2) {
+        const key = filterParts[0].toLowerCase();
+        const value = filterParts[1];
+        if (key === 'subjectid') {
+          const parsedId = parseInt(value, 10);
+          // subject id should be > 0 as in v3 java code
+          if (!isNaN(parsedId) && parsedId > 0) {
+            subjectId = parsedId;
+          } else {
+            throw new BadRequestException(
+              'Invalid format for subjectId in filter parameter.',
+            );
+          }
+        } else if (key === 'rolename') {
+          roleName = value;
         }
       }
     }
@@ -121,7 +125,10 @@ export class RoleController {
       );
     }
 
-    const result = await this.roleService.findAll(subjectId);
+    const result =
+      roleName !== undefined
+        ? await this.roleService.findAll(subjectId, roleName)
+        : await this.roleService.findAll(subjectId);
     if (query.selector && query.selector.trim().length > 0) {
       const keys = query.selector.split(',');
       return CommonUtils.pickArray(result, keys) as RoleResponseDto[];
