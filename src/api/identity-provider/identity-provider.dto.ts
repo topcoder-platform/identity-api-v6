@@ -1,5 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 // --- IdentityProvider Response DTO ---
 
@@ -37,4 +37,20 @@ export class IdentityProviderQueryDto {
   @IsOptional()
   @IsString()
   email?: string;
+}
+
+// --- SSO Providers List DTO ---
+
+export class SsoLoginProviderDto {
+  @ApiProperty({ description: 'Provider id', example: 102 })
+  @IsNumber()
+  ssoLoginProviderId: number;
+
+  @ApiProperty({ description: 'Provider name', example: 'okta-customer' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Provider type', example: 'samlp' })
+  @IsString()
+  type: string;
 }

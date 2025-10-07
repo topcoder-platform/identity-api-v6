@@ -105,10 +105,13 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = getProviderDetails(profileDto.provider);
+    // Lookup SSO provider from DB (authoritative list for admin UI dropdown)
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
+      where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
+    });
     if (!providerRecord) {
       this.logger.error(
-        `SSO Provider ${profileDto.provider} not found. Dynamic creation is currently disabled.`,
+        `SSO Provider ${profileDto.provider} not found in sso_login_provider table.`,
       );
       throw new BadRequestException(
         `SSO Provider '${profileDto.provider}' is not configured in the system. Please contact an administrator.`,
@@ -119,7 +122,7 @@ export class UserProfileService {
       const newSsoLogin = await this.prismaClient.user_sso_login.create({
         data: {
           user_id: userId,
-          provider_id: new Decimal(providerRecord.id),
+          provider_id: providerRecord.sso_login_provider_id,
           sso_user_id: profileDto.userId,
           email: profileDto.email, // Optional, from provider
           sso_user_name: profileDto.name, // Optional, from provider
@@ -220,7 +223,10 @@ export class UserProfileService {
       );
     }
 
-    const providerRecord = getProviderDetails(profileDto.provider);
+    // Lookup SSO provider from DB (authoritative list for admin UI dropdown)
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
+      where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
+    });
     if (!providerRecord) {
       throw new NotFoundException(
         `SSO Provider '${profileDto.provider}' not found. Cannot update SSO link.`,
@@ -232,7 +238,7 @@ export class UserProfileService {
         where: {
           user_id_provider_id: {
             user_id: userId,
-            provider_id: new Decimal(providerRecord.id),
+            provider_id: providerRecord.sso_login_provider_id,
           },
         },
         data: {

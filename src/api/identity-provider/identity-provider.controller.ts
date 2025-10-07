@@ -11,6 +11,7 @@ import { IdentityProviderService } from './identity-provider.service';
 import {
   IdentityProviderDto,
   IdentityProviderQueryDto,
+  SsoLoginProviderDto,
 } from './identity-provider.dto';
 import {
   BaseResponse,
@@ -101,5 +102,28 @@ export class IdentityProviderController {
       email,
     );
     return createBaseResponse(result);
+  }
+
+  /**
+   * Return list of SSO login providers
+   */
+  @Get('sso-providers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List SSO login providers',
+    description: describeAccess({
+      summary: 'Returns all SSO providers from the database.',
+      jwt: 'Not required (public endpoint).',
+      m2m: 'Not applicable.',
+    }),
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of SSO providers',
+    type: [SsoLoginProviderDto],
+  })
+  async listSsoProviders(): Promise<SsoLoginProviderDto[]> {
+    this.logger.log('listSsoProviders called');
+    return this.identityProviderService.listSsoLoginProviders();
   }
 }
