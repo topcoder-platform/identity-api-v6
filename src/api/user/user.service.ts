@@ -1081,7 +1081,7 @@ export class UserService {
         const activationEmailPayload = {
           data: { handle: newUser.handle, code: otpForActivation },
           from: { email: fromEmail },
-          version: 'v6',
+          version: 'v3',
           sendgrid_template_id: sendgridTemplateId,
           recipients: [userParams.email], // The original email used for registration
         };
@@ -2311,7 +2311,7 @@ export class UserService {
       subDomain: 'www',
       path: '/home',
       redirectUrl: `https%3A%2F%2Fwww.${domain}%2Fhome`,
-      version: 'v6',
+      version: 'v3',
       sendgrid_template_id: sendGridTemplateId,
     };
 
@@ -2370,7 +2370,7 @@ export class UserService {
         const activationEmailPayload = {
           data: { handle: userOtp.handle, code: userOtp.otp },
           from: { email: fromEmail },
-          version: 'v6',
+          version: 'v3',
           sendgrid_template_id: sendgridTemplateId,
           recipients: [primaryEmail], // The user's primary email
         };

@@ -369,7 +369,7 @@ export class AuthFlowService {
         const activationEmailPayload = {
           data: { handle: userOtp.handle, code: userOtp.otp },
           from: { email: fromEmail },
-          version: 'v6',
+          version: 'v3',
           sendgrid_template_id: sendgridTemplateId,
           recipients: [primaryEmail], // The user's primary email
         };
