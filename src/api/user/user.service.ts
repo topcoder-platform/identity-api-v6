@@ -1064,35 +1064,6 @@ export class UserService {
       this.logger.log(
         `Published 'event.user.created' notification for ${newUser.user_id.toNumber()}. Attributes: ${JSON.stringify(createdEventAttributes, null, 2)}`,
       );
-
-      // For activation email, use postDirectBusMessage to match legacy Java structure
-      const domain =
-        this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com'; // Get domain from config
-      const fromEmail = `Topcoder <noreply@${domain}>`;
-      const sendgridTemplateId = this.configService.get<string>(
-        'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
-      );
-
-      if (!sendgridTemplateId) {
-        this.logger.error(
-          `SendGrid template ID not configured (SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID). Cannot send initial registration/activation email.`,
-        );
-      } else {
-        const activationEmailPayload = {
-          data: { handle: newUser.handle, code: otpForActivation },
-          from: { email: fromEmail },
-          version: 'v3',
-          sendgrid_template_id: sendgridTemplateId,
-          recipients: [userParams.email], // The original email used for registration
-        };
-        await this.eventService.postDirectBusMessage(
-          'external.action.email',
-          activationEmailPayload,
-        );
-        this.logger.log(
-          `Published 'external.action.email' (activation) for ${newUser.user_id.toNumber()} to ${userParams.email}. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
-        );
-      }
     } catch (eventError) {
       this.logger.error(
         `Failed to publish events for user ${newUser.user_id.toNumber()}: ${eventError.message}`,
