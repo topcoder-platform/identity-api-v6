@@ -70,7 +70,6 @@ export class UserService {
   private readonly logger = new Logger(UserService.name);
   private readonly AUTH0_PROVIDER_NAME = 'auth0'; // Define constant for Auth0 provider name
   private legacyBlowfishKey: string; // Changed: Store the raw Base64 key string directly
-  private readonly defaultPassword: string;
 
   constructor(
     @Inject(PRISMA_CLIENT)
@@ -107,9 +106,6 @@ export class UserService {
         this.legacyBlowfishKey = '';
       }
     }
-    this.defaultPassword = this.configService.get<string>(
-      'DEFAULT_REGISTRATION_PASS',
-    );
   }
 
   // --- Core User Methods ---
@@ -617,6 +613,18 @@ export class UserService {
     return otp;
   }
 
+  // Generates a cryptographically-strong random password consisting of
+  // alphanumeric characters of the requested length.
+  private generateRandomPassword(length: number): string {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.randomBytes(length);
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += charset[bytes[i] % charset.length];
+    }
+    return result;
+  }
+
   /**
    * Encodes password using the legacy Blowfish/ECB/PKCS5Padding method.
    * Matches the logic from the old Java Utils.encodePassword.
@@ -690,7 +698,8 @@ export class UserService {
         userParams.credential = {} as CredentialDto;
       }
       if (!CommonUtils.validateString(userParams.credential.password)) {
-        userParams.credential.password = this.defaultPassword;
+        // Generate a unique random password for social/SSO registrations
+        userParams.credential.password = this.generateRandomPassword(16);
       }
     }
     // perform initial static validations

@@ -1163,7 +1163,7 @@ describe('UserService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should apply default password when profile present and password missing', async () => {
+    it('should generate a random password when profile present and password missing', async () => {
       const dto: CreateUserBodyDto = {
         param: {
           handle: 'socialuser',
@@ -1206,8 +1206,10 @@ describe('UserService', () => {
 
       await service.registerUser(dto);
 
-      // Since configService.get('defaultPassword') is undefined in mock, it should fall back to 'default-password'
-      expect(mockEncode).toHaveBeenCalledWith('default-password');
+      // Should generate and encode a 16-character alphanumeric random password
+      expect(mockEncode).toHaveBeenCalledWith(
+        expect.stringMatching(/^[A-Za-z0-9]{16}$/),
+      );
     });
 
     it('should throw BadRequestException for short password', async () => {
