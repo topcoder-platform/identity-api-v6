@@ -10,8 +10,10 @@
   - [**Prerequisites**](#prerequisites)
   - [**Setting up Environment**](#setting-up-environment)
   - [**Deploying Locally**](#deploying-locally)
-  - [**Verifying through Postman Collections**](#verifying-through-postman-collections)
-  - [**Environment Configuration**](#environment-configuration)
+- [**Verifying through Postman Collections**](#verifying-through-postman-collections)
+- [**Environment Configuration**](#environment-configuration)
+  - [**Downstream Usage**](#downstream-usage)
+  - [**Auth0 Integration**](#auth0-integration)
 
 **Prerequisites**
 ---------------
@@ -125,3 +127,56 @@ The following table summarizes the environment variables used by the application
 | `LOG_LEVEL`                | Logging level (e.g., `debug`, `info`, `warn`, `error`)                      | `info`                        |
 | `JWT_SECRET`               | Secret key for signing/verifying internal JWTs (e.g., 2FA, one-time tokens).  | `just-a-random-string` (example)            |
 | `LEGACY_BLOWFISH_KEY`      | Base64 encoded Blowfish key for legacy password encryption/decryption.        | `dGhpc2lzRGVmYXVmZlZhbHVl` (example)        |
+
+
+**Downstream Usage**
+--------------------
+
+- This service is consumed by multiple Topcoder apps, as well as Auth0. Below is a quick map of where and how it’s called to help with debugging and local development.
+
+**platform-ui**
+
+- Local dev proxy forwards Identity routes to this service:
+  - See `platform-ui/src/config/environments/local.env.ts` (proxies for `/v6/users`, `/v6/roles`, `/v6/user-roles`, `/v6/identityproviders`).
+- Admin users and roles management use the following endpoints:
+  - Search/list users: `GET /v6/users?fields=...&filter=...&limit=...` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Get user by id: `GET /v6/users/{id}` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Update email: `PATCH /v6/users/{id}/email` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Update status: `PATCH /v6/users/{id}/status?comment=...` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Fetch achievements: `GET /v6/users/{id}/achievements` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Manage SSO user logins: `GET/POST/PUT/DELETE /v6/users/{id}/SSOUserLogin(s)` — `platform-ui/src/apps/admin/src/lib/services/user.service.ts`.
+  - Fetch identity providers (SSO): `GET /v6/identityproviders/sso-providers` — `platform-ui/src/apps/admin/src/lib/services/identity-provider.service.ts`.
+  - Roles catalog and assignments:
+    - List roles: `GET /v6/roles` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
+    - Subject roles: `GET /v6/roles?filter=subjectID={userId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
+    - Assign role: `PATCH /v6/user-roles/{userId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
+    - Remove role: `DELETE /v6/user-roles/{userId}/{roleId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
+    - Manage role members: `GET /v6/roles/{roleId}/subjects[?page&perPage&userId&userHandle&email]` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
+- User password changes from the profile context use: `PATCH /v6/users/{id}` (credential payload) — `platform-ui/src/libs/core/lib/auth/user-functions/user-xhr.store.ts` and `platform-ui/src/libs/core/lib/auth/user-functions/user-endpoint.config.ts`.
+
+**community-app**
+
+- Community App does not call Identity API endpoints directly. It authenticates via the Accounts app/Auth0 and consumes roles embedded in the JWT to gate features.
+  - Token acquisition and decoding: `community-app/src/client/index.jsx`.
+  - Various parts of the app read roles from the decoded token (e.g., reviewer checks): `community-app/src/shared/containers/ReviewOpportunityDetails.jsx`.
+
+**work-manager**
+
+- Work Manager does not call Identity API endpoints directly. It relies on JWT roles to authorize actions (admin/manager/copilot/read-only checks).
+  - Role checks based on decoded token claims: `work-manager/src/util/tc.js`.
+  - Token wiring and axios auth header: `work-manager/src/services/axiosWithAuth.js`.
+
+Swagger: when running locally, the Identity API docs are available at `http://localhost:3000/v6/users/api-docs`.
+
+
+**Auth0 Integration**
+---------------------
+
+- Auth0 uses Identity API for critical authentication flows via Actions
+  - Validate username/email + password during login: `POST /v6/users/login` (form data).
+  - Fetch user profile and roles to embed into tokens: `POST /v6/users/roles` (form data).
+  - Registration flow: create users via `POST /v6/users`, then activate with `PUT /v6/users/activate`; resend activation via `POST /v6/users/resendActivationEmail`.
+
+Notes:
+- Endpoints above are intentionally callable by Auth0 without a bearer token and are documented in the code (`identity-api-v6/src/api/user/user.controller.ts`).  These endpoints are restricted to only Auth0 IP addresses
+- Roles added to JWTs are then consumed by apps like Work Manager and Community App to gate features, as well as all services, to validate user access to specific functionality.
