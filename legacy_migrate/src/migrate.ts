@@ -1011,26 +1011,26 @@ async function main() {
   console.log('Starting migration…');
 
   // // 1) Auth (MySQL) → target
-  // await migrateRoles();
-  // await migrateClients();
-  // await migrateRoleAssignments();
+  await migrateRoles();
+  await migrateClients();
+  await migrateRoleAssignments();
 
   // // 2) Identity lookups/providers first (FK-safe order)
-  // await migrateAchievementTypeLu();
-  // await migrateEmailStatusLu();
-  // await migrateEmailTypeLu();
-  // await migrateUserStatusLu();
-  // await migrateUserStatusTypeLu();
-  // await migrateSecurityStatusLu();
-  // await migrateCountry();
-  // await migrateInvalidHandles();
-  // await migrateSocialLoginProvider();
-  // await migrateSsoLoginProvider();
+  await migrateAchievementTypeLu();
+  await migrateEmailStatusLu();
+  await migrateEmailTypeLu();
+  await migrateUserStatusLu();
+  await migrateUserStatusTypeLu();
+  await migrateSecurityStatusLu();
+  await migrateCountry();
+  await migrateInvalidHandles();
+  await migrateSocialLoginProvider();
+  await migrateSsoLoginProvider();
 
   // // 3) Core entities
-  // await migrateUsers();
-  // await migrateSecurityUser();
-  // await migrateSecurityGroups();
+  await migrateUsers();
+  await migrateSecurityUser();
+  await migrateSecurityGroups();
 
   // 4) Email + xref
   await migrateEmail();
