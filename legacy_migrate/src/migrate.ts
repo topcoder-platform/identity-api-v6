@@ -3,6 +3,7 @@ import 'dotenv/config';
 
 const fs = require('fs');
 const path = require('path');
+const { URL } = require('url');
 
 // === CommonJS-friendly requires for generated Prisma clients
 const { PrismaClient: TargetPrisma } = require('../generated/target');
@@ -20,6 +21,37 @@ const sourceIdentity = new SourceIdentityPrisma();
 
 // ---- Tunables
 const BATCH_SIZE = 1000;
+
+function redactCredentials(raw: string) {
+  return raw.replace(/\/\/([^@]*?)@/, '//***@');
+}
+
+function summarizeConnection(raw: string) {
+  try {
+    const parsed = new URL(raw);
+    const hostPart = `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}${parsed.pathname}`;
+    const authStatus =
+      parsed.username || parsed.password ? 'credentials set' : 'no credentials';
+    const queryStatus = parsed.search ? 'query params present' : 'no query params';
+    return `${hostPart} (${authStatus}; ${queryStatus})`;
+  } catch (err: any) {
+    return `unable to parse (${err.message}); raw=${redactCredentials(raw)}`;
+  }
+}
+
+function logConnectionDetails(label: string, envVar: string, rawValue?: string) {
+  if (!rawValue) {
+    console.warn(`[config] ${label}: environment variable ${envVar} is not set`);
+    return;
+  }
+  console.log(`[config] ${label} (${envVar}): ${summarizeConnection(rawValue)}`);
+}
+
+[
+  { label: 'Target identity database', envVar: 'IDENTITY_DB_URL' },
+  { label: 'Source auth database', envVar: 'SOURCE_AUTH_MYSQL_URL' },
+  { label: 'Source identity database', envVar: 'SOURCE_IDENTITY_PG_URL' },
+].forEach(({ label, envVar }) => logConnectionDetails(label, envVar, process.env[envVar]));
 
 
 // ensure ./logs exists
