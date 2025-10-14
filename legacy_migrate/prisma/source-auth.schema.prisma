@@ -41,9 +41,7 @@ model RoleAssignment {
   createdAt   DateTime? @db.Timestamp(0)
   modifiedBy  Int?
   modifiedAt  DateTime? @db.Timestamp(0)
-  subjectType Int       @default(1) @map("subject_type")
 
-  @@unique([roleId, subjectId, subjectType], map: "role_subject_id_subject_type")
   @@index([subjectId], map: "subject_id_idx")
   @@index([roleId], map: "role_id_idx")
   @@map("role_assignment")

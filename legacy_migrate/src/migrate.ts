@@ -158,7 +158,7 @@ async function migrateRoleAssignments() {
               roleId_subjectId_subjectType: {
               roleId: ra.roleId,
               subjectId: ra.subjectId,
-              subjectType: ra.subjectType ?? 1,
+              subjectType: 1,
             },
           },
           create: {
