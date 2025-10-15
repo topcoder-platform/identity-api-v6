@@ -53,6 +53,133 @@ function logConnectionDetails(label: string, envVar: string, rawValue?: string) 
   { label: 'Source identity database', envVar: 'SOURCE_IDENTITY_PG_URL' },
 ].forEach(({ label, envVar }) => logConnectionDetails(label, envVar, process.env[envVar]));
 
+type RunMode = 'full' | 'delta';
+
+interface CliOptions {
+  mode: RunMode;
+  since: Date | null;
+  sinceRaw: string | null;
+}
+
+const cliOptions = parseCliOptions(process.argv.slice(2));
+const CHANGE_WINDOW_START = cliOptions.mode === 'delta' ? cliOptions.since : null;
+const deltaTablesLogged = new Set<string>();
+
+if (cliOptions.mode === 'delta') {
+  console.log(
+    `[config] Run mode: delta (changes since ${CHANGE_WINDOW_START!.toISOString()})`
+  );
+} else {
+  console.log('[config] Run mode: full');
+}
+
+const PARALLEL_LIMIT = resolveParallelLimit();
+console.log(`[config] Parallel worker limit: ${PARALLEL_LIMIT}`);
+
+function applyChangeWindow<T extends Record<string, any>>(
+  args: T,
+  fields: string[],
+  label: string
+): T {
+  if (!CHANGE_WINDOW_START) {
+    return args;
+  }
+
+  if (fields.length === 0) {
+    if (!deltaTablesLogged.has(label)) {
+      deltaTablesLogged.add(label);
+      console.log(`[delta] ${label}: no timestamp fields; exporting full set`);
+    }
+    return args;
+  }
+
+  const deltaWhere = {
+    OR: fields.map((field) => ({ [field]: { gte: CHANGE_WINDOW_START } })),
+  };
+
+  if (!deltaTablesLogged.has(label)) {
+    deltaTablesLogged.add(label);
+    console.log(
+      `[delta] ${label}: filtering rows where ${fields.join(' OR ')} ≥ ${CHANGE_WINDOW_START.toISOString()}`
+    );
+  }
+
+  const baseArgs: any = { ...args };
+  if (baseArgs.where) {
+    baseArgs.where = { AND: [baseArgs.where, deltaWhere] };
+  } else {
+    baseArgs.where = deltaWhere;
+  }
+  return baseArgs;
+}
+
+function parseCliOptions(argv: string[]): CliOptions {
+  let mode: RunMode | null = null;
+  let sinceRaw: string | null = process.env.MIGRATE_SINCE ?? null;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '-h' || arg === '--help') {
+      printUsage();
+      process.exit(0);
+    } else if (arg === '--delta') {
+      mode = 'delta';
+    } else if (arg === '--full') {
+      mode = 'full';
+    } else if (arg.startsWith('--mode=')) {
+      const [, rawMode] = arg.split('=');
+      if (rawMode === 'delta' || rawMode === 'full') {
+        mode = rawMode;
+      } else {
+        throw new Error(`Unsupported --mode value: ${rawMode}`);
+      }
+    } else if (arg === '--since') {
+      const value = argv[i + 1];
+      if (!value) {
+        throw new Error('--since expects an ISO-8601 timestamp value');
+      }
+      sinceRaw = value;
+      i += 1;
+    } else if (arg.startsWith('--since=')) {
+      const [, value] = arg.split('=');
+      if (!value) {
+        throw new Error('--since expects an ISO-8601 timestamp value');
+      }
+      sinceRaw = value;
+    }
+  }
+
+  if (!mode) {
+    mode = sinceRaw ? 'delta' : 'full';
+  }
+
+  const since = sinceRaw ? new Date(sinceRaw) : null;
+  if (sinceRaw && (!since || Number.isNaN(since.getTime()))) {
+    throw new Error(`Invalid timestamp for --since / MIGRATE_SINCE: ${sinceRaw}`);
+  }
+
+  if (mode === 'delta' && !since) {
+    throw new Error('Delta mode requires --since <ISO-8601 timestamp> or MIGRATE_SINCE');
+  }
+
+  return { mode, since, sinceRaw };
+}
+
+function printUsage() {
+  console.log(`Usage: npm run migrate -- [options]
+
+Options:
+  --full                Run the complete migration (default)
+  --delta               Run in delta mode (requires --since or MIGRATE_SINCE)
+  --since <ISO>         ISO-8601 timestamp; limits source rows to those updated since this time
+  --mode=full|delta     Alternate way to set the run mode
+  -h, --help            Show this message
+
+Environment:
+  MIGRATE_SINCE         Acts like --since when provided.
+`);
+}
+
 
 // ensure ./logs exists
 function ensureLogDir() {
@@ -66,6 +193,62 @@ function appendNdjson(filename: string, record: any) {
   fs.appendFileSync(path.join(dir, filename), JSON.stringify(record) + '\n', 'utf8');
 }
 
+function resolveParallelLimit(defaultValue = 3): number {
+  const raw = process.env.MIGRATE_PARALLEL;
+  if (!raw) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    console.warn(
+      `[config] MIGRATE_PARALLEL=${raw} is invalid; using default parallelism of ${defaultValue}`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
+}
+
+async function runParallel(
+  label: string,
+  tasks: Array<() => Promise<void>>,
+  limit = PARALLEL_LIMIT
+): Promise<void> {
+  if (tasks.length === 0) {
+    return;
+  }
+
+  if (tasks.length === 1) {
+    await tasks[0]();
+    return;
+  }
+
+  const concurrency = Math.max(1, Math.min(limit, tasks.length));
+  console.log(`[parallel] ${label}: running ${tasks.length} tasks (limit=${concurrency})`);
+
+  const queue = tasks.slice();
+  let aborted = false;
+
+  async function worker(): Promise<void> {
+    while (!aborted) {
+      const next = queue.shift();
+      if (!next) {
+        return;
+      }
+      try {
+        await next();
+      } catch (err) {
+        aborted = true;
+        throw err;
+      }
+    }
+  }
+
+  const workers = Array.from({ length: concurrency }, () => worker());
+  await Promise.all(workers);
+}
+
 // ===== AUTH (MySQL) → TARGET =====
 
 async function migrateRoles() {
@@ -73,7 +256,13 @@ async function migrateRoles() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceAuth.role.findMany> =
-      await sourceAuth.role.findMany({ skip, take: BATCH_SIZE, orderBy: { id: 'asc' } });
+      await sourceAuth.role.findMany(
+        applyChangeWindow(
+          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
+          ['createdAt', 'modifiedAt'],
+          'sourceAuth.role'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -108,7 +297,13 @@ async function migrateClients() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceAuth.client.findMany> =
-      await sourceAuth.client.findMany({ skip, take: BATCH_SIZE, orderBy: { id: 'asc' } });
+      await sourceAuth.client.findMany(
+        applyChangeWindow(
+          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
+          ['createdAt', 'modifiedAt'],
+          'sourceAuth.client'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -148,7 +343,13 @@ async function migrateRoleAssignments() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceAuth.roleAssignment.findMany> =
-      await sourceAuth.roleAssignment.findMany({ skip, take: BATCH_SIZE, orderBy: { id: 'asc' } });
+      await sourceAuth.roleAssignment.findMany(
+        applyChangeWindow(
+          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
+          ['createdAt', 'modifiedAt'],
+          'sourceAuth.roleAssignment'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -194,9 +395,17 @@ async function migrateAchievementTypeLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.achievement_type_lu.findMany> =
-      await sourceIdentity.achievement_type_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { achievement_type_id: 'asc' }
-      });
+      await sourceIdentity.achievement_type_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { achievement_type_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.achievement_type_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -225,9 +434,17 @@ async function migrateCountry() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.country.findMany> =
-      await sourceIdentity.country.findMany({
-        skip, take: BATCH_SIZE, orderBy: { country_code: 'asc' }
-      });
+      await sourceIdentity.country.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { country_code: 'asc' },
+          },
+          ['modify_date'],
+          'sourceIdentity.country'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -274,9 +491,17 @@ async function migrateEmailStatusLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.email_status_lu.findMany> =
-      await sourceIdentity.email_status_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { status_id: 'asc' }
-      });
+      await sourceIdentity.email_status_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { status_id: 'asc' },
+          },
+          ['create_date', 'modify_date'],
+          'sourceIdentity.email_status_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -308,9 +533,17 @@ async function migrateEmailTypeLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.email_type_lu.findMany> =
-      await sourceIdentity.email_type_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { email_type_id: 'asc' }
-      });
+      await sourceIdentity.email_type_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { email_type_id: 'asc' },
+          },
+          ['create_date', 'modify_date'],
+          'sourceIdentity.email_type_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -342,9 +575,17 @@ async function migrateInvalidHandles() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.invalid_handles.findMany> =
-      await sourceIdentity.invalid_handles.findMany({
-        skip, take: BATCH_SIZE, orderBy: { invalid_handle_id: 'asc' }
-      });
+      await sourceIdentity.invalid_handles.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { invalid_handle_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.invalid_handles'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -373,9 +614,17 @@ async function migrateSecurityStatusLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.security_status_lu.findMany> =
-      await sourceIdentity.security_status_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { security_status_id: 'asc' }
-      });
+      await sourceIdentity.security_status_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { security_status_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.security_status_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -404,9 +653,17 @@ async function migrateSecurityGroups() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.security_groups.findMany> =
-      await sourceIdentity.security_groups.findMany({
-        skip, take: BATCH_SIZE, orderBy: { group_id: 'asc' }
-      });
+      await sourceIdentity.security_groups.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { group_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.security_groups'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -439,9 +696,17 @@ async function migrateSecurityUser() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.security_user.findMany> =
-      await sourceIdentity.security_user.findMany({
-        skip, take: BATCH_SIZE, orderBy: { login_id: 'asc' }
-      });
+      await sourceIdentity.security_user.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { login_id: 'asc' },
+          },
+          ['modify_date'],
+          'sourceIdentity.security_user'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -478,9 +743,17 @@ async function migrateSocialLoginProvider() {
   let skip = 0, total = 0;
   while (true) {
     const batch: any[] =
-      await sourceIdentity.social_login_provider.findMany({
-        skip, take: BATCH_SIZE, orderBy: { social_login_provider_id: 'asc' }
-      });
+      await sourceIdentity.social_login_provider.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { social_login_provider_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.social_login_provider'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -510,9 +783,17 @@ async function migrateSsoLoginProvider() {
   let skip = 0, total = 0;
   while (true) {
     const batch: any[] =
-      await sourceIdentity.sso_login_provider.findMany({
-        skip, take: BATCH_SIZE, orderBy: { sso_login_provider_id: 'asc' }
-      });
+      await sourceIdentity.sso_login_provider.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { sso_login_provider_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.sso_login_provider'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -547,31 +828,39 @@ async function migrateUsers() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user.findMany> =
-      await sourceIdentity.user.findMany({
-        skip, take: BATCH_SIZE, orderBy: { user_id: 'asc' },
-        select: {
-          user_id: true,
-          first_name: true,
-          last_name: true,
-          create_date: true,
-          modify_date: true,
-          handle: true,
-          last_login: true,
-          status: true,
-          activation_code: true,
-          middle_name: true,
-          handle_lower: true,
-          timezone_id: true,
-          last_site_hit_date: true,
-          name_in_another_language: true,
-          password: true,
-          open_id: true,
-          reg_source: true,
-          utm_source: true,
-          utm_medium: true,
-          utm_campaign: true,
-        }
-      });
+      await sourceIdentity.user.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { user_id: 'asc' },
+            select: {
+              user_id: true,
+              first_name: true,
+              last_name: true,
+              create_date: true,
+              modify_date: true,
+              handle: true,
+              last_login: true,
+              status: true,
+              activation_code: true,
+              middle_name: true,
+              handle_lower: true,
+              timezone_id: true,
+              last_site_hit_date: true,
+              name_in_another_language: true,
+              password: true,
+              open_id: true,
+              reg_source: true,
+              utm_source: true,
+              utm_medium: true,
+              utm_campaign: true,
+            },
+          },
+          ['modify_date', 'create_date', 'last_login', 'last_site_hit_date'],
+          'sourceIdentity.user'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -637,9 +926,17 @@ async function migrateEmail() {
 
   while (true) {
     const batch: Rows<typeof sourceIdentity.email.findMany> =
-      await sourceIdentity.email.findMany({
-        skip, take: BATCH_SIZE, orderBy: { email_id: 'asc' }
-      });
+      await sourceIdentity.email.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { email_id: 'asc' },
+          },
+          ['modify_date', 'create_date'],
+          'sourceIdentity.email'
+        )
+      );
     if (batch.length === 0) break;
 
     // Build a unique list of non-null user_ids from this batch
@@ -733,9 +1030,17 @@ async function migrateUserEmailXref() {
 
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_email_xref.findMany> =
-      await sourceIdentity.user_email_xref.findMany({
-        skip, take: BATCH_SIZE, orderBy: [{ user_id: 'asc' }, { email_id: 'asc' }]
-      });
+      await sourceIdentity.user_email_xref.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: [{ user_id: 'asc' }, { email_id: 'asc' }],
+          },
+          ['modify_date', 'create_date'],
+          'sourceIdentity.user_email_xref'
+        )
+      );
     if (batch.length === 0) break;
 
     // Collect parents to validate existence
@@ -821,9 +1126,17 @@ async function migrateUserSocialLogin() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_social_login.findMany> =
-      await sourceIdentity.user_social_login.findMany({
-        skip, take: BATCH_SIZE, orderBy: [{ user_id: 'asc' }, { social_login_provider_id: 'asc' }]
-      });
+      await sourceIdentity.user_social_login.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: [{ user_id: 'asc' }, { social_login_provider_id: 'asc' }],
+          },
+          ['modify_date', 'create_date'],
+          'sourceIdentity.user_social_login'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -868,9 +1181,17 @@ async function migrateUserSsoLogin() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_sso_login.findMany> =
-      await sourceIdentity.user_sso_login.findMany({
-        skip, take: BATCH_SIZE, orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }]
-      });
+      await sourceIdentity.user_sso_login.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }],
+          },
+          [],
+          'sourceIdentity.user_sso_login'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -910,9 +1231,17 @@ async function migrateUserOtpEmail() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_otp_email.findMany> =
-      await sourceIdentity.user_otp_email.findMany({
-        skip, take: BATCH_SIZE, orderBy: { id: 'asc' }
-      });
+      await sourceIdentity.user_otp_email.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { id: 'asc' },
+          },
+          [],
+          'sourceIdentity.user_otp_email'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -952,9 +1281,17 @@ async function migrateUserStatusLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_status_lu.findMany> =
-      await sourceIdentity.user_status_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { user_status_id: 'asc' }
-      });
+      await sourceIdentity.user_status_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { user_status_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.user_status_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -978,9 +1315,17 @@ async function migrateUserStatusTypeLu() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_status_type_lu.findMany> =
-      await sourceIdentity.user_status_type_lu.findMany({
-        skip, take: BATCH_SIZE, orderBy: { user_status_type_id: 'asc' }
-      });
+      await sourceIdentity.user_status_type_lu.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: { user_status_type_id: 'asc' },
+          },
+          [],
+          'sourceIdentity.user_status_type_lu'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -1004,9 +1349,17 @@ async function migrateUserStatus() {
   let skip = 0, total = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_status.findMany> =
-      await sourceIdentity.user_status.findMany({
-        skip, take: BATCH_SIZE, orderBy: [{ user_id: 'asc' }, { user_status_type_id: 'asc' }]
-      });
+      await sourceIdentity.user_status.findMany(
+        applyChangeWindow(
+          {
+            skip,
+            take: BATCH_SIZE,
+            orderBy: [{ user_id: 'asc' }, { user_status_type_id: 'asc' }],
+          },
+          [],
+          'sourceIdentity.user_status'
+        )
+      );
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -1040,39 +1393,45 @@ async function migrateUserStatus() {
 // ===== Main =====
 
 async function main() {
-  console.log('Starting migration…');
+  const descriptor =
+    cliOptions.mode === 'delta'
+      ? `mode=delta, since=${CHANGE_WINDOW_START!.toISOString()}`
+      : 'mode=full';
+  console.log(`Starting migration… (${descriptor})`);
 
   // // 1) Auth (MySQL) → target
-  await migrateRoles();
-  await migrateClients();
+  await runParallel('auth (roles + clients)', [migrateRoles, migrateClients]);
   await migrateRoleAssignments();
 
   // // 2) Identity lookups/providers first (FK-safe order)
-  await migrateAchievementTypeLu();
-  await migrateEmailStatusLu();
-  await migrateEmailTypeLu();
-  await migrateUserStatusLu();
-  await migrateUserStatusTypeLu();
-  await migrateSecurityStatusLu();
-  await migrateCountry();
-  await migrateInvalidHandles();
-  await migrateSocialLoginProvider();
-  await migrateSsoLoginProvider();
+  await runParallel('identity lookups/providers', [
+    migrateAchievementTypeLu,
+    migrateEmailStatusLu,
+    migrateEmailTypeLu,
+    migrateUserStatusLu,
+    migrateUserStatusTypeLu,
+    migrateSecurityStatusLu,
+    migrateCountry,
+    migrateInvalidHandles,
+    migrateSocialLoginProvider,
+    migrateSsoLoginProvider,
+  ]);
 
-  // // 3) Core entities
+  // // 3) Core entities (users first for FK dependencies)
   await migrateUsers();
-  await migrateSecurityUser();
-  await migrateSecurityGroups();
+  await runParallel('security tables', [migrateSecurityUser, migrateSecurityGroups]);
 
-  // 4) Email + xref
+  // 4) Email + xref (require users/emails present)
   await migrateEmail();
-  await migrateUserEmailXref();
+  //await migrateUserEmailXref();
 
   // 5) Social / SSO / OTP / status rows
-  await migrateUserSocialLogin();
-  await migrateUserSsoLogin();
-  await migrateUserOtpEmail();
-  await migrateUserStatus();
+  await runParallel('user-related tables', [
+    migrateUserSocialLogin,
+    migrateUserSsoLogin,
+    migrateUserOtpEmail,
+    migrateUserStatus,
+  ]);
 
   console.log('✓ Migration complete.');
 }
