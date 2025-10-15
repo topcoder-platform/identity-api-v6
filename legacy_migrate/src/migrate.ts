@@ -1123,7 +1123,9 @@ async function migrateUserEmailXref() {
 
 async function migrateUserSocialLogin() {
   console.log('→ user_social_login');
-  let skip = 0, total = 0;
+  let skip = 0,
+    total = 0,
+    failures = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_social_login.findMany> =
       await sourceIdentity.user_social_login.findMany(
@@ -1139,7 +1141,7 @@ async function migrateUserSocialLogin() {
       );
     if (batch.length === 0) break;
 
-    await target.$transaction(
+    const results = await Promise.allSettled(
       batch.map((r: any) =>
         target.user_social_login.upsert({
           where: {
@@ -1166,14 +1168,38 @@ async function migrateUserSocialLogin() {
             modify_date: r.modify_date ?? null,
           },
         })
-      ),
-      { timeout: 120_000 }
+      )
     );
 
-    total += batch.length; skip += batch.length;
-    console.log(`  … ${total}`);
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled') {
+        total += 1;
+      } else {
+        const err: any = result.reason;
+        const record = batch[idx];
+        if (err?.code === 'P2003' && err?.meta?.constraint === 'user_social_user_fk') {
+          failures += 1;
+          appendNdjson('bad-user-social-login.ndjson', {
+            reason: 'foreign key violation: user missing',
+            user_id: record.user_id,
+            social_login_provider_id: record.social_login_provider_id,
+            social_user_id: record.social_user_id ?? null,
+            error: err.message,
+          });
+        } else {
+          throw err;
+        }
+      }
+    });
+
+    skip += batch.length;
+    console.log(`  … imported=${total} (failed=${failures} so far)`);
   }
-  console.log(`✓ user_social_login: ${total}`);
+  const summarySuffix =
+    failures > 0
+      ? `, failed=${failures}. See logs/bad-user-social-login.ndjson`
+      : '';
+  console.log(`✓ user_social_login: imported=${total}${summarySuffix}`);
 }
 
 async function migrateUserSsoLogin() {
