@@ -1254,7 +1254,9 @@ async function migrateUserSsoLogin() {
 
 async function migrateUserOtpEmail() {
   console.log('→ user_otp_email');
-  let skip = 0, total = 0;
+  let skip = 0,
+    total = 0,
+    failures = 0;
   while (true) {
     const batch: Rows<typeof sourceIdentity.user_otp_email.findMany> =
       await sourceIdentity.user_otp_email.findMany(
@@ -1270,7 +1272,7 @@ async function migrateUserOtpEmail() {
       );
     if (batch.length === 0) break;
 
-    await target.$transaction(
+    const results = await Promise.allSettled(
       batch.map((r: any) =>
         target.user_otp_email.upsert({
           where: { id: r.id },
@@ -1292,14 +1294,52 @@ async function migrateUserOtpEmail() {
             fail_count: r.fail_count ?? 0,
           },
         })
-      ),
-      { timeout: 120_000 }
+      )
     );
 
-    total += batch.length; skip += batch.length;
-    console.log(`  … ${total}`);
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled') {
+        total += 1;
+        return;
+      }
+
+      const err: any = result.reason;
+      const record = batch[idx];
+      failures += 1;
+
+      if (err?.code === 'P2003' && err?.meta?.constraint === 'user_otp_email_user_id_fkey') {
+        appendNdjson('bad-user-otp-email.ndjson', {
+          reason: 'foreign key violation: user missing',
+          id: record.id,
+          user_id: record.user_id,
+          mode: record.mode,
+          otp: record.otp,
+          expire_at: record.expire_at,
+          resend: record.resend ?? null,
+          fail_count: record.fail_count ?? null,
+          error: err.message,
+        });
+      } else {
+        appendNdjson('bad-user-otp-email.ndjson', {
+          reason: 'unexpected error',
+          id: record.id,
+          user_id: record.user_id,
+          mode: record.mode,
+          otp: record.otp,
+          expire_at: record.expire_at,
+          resend: record.resend ?? null,
+          fail_count: record.fail_count ?? null,
+          error: err?.message ?? String(err),
+        });
+      }
+    });
+
+    skip += batch.length;
+    console.log(`  … imported=${total} (failed=${failures} so far)`);
   }
-  console.log(`✓ user_otp_email: ${total}`);
+  const summarySuffix =
+    failures > 0 ? `, failed=${failures}. See logs/bad-user-otp-email.ndjson` : '';
+  console.log(`✓ user_otp_email: imported=${total}${summarySuffix}`);
 }
 
 async function migrateUserStatusLu() {
