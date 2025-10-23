@@ -61,8 +61,9 @@ model email {
   user_email_xref user_email_xref[]
   user            user?            @relation("UserToEmail", fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([address])
   @@index([user_id, primary_ind], map: "email_user_id_idx")
+  @@index([user_id, email_type_id, status_id])
+  @@index([address, status_id])
 }
 
 model email_status_lu {
@@ -176,7 +177,7 @@ model user {
   @@index([handle])
   @@index([handle_lower], map: "user_lower_handle_idx")
   @@index([open_id])
-  @@index([status])
+  @@index([status, handle_lower])
 }
 
 model user_2fa {
@@ -249,6 +250,7 @@ model user_social_login {
   user                     user                  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_social_user_fk")
 
   @@id([user_id, social_login_provider_id], map: "user_social_prkey")
+  @@index([social_user_id, social_login_provider_id])
   
 }
 
@@ -307,6 +309,7 @@ model user_email_xref {
 
   @@id([user_id, email_id], map: "user_email_xref_pkey") // Define composite primary key
   @@index([email_id], map: "user_email_xref_email_idx")
+  @@index([user_id, status_id])
 }
 
 
@@ -356,5 +359,6 @@ model RoleAssignment {
   @@unique([roleId, subjectId, subjectType], map: "role_subject_id_subject_type")
   @@index([subjectId], map: "subject_id_idx")
   @@index([roleId], map: "role_id_idx")
+  @@index([subjectId, subjectType])
   @@map("role_assignment")
 }
