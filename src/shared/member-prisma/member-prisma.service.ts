@@ -9,7 +9,9 @@ export class MemberPrismaService
   constructor() {
     super({
       transactionOptions: {
-        timeout: process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT || 10000,
+        timeout: process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT
+          ? parseInt(process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT, 10)
+          : 10000,
       },
     });
   }
