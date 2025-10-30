@@ -376,18 +376,15 @@ export class RoleService {
     } catch (error) {
       if (error.code === Constants.prismaUniqueConflictcode) {
         this.logger.warn(
-          `Attempt to assign role ${roleId} to subject ${subjectId} which already exists.`,
+          `Attempt to assign role ${roleId} to subject ${subjectId} which already exists. Ignoring duplicate.`,
         );
-        throw new ConflictException(
-          `Role ${roleId} is already assigned to subject ${subjectId}.`,
-        );
-      } else {
-        this.logger.error(
-          `Failed to assign role ${roleId} to subject ${subjectId}: ${error.message}`,
-          error.stack,
-        );
-        throw error;
+        return;
       }
+      this.logger.error(
+        `Failed to assign role ${roleId} to subject ${subjectId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
   }
 

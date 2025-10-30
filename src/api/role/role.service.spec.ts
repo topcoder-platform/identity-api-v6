@@ -390,13 +390,16 @@ describe('RoleService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ConflictException if assignment already exists', async () => {
+    it('should ignore duplicate assignment if already exists', async () => {
       mockPrisma.role.count.mockResolvedValue(1);
       mockPrisma.roleAssignment.create.mockRejectedValue({ code: 'P2002' });
 
       await expect(
         service.assignRoleToSubject(roleId, subjectId, operatorId),
-      ).rejects.toThrow(ConflictException);
+      ).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        `Attempt to assign role ${roleId} to subject ${subjectId} which already exists. Ignoring duplicate.`,
+      );
     });
   });
 

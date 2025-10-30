@@ -6,6 +6,16 @@ export class MemberPrismaService
   extends MemberPrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  constructor() {
+    super({
+      transactionOptions: {
+        timeout: process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT
+          ? parseInt(process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT, 10)
+          : 10000,
+      },
+    });
+  }
+
   async onModuleInit() {
     await this.$connect();
   }
