@@ -953,6 +953,10 @@ export class UserService {
     this.logger.log('Primary Role to be saved: ' + primaryRole);
     // assign primary role
     await this.roleService.assignRoleByName(primaryRole, userId, userId);
+    // Assign 'Topcoder User' at the same time, to avoid weird issues after the first login
+    if (primaryRole == 'Topcoder Talent') {
+      await this.roleService.assignRoleByName('Topcoder User', userId, userId);
+    }
   }
 
   private async getNextUserId(): Promise<number> {
