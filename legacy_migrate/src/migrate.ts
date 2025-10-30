@@ -64,6 +64,7 @@ interface CliOptions {
 const cliOptions = parseCliOptions(process.argv.slice(2));
 const CHANGE_WINDOW_START = cliOptions.mode === 'delta' ? cliOptions.since : null;
 const deltaTablesLogged = new Set<string>();
+const deltaTableStats = new Map<string, { fields: string[]; fetches: number; matched: number }>();
 
 if (cliOptions.mode === 'delta') {
   console.log(
@@ -81,6 +82,12 @@ function applyChangeWindow<T extends Record<string, any>>(
   fields: string[],
   label: string
 ): T {
+  if (!deltaTableStats.has(label)) {
+    deltaTableStats.set(label, { fields, fetches: 0, matched: 0 });
+  } else if (fields.length && deltaTableStats.get(label)!.fields.length === 0) {
+    deltaTableStats.get(label)!.fields = fields;
+  }
+
   if (!CHANGE_WINDOW_START) {
     return args;
   }
@@ -88,7 +95,7 @@ function applyChangeWindow<T extends Record<string, any>>(
   if (fields.length === 0) {
     if (!deltaTablesLogged.has(label)) {
       deltaTablesLogged.add(label);
-      console.log(`[delta] ${label}: no timestamp fields; exporting full set`);
+      console.log(`[delta] ${label}: no timestamp fields; exporting full set (delta filter skipped)`);
     }
     return args;
   }
@@ -102,6 +109,7 @@ function applyChangeWindow<T extends Record<string, any>>(
     console.log(
       `[delta] ${label}: filtering rows where ${fields.join(' OR ')} ≥ ${CHANGE_WINDOW_START.toISOString()}`
     );
+    console.log(`[delta] ${label}: resolved where clause ${JSON.stringify(deltaWhere)}`);
   }
 
   const baseArgs: any = { ...args };
@@ -111,6 +119,66 @@ function applyChangeWindow<T extends Record<string, any>>(
     baseArgs.where = deltaWhere;
   }
   return baseArgs;
+}
+
+function recordDeltaFetch(label: string, count: number) {
+  if (!deltaTableStats.has(label)) {
+    deltaTableStats.set(label, { fields: [], fetches: 0, matched: 0 });
+  }
+  const stats = deltaTableStats.get(label)!;
+  stats.fetches += 1;
+  stats.matched += count;
+  if (cliOptions.mode === 'delta' && count === 0 && stats.fetches === 1) {
+    console.warn(`[delta] ${label}: first fetch returned 0 rows during delta migration.`);
+  }
+}
+
+function resolvePrismaDelegate(label: string) {
+  if (!label) {
+    return null;
+  }
+  const [clientKey, ...modelParts] = label.split('.');
+  const modelName = modelParts.join('.');
+  const client = clientKey === 'target' ? target : clientKey === 'sourceAuth' ? sourceAuth : clientKey === 'sourceIdentity' ? sourceIdentity : null;
+  if (!client || !modelName) {
+    return null;
+  }
+  const delegate = (client as any)[modelName];
+  if (!delegate || typeof delegate.count !== 'function') {
+    return null;
+  }
+  return delegate;
+}
+
+function buildDeltaWhereClause(fields: string[]) {
+  if (!CHANGE_WINDOW_START || !fields || fields.length === 0) {
+    return undefined;
+  }
+  return {
+    OR: fields.map((field) => ({ [field]: { gte: CHANGE_WINDOW_START } }))
+  };
+}
+
+function logDeltaTableSummary() {
+  if (deltaTableStats.size === 0) {
+    if (cliOptions.mode === 'delta') {
+      console.log('[delta] No delta table statistics were collected.');
+    }
+    return;
+  }
+
+  console.log('[delta] Table fetch summary:');
+  deltaTableStats.forEach((stats, label) => {
+    const fieldsSummary = stats.fields.length ? stats.fields.join(', ') : 'n/a';
+    console.log(`[delta] ${label}: matched=${stats.matched}, fetches=${stats.fetches}, fields=${fieldsSummary}`);
+    if (cliOptions.mode === 'delta') {
+      if (stats.matched === 0) {
+        console.warn(`[delta] ${label}: matched 0 records; verify incremental filters for this table.`);
+      } else if (stats.matched > 100_000) {
+        console.warn(`[delta] ${label}: processed ${stats.matched} records during delta run; confirm the since-date filter is correct.`);
+      }
+    }
+  });
 }
 
 function parseCliOptions(argv: string[]): CliOptions {
@@ -263,6 +331,7 @@ async function migrateRoles() {
           'sourceAuth.role'
         )
       );
+    recordDeltaFetch('sourceAuth.role', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -304,6 +373,7 @@ async function migrateClients() {
           'sourceAuth.client'
         )
       );
+    recordDeltaFetch('sourceAuth.client', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -350,6 +420,7 @@ async function migrateRoleAssignments() {
           'sourceAuth.roleAssignment'
         )
       );
+    recordDeltaFetch('sourceAuth.roleAssignment', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -406,6 +477,7 @@ async function migrateAchievementTypeLu() {
           'sourceIdentity.achievement_type_lu'
         )
       );
+    recordDeltaFetch('sourceIdentity.achievement_type_lu', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -445,6 +517,7 @@ async function migrateCountry() {
           'sourceIdentity.country'
         )
       );
+    recordDeltaFetch('sourceIdentity.country', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -502,6 +575,7 @@ async function migrateEmailStatusLu() {
           'sourceIdentity.email_status_lu'
         )
       );
+    recordDeltaFetch('sourceIdentity.email_status_lu', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -544,6 +618,7 @@ async function migrateEmailTypeLu() {
           'sourceIdentity.email_type_lu'
         )
       );
+    recordDeltaFetch('sourceIdentity.email_type_lu', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -586,6 +661,7 @@ async function migrateInvalidHandles() {
           'sourceIdentity.invalid_handles'
         )
       );
+    recordDeltaFetch('sourceIdentity.invalid_handles', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -625,6 +701,7 @@ async function migrateSecurityStatusLu() {
           'sourceIdentity.security_status_lu'
         )
       );
+    recordDeltaFetch('sourceIdentity.security_status_lu', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -664,6 +741,7 @@ async function migrateSecurityGroups() {
           'sourceIdentity.security_groups'
         )
       );
+    recordDeltaFetch('sourceIdentity.security_groups', batch.length);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -1458,12 +1536,147 @@ async function migrateUserStatus() {
 
 // ===== Main =====
 
+async function validateDeltaMigration() {
+  console.log('[delta] Performing preflight validation…');
+  if (cliOptions.mode !== 'delta') {
+    console.log('[delta] Run mode is full; delta validation skipped.');
+    return;
+  }
+
+  if (!CHANGE_WINDOW_START) {
+    throw new Error('[delta] Delta mode requires a since-date; none was resolved.');
+  }
+
+  const now = new Date();
+  if (CHANGE_WINDOW_START > now) {
+    throw new Error(`[delta] Since-date ${CHANGE_WINDOW_START.toISOString()} is in the future.`);
+  }
+
+  const windowHours = (now.getTime() - CHANGE_WINDOW_START.getTime()) / 36e5;
+  if (windowHours > 24 * 30) {
+    const windowDays = Math.round(windowHours / 24);
+    console.warn(`[delta] Since-date is ${windowDays} days old; ensure this wide window is intentional.`);
+  }
+
+  const connectionChecks = [
+    { label: 'target', client: target },
+    { label: 'sourceAuth', client: sourceAuth },
+    { label: 'sourceIdentity', client: sourceIdentity }
+  ];
+
+  for (const { label, client } of connectionChecks) {
+    try {
+      await client.$queryRawUnsafe('SELECT 1');
+      console.log(`[delta] Connectivity check OK: ${label}`);
+    } catch (err: any) {
+      throw new Error(`[delta] Connectivity check failed for ${label}: ${err.message}`);
+    }
+  }
+
+  console.log(`[delta] Change window start: ${CHANGE_WINDOW_START.toISOString()}`);
+  console.log(`[delta] Parallel worker limit: ${PARALLEL_LIMIT}`);
+}
+
+async function performReferentialIntegrityChecks() {
+  if (cliOptions.mode !== 'delta') {
+    return;
+  }
+
+  console.log('[delta] Validating basic referential integrity on target…');
+  const checks: Array<{ label: string; query: () => Promise<number> }> = [
+    {
+      label: 'roleAssignment.role',
+      query: () => target.roleAssignment.count({ where: { role: { is: null } } })
+    },
+    {
+      label: 'userEmail.user',
+      query: () => target.userEmail.count({ where: { user: { is: null } } })
+    },
+    {
+      label: 'userStatus.user',
+      query: () => target.userStatus.count({ where: { user: { is: null } } })
+    }
+  ];
+
+  for (const check of checks) {
+    try {
+      const orphans = await check.query();
+      if (orphans > 0) {
+        console.warn(`[delta] Referential check failed for ${check.label}: ${orphans} orphan record(s).`);
+      } else {
+        console.log(`[delta] Referential check passed for ${check.label}.`);
+      }
+    } catch (err: any) {
+      console.warn(`[delta] Referential check errored for ${check.label}: ${err.message}`);
+    }
+  }
+}
+
+async function verifyDeltaMigration() {
+  if (cliOptions.mode !== 'delta') {
+    logDeltaTableSummary();
+    return;
+  }
+
+  console.log('[delta] Verifying delta migration results…');
+  const discrepancies: Array<{ label: string; source: number; target: number }> = [];
+
+  for (const [label, stats] of deltaTableStats.entries()) {
+    if (!stats.fields.length) {
+      console.log(`[delta] ${label}: no delta fields registered; skipping count comparison.`);
+      continue;
+    }
+
+    const sourceDelegate = resolvePrismaDelegate(label);
+    const targetLabel = label.startsWith('sourceAuth.') || label.startsWith('sourceIdentity.')
+      ? `target.${label.split('.').slice(1).join('.')}`
+      : null;
+    if (!sourceDelegate || !targetLabel) {
+      console.warn(`[delta] ${label}: unable to resolve source delegate; skipping verification.`);
+      continue;
+    }
+
+    const targetDelegate = resolvePrismaDelegate(targetLabel);
+    if (!targetDelegate) {
+      console.warn(`[delta] ${label}: unable to resolve target delegate (${targetLabel}); skipping.`);
+      continue;
+    }
+
+    const whereClause = buildDeltaWhereClause(stats.fields);
+    try {
+      const [sourceCount, targetCount] = await Promise.all([
+        sourceDelegate.count({ where: whereClause }),
+        targetDelegate.count({ where: whereClause })
+      ]);
+      if (sourceCount !== targetCount) {
+        discrepancies.push({ label, source: sourceCount, target: targetCount });
+        console.warn(`[delta] ${label}: count mismatch (source=${sourceCount}, target=${targetCount}).`);
+      } else {
+        console.log(`[delta] ${label}: counts OK (${sourceCount}).`);
+      }
+    } catch (err: any) {
+      console.warn(`[delta] ${label}: unable to verify counts (${err.message}).`);
+    }
+  }
+
+  await performReferentialIntegrityChecks();
+  logDeltaTableSummary();
+
+  if (discrepancies.length) {
+    console.warn(`[delta] Count verification identified ${discrepancies.length} table(s) with mismatches.`);
+  } else {
+    console.log('[delta] Source and target counts match for monitored tables.');
+  }
+}
+
 async function main() {
   const descriptor =
     cliOptions.mode === 'delta'
       ? `mode=delta, since=${CHANGE_WINDOW_START!.toISOString()}`
       : 'mode=full';
   console.log(`Starting migration… (${descriptor})`);
+
+  await validateDeltaMigration();
 
   // // 1) Auth (MySQL) → target
   await runParallel('auth (roles + clients)', [migrateRoles, migrateClients]);
@@ -1499,6 +1712,7 @@ async function main() {
     migrateUserStatus,
   ]);
 
+  await verifyDeltaMigration();
   console.log('✓ Migration complete.');
 }
 

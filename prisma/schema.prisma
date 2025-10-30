@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("IDENTITY_DB_URL")
+  schemas  = ["identity"]
 }
 
 // IDENTITY SCHEMA MODELS
@@ -16,6 +18,7 @@ model achievement_type_lu {
   achievement_type_id   Decimal            @id(map: "achv_type_lu_pkey") @db.Decimal(5, 0)
   achievement_type_desc String             @db.VarChar(64)
   user_achievement      user_achievement[]
+  @@schema("identity")
 }
 
 model country {
@@ -31,6 +34,7 @@ model country {
   iso_alpha2_code    String?           @db.VarChar(2)
   iso_alpha3_code    String?           @db.VarChar(3)
 
+  @@schema("identity")
 }
 
 model dice_connection {
@@ -45,6 +49,7 @@ model dice_connection {
 
   @@index([connection])
   
+  @@schema("identity")
 }
 
 model email {
@@ -64,6 +69,7 @@ model email {
   @@index([user_id, primary_ind], map: "email_user_id_idx")
   @@index([user_id, email_type_id, status_id])
   @@index([address, status_id])
+  @@schema("identity")
 }
 
 model email_status_lu {
@@ -73,6 +79,7 @@ model email_status_lu {
   modify_date DateTime? @default(now()) @db.Timestamp(6)
   email       email[]
   user_email_xref user_email_xref[] // Added back-relation to user_email_xref
+  @@schema("identity")
 }
 
 model email_type_lu {
@@ -82,6 +89,7 @@ model email_type_lu {
   modify_date     DateTime? @default(now()) @db.Timestamp(6)
   email           email[]
   
+  @@schema("identity")
 }
 
 model id_sequences {
@@ -90,12 +98,14 @@ model id_sequences {
   block_size       Decimal @db.Decimal(10, 0)
   exhausted        Decimal @default(0) @db.Decimal(1, 0)
   
+  @@schema("identity")
 }
 
 model invalid_handles {
   invalid_handle_id Int    @id(map: "pk_invalid_hand556")
   invalid_handle    String @db.VarChar(20)
   
+  @@schema("identity")
 }
 
 
@@ -105,6 +115,7 @@ model security_groups {
   challenge_group_ind  Int                    @default(0) @db.SmallInt
   create_user_id       Decimal?               @db.Decimal(12, 0)
   user_group_xref      user_group_xref[]
+  @@schema("identity")
 }
 
 model security_status_lu {
@@ -112,6 +123,7 @@ model security_status_lu {
   status_desc        String?           @db.VarChar(200)
   user_group_xref    user_group_xref[]
   
+  @@schema("identity")
 }
 
 model security_user {
@@ -122,6 +134,7 @@ model security_user {
   modify_date     DateTime?         @db.Timestamp(6)
   user_group_xref user_group_xref[]
   
+  @@schema("identity")
 }
 
 
@@ -130,6 +143,7 @@ model social_login_provider {
   name                     String?             @db.VarChar(50)
   user_social_login        user_social_login[]
   
+  @@schema("identity")
 }
 
 model sso_login_provider {
@@ -140,6 +154,7 @@ model sso_login_provider {
   identify_handle_enabled Boolean          @default(true)
   user_sso_login          user_sso_login[]
   
+  @@schema("identity")
 }
 
 model user {
@@ -178,6 +193,7 @@ model user {
   @@index([handle_lower], map: "user_lower_handle_idx")
   @@index([open_id])
   @@index([status, handle_lower])
+  @@schema("identity")
 }
 
 model user_2fa {
@@ -191,6 +207,7 @@ model user_2fa {
   modified_at  DateTime @default(now()) @db.Timestamp(6)
   user         user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
   
+  @@schema("identity")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -206,6 +223,7 @@ model user_achievement {
   // Define composite primary key
   @@id([user_id, achievement_type_id], map: "user_achievement_pkey") // Added @@id
   // @@ignore // Removed @@ignore
+  @@schema("identity")
 }
 
 model user_group_xref {
@@ -221,6 +239,7 @@ model user_group_xref {
 
   @@unique([login_id, group_id], map: "user_grp_xref_i2")
   
+  @@schema("identity")
 }
 
 model user_otp_email {
@@ -235,6 +254,7 @@ model user_otp_email {
 
   @@unique([user_id, mode])
   
+  @@schema("identity")
 }
 
 model user_social_login {
@@ -252,6 +272,7 @@ model user_social_login {
   @@id([user_id, social_login_provider_id], map: "user_social_prkey")
   @@index([social_user_id, social_login_provider_id])
   
+  @@schema("identity")
 }
 
 model user_sso_login {
@@ -266,6 +287,7 @@ model user_sso_login {
   @@id([user_id, provider_id], map: "user_sso_prkey") // Primary key
   @@index([sso_user_id, provider_id], map: "idx_user_social_login_sso_user_id_provider_id") // Index only, NOT unique
   
+  @@schema("identity")
 }
 
 model user_status {
@@ -278,6 +300,7 @@ model user_status {
 
   @@id([user_id, user_status_type_id], map: "userstatus_pk")
   
+  @@schema("identity")
 }
 
 model user_status_lu {
@@ -285,6 +308,7 @@ model user_status_lu {
   description    String?       @db.VarChar(100)
   user_status    user_status[]
   
+  @@schema("identity")
 }
 
 model user_status_type_lu {
@@ -292,6 +316,7 @@ model user_status_type_lu {
   description         String?       @db.VarChar(100)
   user_status         user_status[]
   
+  @@schema("identity")
 }
 
 // Explicit definition for the user-email join table
@@ -310,6 +335,7 @@ model user_email_xref {
   @@id([user_id, email_id], map: "user_email_xref_pkey") // Define composite primary key
   @@index([email_id], map: "user_email_xref_email_idx")
   @@index([user_id, status_id])
+  @@schema("identity")
 }
 
 
@@ -329,6 +355,7 @@ model Client {
   modifiedAt  DateTime? @db.Timestamp(0)
 
   @@map("client") // Map model name to table name
+  @@schema("identity")
 }
 
 model Role {
@@ -342,6 +369,7 @@ model Role {
   roleAssignments RoleAssignment[] // Relation field
 
   @@map("role") // Map model name to table name
+  @@schema("identity")
 }
 
 model RoleAssignment {
@@ -361,4 +389,5 @@ model RoleAssignment {
   @@index([roleId], map: "role_id_idx")
   @@index([subjectId, subjectType])
   @@map("role_assignment")
+  @@schema("identity")
 }
