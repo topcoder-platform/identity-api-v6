@@ -64,6 +64,8 @@ export const ACTIVATION_OTP_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 export const ACTIVATION_OTP_LENGTH = 6;
 const OTP_ACTIVATION_MODE = 1;
 const ACTIVATION_OTP_EXPIRY_MINUTES = 24 * 60;
+const WIPRO_SSO_PROVIDER = 'wipro-adfs';
+const WIPRO_ALL_GROUP_NAME = 'Wipro - All';
 
 @Injectable()
 export class UserService {
@@ -828,6 +830,15 @@ export class UserService {
 
         // add user to initial groups
         await this.addUserToDefaultGroups(prisma, nextUserId);
+        if (
+          userParams.profile?.provider?.toLowerCase() === WIPRO_SSO_PROVIDER
+        ) {
+          await this.addUserToGroupByDescription(
+            prisma,
+            nextUserId,
+            WIPRO_ALL_GROUP_NAME,
+          );
+        }
 
         return createdUser;
       });
@@ -2389,6 +2400,34 @@ export class UserService {
     ];
     for (const groupId of defaultGroups) {
       await this.addUserToGroup(prisma, userId, groupId);
+    }
+  }
+
+  private async addUserToGroupByDescription(
+    prisma: any,
+    userId: number,
+    groupName: string,
+  ) {
+    try {
+      const groupRecord = await prisma.security_groups.findFirst({
+        where: { description: groupName },
+      });
+      if (!groupRecord) {
+        this.logger.warn(
+          `Group '${groupName}' not found when assigning user ${userId}.`,
+        );
+        return;
+      }
+      await this.addUserToGroup(
+        prisma,
+        userId,
+        Number(groupRecord.group_id),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Unable to resolve group '${groupName}' for user ${userId}`,
+        error,
+      );
     }
   }
 
