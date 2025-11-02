@@ -110,9 +110,9 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     isSocial: false,
     isEnterprise: true,
   },
-  adfs: {
+  "wipro-adfs": {
     id: ProviderId.ADFS,
-    key: 'adfs',
+    key: 'wipro-adfs',
     isSocial: false,
     isEnterprise: true,
   },

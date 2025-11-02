@@ -821,6 +821,7 @@ export class ValidationService {
         select: { user_id: true },
       });
     }
+    console.log("Looking for user ID: " + profile.userId);
     // getUserIdBySSOUserId
     if (!ssoLink && profile.userId) {
       ssoLink = await this.prismaClient.user_sso_login.findFirst({
