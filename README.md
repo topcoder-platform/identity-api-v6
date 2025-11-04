@@ -128,6 +128,13 @@ The following table summarizes the environment variables used by the application
 | `JWT_SECRET`               | Secret key for signing/verifying internal JWTs (e.g., 2FA, one-time tokens).  | `just-a-random-string` (example)            |
 | `LEGACY_BLOWFISH_KEY`      | Base64 encoded Blowfish key for legacy password encryption/decryption.        | `dGhpc2lzRGVmYXVmZlZhbHVl` (example)        |
 
+### Migrating legacy social login data
+
+- Run `npx ts-node scripts/migrate-user-social-login.ts` to copy legacy `user_social_login` rows into `identity.user_social_login`.
+- Set `SOURCE_IDENTITY_PG_URL` (legacy) and `IDENTITY_DB_URL` (target) before running; `USER_SOCIAL_LOGIN_BATCH_SIZE` tunes pagination.
+- Flags available: `--dry-run` (log only), `--truncate` (clear target before load; ignored during dry-run), and `--insert-missing-only` (skip rows that already exist in the target).
+- Ensure `identity.social_login_provider` is migrated first so foreign keys resolve during import.
+
 
 **Downstream Usage**
 --------------------
