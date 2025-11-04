@@ -138,11 +138,13 @@ const mockEventService: jest.Mocked<Partial<EventService>> = {
   postDirectBusMessage: jest.fn(),
 };
 
-const mockMemberPrisma: Partial<MemberPrismaService> = {
+const memberUpdateMock = jest.fn();
+const mockMemberPrisma: any = {
   // Only the parts used by UserService need to be mocked
   member: {
     create: jest.fn(),
-  } as any,
+    update: memberUpdateMock,
+  },
 };
 
 const mockConfigService = {
@@ -1562,6 +1564,8 @@ describe('UserService', () => {
     beforeEach(() => {
       jest.clearAllMocks();
 
+      memberUpdateMock.mockResolvedValue(undefined);
+
       // Mock checkEmailAvailabilityForUser
       mockCheckEmail = jest
         .spyOn(service, 'checkEmailAvailabilityForUser')
@@ -1652,6 +1656,10 @@ describe('UserService', () => {
         { userId: 1, handle: 'testuser' },
       );
       expect(result).toEqual(mockUser);
+      expect(memberUpdateMock).toHaveBeenCalledWith({
+        where: { userId },
+        data: { email: newEmail.toLowerCase() },
+      });
     });
 
     it('should throw BadRequestException for invalid user ID format', async () => {
@@ -1863,6 +1871,48 @@ describe('UserService', () => {
       );
     });
 
+    it('should log an error if members.member update fails but continue', async () => {
+      const txMock = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(mockUser),
+          update: jest.fn().mockResolvedValue(mockUser),
+        },
+        email: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(mockCurrentEmailRecord)
+            .mockResolvedValueOnce(null),
+          update: jest.fn().mockResolvedValue(mockUpdatedEmailRecord),
+        },
+      };
+      mockPrismaOltp.$transaction.mockImplementation(
+        <T>(callback): Promise<T> => {
+          const result = callback(txMock);
+          return result instanceof Promise ? result : Promise.resolve(result);
+        },
+      );
+
+      memberUpdateMock.mockRejectedValueOnce(
+        new Error('Member update failed'),
+      );
+
+      const result = await service.updatePrimaryEmail(
+        userIdString,
+        newEmail,
+        mockAuthUser,
+      );
+
+      expect(result).toEqual(mockUser);
+      expect(memberUpdateMock).toHaveBeenCalledWith({
+        where: { userId },
+        data: { email: newEmail.toLowerCase() },
+      });
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to update members.member email'),
+        expect.any(String),
+      );
+    });
+
     it('should handle case when updated email record is not found after transaction', async () => {
       // Set up transaction mock
       const txMock = {
@@ -1965,6 +2015,7 @@ describe('UserService', () => {
     const userIdString = '1';
     const oldStatus = 'U';
     const newStatus = 'A'; // Unverified to Active
+    const statusComment = 'Unit test comment';
     const mockExistingUser = createMockUserModel({
       user_id: new Decimal(userId),
       status: oldStatus,
@@ -1992,6 +2043,7 @@ describe('UserService', () => {
         userIdString,
         newStatus,
         mockUser,
+        statusComment,
       );
 
       expect(prismaOltp.user.update).toHaveBeenCalledWith({
@@ -2023,7 +2075,7 @@ describe('UserService', () => {
       prismaOltp.user.findUnique.mockResolvedValue(fromActiveUser);
       prismaOltp.user.update.mockResolvedValue(toInactiveUser);
 
-      await service.updateStatus(userIdString, 'I', mockUser);
+      await service.updateStatus(userIdString, 'I', mockUser, statusComment);
       expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
         'event.user.deactivated',
         service.toCamelCase(toInactiveUser),
@@ -2037,17 +2089,17 @@ describe('UserService', () => {
 
     it('should throw BadRequest for invalid user ID or status code', async () => {
       await expect(
-        service.updateStatus('abc', newStatus, mockUser),
+        service.updateStatus('abc', newStatus, mockUser, statusComment),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.updateStatus(userIdString, 'X', mockUser),
+        service.updateStatus(userIdString, 'X', mockUser, statusComment),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if user not found', async () => {
       prismaOltp.user.findUnique.mockResolvedValue(null);
       await expect(
-        service.updateStatus(userIdString, newStatus, mockUser),
+        service.updateStatus(userIdString, newStatus, mockUser, statusComment),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -2056,6 +2108,7 @@ describe('UserService', () => {
         userIdString,
         oldStatus,
         mockUser,
+        statusComment,
       );
       expect(prismaOltp.user.update).not.toHaveBeenCalled();
       expect(result).toEqual(mockExistingUser);

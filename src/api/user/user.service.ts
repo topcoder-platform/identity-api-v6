@@ -1451,6 +1451,8 @@ export class UserService {
     if (isNaN(userId)) {
       throw new BadRequestException('Invalid user ID format.');
     }
+    const normalizedEmail = newEmail.toLowerCase();
+    let emailChanged = false;
 
     this.logger.log(
       `Attempting to update primary email for user ID: ${userId} to ${newEmail} by admin ${authUser.userId}`,
@@ -1512,10 +1514,11 @@ export class UserService {
       await tx.email.update({
         where: { email_id: currentPrimaryEmailRecord.email_id },
         data: {
-          address: newEmail.toLowerCase(),
+          address: normalizedEmail,
           modify_date: new Date(),
         },
       });
+      emailChanged = true;
 
       this.logger.log(
         `Updated existing primary email record ${currentPrimaryEmailRecord.email_id.toNumber()} from ${oldEmail} to ${newEmail} for user ${userId}`,
@@ -1552,6 +1555,23 @@ export class UserService {
         `Failed to publish user.updated notification for primary email change, user ${userIdString}: ${eventError.message}`,
         eventError.stack,
       );
+    }
+
+    if (emailChanged) {
+      try {
+        await this.memberPrisma.member.update({
+          where: { userId },
+          data: { email: normalizedEmail },
+        });
+        this.logger.log(
+          `Updated members.member email to ${normalizedEmail} for user ${userId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to update members.member email for user ${userId}: ${error.message}`,
+          error.stack,
+        );
+      }
     }
 
     return updatedUserInTx;
@@ -2172,8 +2192,7 @@ export class UserService {
 
       // Send Welcome Email directly, matching legacy Java behavior
       if (emailAddress && user?.handle) {
-        const domain =
-          this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+        const domain = CommonUtils.getAppDomain(this.configService);
         const fromEmail = `Topcoder <noreply@${domain}>`;
         let welcomeTemplateId = this.configService.get<string>(
           'SENDGRID_WELCOME_EMAIL_TEMPLATE_ID',
@@ -2289,8 +2308,7 @@ export class UserService {
     email: string,
     regSource?: string,
   ) {
-    const domain =
-      this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+    const domain = CommonUtils.getAppDomain(this.configService);
     const fromEmail = `Topcoder <noreply@${domain}>`;
     const sendGridTemplateId = this.configService.get<string>(
       'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
@@ -2349,8 +2367,7 @@ export class UserService {
   async resendActivationEmailEvent(userOtp: UserOtpDto, primaryEmail: string) {
     try {
       // For activation email (resend), use postDirectBusMessage to match legacy Java structure
-      const domain =
-        this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
+      const domain = CommonUtils.getAppDomain(this.configService);
       const fromEmail = `Topcoder <noreply@${domain}>`;
       // Use the specific template ID for resending activation emails
       const sendgridTemplateId = this.configService.get<string>(
