@@ -12,6 +12,7 @@ const targetModule = require('../generated/target') as typeof import('../generat
 
 const SourceIdentityPrisma: new () => SourceIdentityPrismaClient = sourceModule.PrismaClient;
 const TargetPrisma: new () => TargetPrismaClient = targetModule.PrismaClient;
+const SourcePrisma = sourceModule.Prisma;
 const { Prisma } = targetModule;
 
 interface CliOptions {
@@ -26,6 +27,12 @@ interface SecurityUserRecord {
   password: string;
   createUserId: string | null;
   modifyDate: Date | null;
+}
+
+interface TargetUserWithoutSecurityUser {
+  loginId: string;
+  handle: string | null;
+  createDate: Date | null;
 }
 
 const SOURCE_FETCH_BATCH_SIZE = 500;
@@ -70,18 +77,59 @@ async function main(): Promise<void> {
     const targetPrisma = new TargetPrisma();
 
     try {
+      const candidateRecords = new Map<string, SecurityUserRecord>();
+
       const candidates = await loadSecurityUserRecords(sourcePrisma, options.since);
 
       if (candidates.length === 0) {
-        console.log('[result] No candidate records were returned from the source database.');
+        console.log('[load] Source modify_date scan returned 0 candidate records.');
+      } else {
+        console.log(
+          `[load] Loaded ${candidates.length} candidate records from the source identity database.`
+        );
+        candidates.forEach((record) => candidateRecords.set(record.loginId, record));
+      }
+
+      const targetGaps = await loadUsersMissingSecurityUser(targetPrisma, options.since);
+      if (targetGaps.length > 0) {
+        console.log(
+          `[load] Found ${targetGaps.length} users in the target database without a security_user record.`
+        );
+        const gapLoginIds = targetGaps.map((gap) => gap.loginId);
+        const gapRecords = await loadSecurityUserRecordsByLoginIds(sourcePrisma, gapLoginIds);
+        console.log(
+          `[load] Retrieved ${gapRecords.length} matching security_user records from the source database for target gaps.`
+        );
+
+        const foundSet = new Set(gapRecords.map((record) => record.loginId));
+        const unresolvedGaps = targetGaps.filter((gap) => !foundSet.has(gap.loginId));
+        if (unresolvedGaps.length > 0) {
+          const sampleHandles = unresolvedGaps
+            .slice(0, 10)
+            .map((gap) => gap.handle ?? gap.loginId)
+            .join(', ');
+          console.warn(
+            `[warn] ${unresolvedGaps.length} target users lack a matching security_user row in the source database. Examples: ${sampleHandles}${
+              unresolvedGaps.length > 10 ? '…' : ''
+            }`
+          );
+        }
+
+        gapRecords.forEach((record) => candidateRecords.set(record.loginId, record));
+      } else {
+        console.log('[load] No users in the target database are missing security_user rows.');
+      }
+
+      if (candidateRecords.size === 0) {
+        console.log('[result] No candidate security_user records to process after applying filters.');
         return;
       }
 
       console.log(
-        `[load] Loaded ${candidates.length} candidate records from the source identity database.`
+        `[load] Combined candidate set contains ${candidateRecords.size} unique security_user rows.`
       );
 
-      const missingRecords = await findMissingRecords(targetPrisma, candidates);
+      const missingRecords = await findMissingRecords(targetPrisma, Array.from(candidateRecords.values()));
 
       if (missingRecords.length === 0) {
         console.log('[result] All candidate records already exist in the target database.');
@@ -168,7 +216,7 @@ Usage:
   node -r ts-node/register src/backfill-security-user.ts --since <ISO> [--apply]
 
 Options:
-  --since <ISO>      Only consider source records with modify_date ≥ this timestamp
+  --since <ISO>      Limit the source modify_date scan and target user create_date gap check to this timestamp
   --apply            Insert missing records (default: dry-run prints handles only)
   -h, --help         Show this message
 
@@ -230,6 +278,62 @@ async function loadSecurityUserRecords(
 
   console.log(`[load] Completed source fetch. Retrieved ${records.length} records.`);
   return records;
+}
+
+async function loadSecurityUserRecordsByLoginIds(
+  prisma: SourceIdentityPrismaClient,
+  loginIds: string[]
+): Promise<SecurityUserRecord[]> {
+  if (loginIds.length === 0) {
+    return [];
+  }
+
+  const records: SecurityUserRecord[] = [];
+  for (let i = 0; i < loginIds.length; i += SOURCE_FETCH_BATCH_SIZE) {
+    const chunk = loginIds.slice(i, i + SOURCE_FETCH_BATCH_SIZE);
+    const rows = await prisma.security_user.findMany({
+      where: { login_id: { in: chunk.map((value) => new SourcePrisma.Decimal(value)) } },
+    });
+
+    rows.forEach((row) => {
+      records.push({
+        loginId: row.login_id.toString(),
+        userId: row.user_id,
+        password: row.password,
+        createUserId: row.create_user_id ? row.create_user_id.toString() : null,
+        modifyDate: row.modify_date ?? null,
+      });
+    });
+  }
+  return records;
+}
+
+async function loadUsersMissingSecurityUser(
+  prisma: TargetPrismaClient,
+  since?: Date
+): Promise<TargetUserWithoutSecurityUser[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{ user_id: string; handle: string | null; create_date: Date | null }>
+  >(
+    Prisma.sql`
+      SELECT
+        u.user_id::text AS user_id,
+        u.handle,
+        u.create_date
+      FROM identity."user" AS u
+      LEFT JOIN identity.security_user AS s
+        ON u.user_id = s.login_id
+      WHERE s.login_id IS NULL
+      ${since ? Prisma.sql`AND u.create_date >= ${since}` : Prisma.empty}
+      ORDER BY u.create_date DESC NULLS LAST
+    `
+  );
+
+  return rows.map((row) => ({
+    loginId: row.user_id,
+    handle: row.handle,
+    createDate: row.create_date,
+  }));
 }
 
 async function findMissingRecords(
