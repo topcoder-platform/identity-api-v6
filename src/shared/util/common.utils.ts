@@ -95,4 +95,26 @@ export class CommonUtils {
     }
     return result;
   }
+
+  /**
+   * Resolve the Topcoder application domain from configuration with safe fallbacks.
+   * @param configService Nest config service (or look-alike) used to read env config
+   * @returns application domain such as topcoder-dev.com
+   */
+  static getAppDomain(
+    configService?: { get<T = any>(key: string): T | undefined },
+  ): string {
+    const envDomain = process.env.APP_DOMAIN;
+    if (envDomain && envDomain.trim().length > 0) {
+      return envDomain.trim();
+    }
+
+    // Fallback to topcoder.com for prod, if APP_DOMAIN isn't set
+    const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+    if (nodeEnv === 'prod' || nodeEnv === 'production') {
+      return 'topcoder.com';
+    }
+
+    return 'topcoder-dev.com';
+  }
 }
