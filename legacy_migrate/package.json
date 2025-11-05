@@ -4,7 +4,8 @@
   "type": "commonjs",
   "scripts": {
     "generate": "prisma generate --schema=prisma/target.schema.prisma && prisma generate --schema=prisma/source-auth.schema.prisma && prisma generate --schema=prisma/source-identity.schema.prisma",
-    "migrate": "node -r ts-node/register src/migrate.ts"
+    "migrate": "node -r ts-node/register src/migrate.ts",
+    "backfill-security-user": "node -r ts-node/register src/backfill-security-user.ts"
   },
   "dependencies": {
     "@prisma/client": "latest",
