@@ -35,6 +35,7 @@
     "postinstall": "npm run prisma:generate",
     "db:migrate-to-identity": "npx ts-node scripts/migrate-to-identity.ts",
     "db:load-to-identity": "npx ts-node scripts/load-to-identity.ts",
+    "db:backfill-security-user": "npx ts-node scripts/backfill-security-user.ts",
     "test:postman:roles": "newman run 'doc/roles api.postman_collection.json' -e doc/postman_environment.json -r cli,json --reporter-json-export roles-report.json",
     "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json",
     "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json",
