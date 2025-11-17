@@ -159,7 +159,7 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
     const adminRoleName = (process.env.ADMIN_ROLE_NAME || 'administrator').toLowerCase();
     const dbRoles: string[] = Array.isArray(user?.roles) ? user.roles : [];
     const jwtRoles: string[] =
-      (user?.payload?.['https://topcoder-dev.com/claims/roles'] as string[]) ||
+      (user?.payload?.['https://topcoder-dev.com/roles'] as string[]) ||
       (user?.payload?.roles as string[]) ||
       [];
 
