@@ -678,14 +678,16 @@ export class UserController {
    * @returns The created UserResponseDto.
    */
   @Post()
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @ApiOperation({
     summary:
       'Register a new user (Placeholder - actual registration flow might be different)',
     description: describeAccess({
       summary:
-        'Creates a new member record using the legacy param envelope. This endpoint mirrors the old v3 behaviour and does not require authentication.',
-      jwt: 'Not required (public endpoint).',
-      m2m: 'Not applicable.',
+        'Creates a new member record using the legacy param envelope. Requires authentication.',
+      jwt: 'Requires a bearer token containing the `auth0` scope.',
+      m2m: 'Requires an M2M token containing the `auth0` scope.',
     }),
   })
   @ApiBody({ type: DTOs.CreateUserBodyDto })
