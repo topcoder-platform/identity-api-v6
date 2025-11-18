@@ -37,6 +37,8 @@ import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 import { SelfOrAdmin } from '../../auth/decorators/self-or-admin.decorator';
 import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
+import { Scopes } from '../../auth/decorators/scopes.decorator';
+import { ScopesGuard } from '../../auth/guards/scopes.guard';
 import { RoleService } from '../role/role.service'; // If needed directly
 import * as DTOs from '../../dto/user/user.dto'; // Import all user DTOs
 import { Constants } from '../../core/constant/constants';
@@ -1348,14 +1350,16 @@ export class UserController {
    * @throws UnauthorizedException if credentials are invalid.
    */
   @Post('login')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Authenticate user for Auth0 Custom Database script.',
     description: describeAccess({
       summary:
         'Validates credentials for Auth0 Custom DB login flows. Intended for Auth0 to call without a bearer token.',
-      jwt: 'Not required (used by Auth0).',
-      m2m: 'Not applicable.',
+      jwt: 'Requires an M2M token with auth0 scope.',
+      m2m: 'Requires an M2M token with auth0 scope.',
     }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
@@ -1410,14 +1414,16 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Post('roles')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get user profile and roles for Auth0 Rules/Actions.',
     description: describeAccess({
       summary:
         'Returns a simplified profile/role payload used by Auth0 Rules and Actions. Intended for server-to-server calls without a bearer token.',
-      jwt: 'Not required (used by Auth0).',
-      m2m: 'Not applicable.',
+      jwt: 'Requires an M2M token with auth0 scope.',
+      m2m: 'Requires an M2M token with auth0 scope.',
     }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
