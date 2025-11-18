@@ -1558,17 +1558,18 @@ export class UserService {
     }
 
     if (emailChanged) {
+      const memberUserId = BigInt(userId);
       try {
-        await this.memberPrisma.member.update({
-          where: { userId },
+        const updateResult = await this.memberPrisma.member.update({
+          where: { userId: memberUserId },
           data: { email: normalizedEmail },
         });
         this.logger.log(
-          `Updated members.member email to ${normalizedEmail} for user ${userId}`,
+          `Updated members.member email to ${normalizedEmail} for user ${memberUserId}`,
         );
       } catch (error) {
         this.logger.error(
-          `Failed to update members.member email for user ${userId}: ${error.message}`,
+          `Failed to update members.member email for user ${memberUserId}: ${error.message}`,
           error.stack,
         );
       }

@@ -139,11 +139,13 @@ const mockEventService: jest.Mocked<Partial<EventService>> = {
 };
 
 const memberUpdateMock = jest.fn();
+const memberUpdateManyMock = jest.fn();
 const mockMemberPrisma: any = {
   // Only the parts used by UserService need to be mocked
   member: {
     create: jest.fn(),
     update: memberUpdateMock,
+    updateMany: memberUpdateManyMock,
   },
 };
 
@@ -1565,6 +1567,7 @@ describe('UserService', () => {
       jest.clearAllMocks();
 
       memberUpdateMock.mockResolvedValue(undefined);
+      memberUpdateManyMock.mockResolvedValue({ count: 1 });
 
       // Mock checkEmailAvailabilityForUser
       mockCheckEmail = jest
@@ -1656,8 +1659,8 @@ describe('UserService', () => {
         { userId: 1, handle: 'testuser' },
       );
       expect(result).toEqual(mockUser);
-      expect(memberUpdateMock).toHaveBeenCalledWith({
-        where: { userId },
+      expect(memberUpdateManyMock).toHaveBeenCalledWith({
+        where: { userId: BigInt(userId) },
         data: { email: newEmail.toLowerCase() },
       });
     });
@@ -1892,7 +1895,7 @@ describe('UserService', () => {
         },
       );
 
-      memberUpdateMock.mockRejectedValueOnce(
+      memberUpdateManyMock.mockRejectedValueOnce(
         new Error('Member update failed'),
       );
 
@@ -1903,8 +1906,8 @@ describe('UserService', () => {
       );
 
       expect(result).toEqual(mockUser);
-      expect(memberUpdateMock).toHaveBeenCalledWith({
-        where: { userId },
+      expect(memberUpdateManyMock).toHaveBeenCalledWith({
+        where: { userId: BigInt(userId) },
         data: { email: newEmail.toLowerCase() },
       });
       expect(loggerErrorSpy).toHaveBeenCalledWith(
