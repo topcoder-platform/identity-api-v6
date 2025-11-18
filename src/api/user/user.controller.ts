@@ -1467,6 +1467,8 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Post('changePassword')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
