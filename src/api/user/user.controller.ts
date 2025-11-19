@@ -409,8 +409,12 @@ export class UserController {
     @Query('handle') handle: string,
   ): Promise<DTOs.ValidationResponseDto> {
     this.logger.log(`Validating handle: ${handle}`);
-    if (!handle) {
-      throw new BadRequestException('Handle is required.');
+    if (
+      !handle ||
+      typeof handle !== "string" ||
+      (Array.isArray(handle))
+    ) {
+      throw new BadRequestException('Handle is required and must be a string.');
     }
     return this.validationService.validateHandle(handle);
   }
