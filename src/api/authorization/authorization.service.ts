@@ -176,11 +176,6 @@ export class AuthorizationService {
 
     const cookieOptions = { maxAge: this.cookieExpirySeconds };
     res.cookie(Constants.tcJwtCookieName, credential.id_token, cookieOptions);
-    res.cookie(
-      Constants.tcV3JwtCookieName,
-      credential.access_token,
-      cookieOptions,
-    );
     const userId = this.extractUserIdFromToken(credential.access_token);
     const token = await this.userService.generateSSOToken(userId);
     res.cookie(Constants.tcSsoCookieName, token, cookieOptions);

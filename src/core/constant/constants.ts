@@ -28,7 +28,6 @@ export const Constants = {
   // cookie names used to set token and sso
   tcJwtCookieName: 'tcjwt',
   tcSsoCookieName: 'tcsso',
-  tcV3JwtCookieName: 'v3jwt',
 
   // default page size
   defaultPageSize: 20,

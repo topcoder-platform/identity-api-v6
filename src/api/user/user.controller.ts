@@ -37,6 +37,8 @@ import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
 import { SelfOrAdmin } from '../../auth/decorators/self-or-admin.decorator';
 import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
+import { Scopes } from '../../auth/decorators/scopes.decorator';
+import { ScopesGuard } from '../../auth/guards/scopes.guard';
 import { RoleService } from '../role/role.service'; // If needed directly
 import * as DTOs from '../../dto/user/user.dto'; // Import all user DTOs
 import { Constants } from '../../core/constant/constants';
@@ -159,7 +161,7 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
     const adminRoleName = (process.env.ADMIN_ROLE_NAME || 'administrator').toLowerCase();
     const dbRoles: string[] = Array.isArray(user?.roles) ? user.roles : [];
     const jwtRoles: string[] =
-      (user?.payload?.['https://topcoder-dev.com/claims/roles'] as string[]) ||
+      (user?.payload?.['https://topcoder-dev.com/roles'] as string[]) ||
       (user?.payload?.roles as string[]) ||
       [];
 
@@ -678,14 +680,16 @@ export class UserController {
    * @returns The created UserResponseDto.
    */
   @Post()
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @ApiOperation({
     summary:
       'Register a new user (Placeholder - actual registration flow might be different)',
     description: describeAccess({
       summary:
-        'Creates a new member record using the legacy param envelope. This endpoint mirrors the old v3 behaviour and does not require authentication.',
-      jwt: 'Not required (public endpoint).',
-      m2m: 'Not applicable.',
+        'Creates a new member record using the legacy param envelope. Requires authentication.',
+      jwt: 'Requires a bearer token containing the `auth0` scope.',
+      m2m: 'Requires an M2M token containing the `auth0` scope.',
     }),
   })
   @ApiBody({ type: DTOs.CreateUserBodyDto })
@@ -1346,14 +1350,16 @@ export class UserController {
    * @throws UnauthorizedException if credentials are invalid.
    */
   @Post('login')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Authenticate user for Auth0 Custom Database script.',
     description: describeAccess({
       summary:
         'Validates credentials for Auth0 Custom DB login flows. Intended for Auth0 to call without a bearer token.',
-      jwt: 'Not required (used by Auth0).',
-      m2m: 'Not applicable.',
+      jwt: 'Requires an M2M token with auth0 scope.',
+      m2m: 'Requires an M2M token with auth0 scope.',
     }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
@@ -1408,14 +1414,16 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Post('roles')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get user profile and roles for Auth0 Rules/Actions.',
     description: describeAccess({
       summary:
         'Returns a simplified profile/role payload used by Auth0 Rules and Actions. Intended for server-to-server calls without a bearer token.',
-      jwt: 'Not required (used by Auth0).',
-      m2m: 'Not applicable.',
+      jwt: 'Requires an M2M token with auth0 scope.',
+      m2m: 'Requires an M2M token with auth0 scope.',
     }),
   })
   @ApiConsumes('application/x-www-form-urlencoded')
@@ -1459,6 +1467,8 @@ export class UserController {
    * @throws NotFoundException if the user is not found.
    */
   @Post('changePassword')
+  @UseGuards(AuthRequiredGuard, ScopesGuard)
+  @Scopes('auth0')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
