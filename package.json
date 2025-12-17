@@ -78,7 +78,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
-    "tc-core-library-js": "github:appirio-tech/tc-core-library-js#v3.0.1",
+    "tc-core-library-js": "github:topcoder-platform/tc-core-library-js#master",
     "trolleyhq": "^1.1.0",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
