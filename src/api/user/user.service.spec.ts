@@ -1145,6 +1145,28 @@ describe('UserService', () => {
       expect(result).toEqual(mockCreatedUser);
     });
 
+    it('should store isoAlpha3Code for home and competition country codes', async () => {
+      const dto: CreateUserBodyDto = {
+        param: {
+          ...createUserDto.param,
+          handle: 'countryuser',
+          email: 'countryuser@example.com',
+          country: { code: 'US', isoAlpha3Code: 'USA' },
+        },
+      };
+
+      await service.registerUser(dto);
+
+      expect(mockMemberPrisma.member.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            homeCountryCode: 'USA',
+            competitionCountryCode: 'USA',
+          }),
+        }),
+      );
+    });
+
     it('should throw BadRequestException for missing handle, email, or password', async () => {
       await expect(
         service.registerUser({

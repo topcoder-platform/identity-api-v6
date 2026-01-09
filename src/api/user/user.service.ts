@@ -999,12 +999,19 @@ export class UserService {
     // Create the member record outside of the interactive transaction
     // to avoid cross-client work while a Prisma transaction is open
     try {
+      const isoAlpha3Code = CommonUtils.validateString(
+        userParams.country?.isoAlpha3Code,
+      )
+        ? userParams.country?.isoAlpha3Code
+        : null;
       await this.memberPrisma.member.create({
         data: {
           userId: Number(nextUserId),
           handle: userParams.handle,
           handleLower: userParams.handle.toLowerCase(),
           email: userParams.email,
+          homeCountryCode: isoAlpha3Code,
+          competitionCountryCode: isoAlpha3Code,
           tracks: [],
           createdBy: String(nextUserId),
           firstName: userParams.firstName ?? null,
