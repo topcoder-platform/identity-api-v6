@@ -1,11 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
 }
 
 generator externalClient {
-  provider = "prisma-client-js"
-  output   = "../packages/identity-prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../packages/identity-prisma-client"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -19,26 +19,26 @@ datasource db {
 // (Introspected from existing database)
 // -----------------------------------------
 
-
 model achievement_type_lu {
   achievement_type_id   Decimal            @id(map: "achv_type_lu_pkey") @db.Decimal(5, 0)
   achievement_type_desc String             @db.VarChar(64)
   user_achievement      user_achievement[]
+
   @@schema("identity")
 }
 
 model country {
-  country_code       String            @id @db.VarChar(3)
-  country_name       String            @db.VarChar(40)
-  modify_date        DateTime?         @default(now()) @db.Timestamp(6)
-  participating      Decimal?          @db.Decimal(1, 0)
-  default_taxform_id Decimal?          @db.Decimal(10, 0)
-  longitude          Decimal?          @db.Decimal(10, 7)
-  latitude           Decimal?          @db.Decimal(10, 7)
-  region             String?           @db.VarChar(64)
-  iso_name           String?           @db.VarChar(128)
-  iso_alpha2_code    String?           @db.VarChar(2)
-  iso_alpha3_code    String?           @db.VarChar(3)
+  country_code       String    @id @db.VarChar(3)
+  country_name       String    @db.VarChar(40)
+  modify_date        DateTime? @default(now()) @db.Timestamp(6)
+  participating      Decimal?  @db.Decimal(1, 0)
+  default_taxform_id Decimal?  @db.Decimal(10, 0)
+  longitude          Decimal?  @db.Decimal(10, 7)
+  latitude           Decimal?  @db.Decimal(10, 7)
+  region             String?   @db.VarChar(64)
+  iso_name           String?   @db.VarChar(128)
+  iso_alpha2_code    String?   @db.VarChar(2)
+  iso_alpha3_code    String?   @db.VarChar(3)
 
   @@schema("identity")
 }
@@ -54,23 +54,22 @@ model dice_connection {
   user           user      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([connection])
-  
   @@schema("identity")
 }
 
 model email {
-  user_id         Decimal?         @db.Decimal(10, 0)
-  email_id        Decimal          @id(map: "u110_23") @default(dbgenerated("nextval('sequence_email_seq'::regclass)")) @db.Decimal(10, 0)
-  email_type_id   Decimal?         @db.Decimal(5, 0)
-  address         String?          @db.VarChar(100)
-  create_date     DateTime?        @default(now()) @db.Timestamp(6)
-  modify_date     DateTime?        @default(now()) @db.Timestamp(6)
-  primary_ind     Decimal?         @db.Decimal(1, 0)
-  status_id       Decimal?         @db.Decimal(3, 0)
-  email_status_lu email_status_lu? @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailstatuslu_fk")
-  email_type_lu   email_type_lu?   @relation(fields: [email_type_id], references: [email_type_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailtypelu_fk")
+  user_id         Decimal?          @db.Decimal(10, 0)
+  email_id        Decimal           @id(map: "u110_23") @default(dbgenerated("nextval('sequence_email_seq'::regclass)")) @db.Decimal(10, 0)
+  email_type_id   Decimal?          @db.Decimal(5, 0)
+  address         String?           @db.VarChar(100)
+  create_date     DateTime?         @default(now()) @db.Timestamp(6)
+  modify_date     DateTime?         @default(now()) @db.Timestamp(6)
+  primary_ind     Decimal?          @db.Decimal(1, 0)
+  status_id       Decimal?          @db.Decimal(3, 0)
+  email_status_lu email_status_lu?  @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailstatuslu_fk")
+  email_type_lu   email_type_lu?    @relation(fields: [email_type_id], references: [email_type_id], onDelete: NoAction, onUpdate: NoAction, map: "email_emailtypelu_fk")
   user_email_xref user_email_xref[]
-  user            user?            @relation("UserToEmail", fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  user            user?             @relation("UserToEmail", fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([user_id, primary_ind], map: "email_user_id_idx")
   @@index([user_id, email_type_id, status_id])
@@ -79,12 +78,13 @@ model email {
 }
 
 model email_status_lu {
-  status_id   Decimal   @id(map: "email_status_lu_pk") @db.Decimal(3, 0)
-  status_desc String?   @db.VarChar(100)
-  create_date DateTime? @default(now()) @db.Timestamp(6)
-  modify_date DateTime? @default(now()) @db.Timestamp(6)
-  email       email[]
+  status_id       Decimal           @id(map: "email_status_lu_pk") @db.Decimal(3, 0)
+  status_desc     String?           @db.VarChar(100)
+  create_date     DateTime?         @default(now()) @db.Timestamp(6)
+  modify_date     DateTime?         @default(now()) @db.Timestamp(6)
+  email           email[]
   user_email_xref user_email_xref[] // Added back-relation to user_email_xref
+
   @@schema("identity")
 }
 
@@ -94,7 +94,7 @@ model email_type_lu {
   create_date     DateTime? @default(now()) @db.Timestamp(6)
   modify_date     DateTime? @default(now()) @db.Timestamp(6)
   email           email[]
-  
+
   @@schema("identity")
 }
 
@@ -103,24 +103,24 @@ model id_sequences {
   next_block_start Decimal @db.Decimal(12, 0)
   block_size       Decimal @db.Decimal(10, 0)
   exhausted        Decimal @default(0) @db.Decimal(1, 0)
-  
+
   @@schema("identity")
 }
 
 model invalid_handles {
   invalid_handle_id Int    @id(map: "pk_invalid_hand556")
   invalid_handle    String @db.VarChar(20)
-  
+
   @@schema("identity")
 }
 
-
 model security_groups {
-  group_id             Decimal                @id(map: "pk_security_groups") @db.Decimal(12, 0)
-  description          String                 @db.VarChar(254)
-  challenge_group_ind  Int                    @default(0) @db.SmallInt
-  create_user_id       Decimal?               @db.Decimal(12, 0)
-  user_group_xref      user_group_xref[]
+  group_id            Decimal           @id(map: "pk_security_groups") @db.Decimal(12, 0)
+  description         String            @db.VarChar(254)
+  challenge_group_ind Int               @default(0) @db.SmallInt
+  create_user_id      Decimal?          @db.Decimal(12, 0)
+  user_group_xref     user_group_xref[]
+
   @@schema("identity")
 }
 
@@ -128,7 +128,7 @@ model security_status_lu {
   security_status_id Decimal           @id(map: "securitystatuslu_pkey") @db.Decimal(3, 0)
   status_desc        String?           @db.VarChar(200)
   user_group_xref    user_group_xref[]
-  
+
   @@schema("identity")
 }
 
@@ -139,16 +139,15 @@ model security_user {
   create_user_id  Decimal?          @db.Decimal(12, 0)
   modify_date     DateTime?         @db.Timestamp(6)
   user_group_xref user_group_xref[]
-  
+
   @@schema("identity")
 }
-
 
 model social_login_provider {
   social_login_provider_id Decimal             @id(map: "social_provider_prkey") @db.Decimal(10, 0)
   name                     String?             @db.VarChar(50)
   user_social_login        user_social_login[]
-  
+
   @@schema("identity")
 }
 
@@ -159,40 +158,40 @@ model sso_login_provider {
   identify_email_enabled  Boolean          @default(true)
   identify_handle_enabled Boolean          @default(true)
   user_sso_login          user_sso_login[]
-  
+
   @@schema("identity")
 }
 
 model user {
-  user_id                    Decimal                      @id(map: "u175_45") @default(dbgenerated("nextval('sequence_user_seq'::regclass)")) @db.Decimal(10, 0)
-  first_name                 String?                      @db.VarChar(64)
-  last_name                  String?                      @db.VarChar(64)
-  create_date                DateTime?                    @default(now()) @db.Timestamp(6)
-  modify_date                DateTime?                    @default(now()) @db.Timestamp(6)
-  handle                     String                       @db.VarChar(50)
-  last_login                 DateTime?                    @db.Timestamp(6)
-  status                     String                       @db.VarChar(3)
-  activation_code            String?                      @db.VarChar(32)
-  middle_name                String?                      @db.VarChar(64)
-  handle_lower               String?                      @db.VarChar(50)
-  timezone_id                Decimal?                     @db.Decimal(5, 0)
-  last_site_hit_date         DateTime?                    @db.Timestamp(6)
-  name_in_another_language   String?                      @db.VarChar(64)
-  password                   String?                      @db.VarChar(16)
-  open_id                    String?                      @db.VarChar(200)
-  reg_source                 String?                      @db.VarChar(20)
-  utm_source                 String?                      @db.VarChar(50)
-  utm_medium                 String?                      @db.VarChar(50)
-  utm_campaign               String?                      @db.VarChar(50)
-  dice_connection            dice_connection?
-  user_2fa                   user_2fa?
-  user_achievement           user_achievement[]
-  user_otp_email             user_otp_email[]
-  user_social_login          user_social_login[]
-  user_sso_login             user_sso_login[]
-  user_status                user_status[]
-  user_email_xref            user_email_xref[]
-  emails                     email[]                      @relation("UserToEmail")
+  user_id                  Decimal             @id(map: "u175_45") @default(dbgenerated("nextval('sequence_user_seq'::regclass)")) @db.Decimal(10, 0)
+  first_name               String?             @db.VarChar(64)
+  last_name                String?             @db.VarChar(64)
+  create_date              DateTime?           @default(now()) @db.Timestamp(6)
+  modify_date              DateTime?           @default(now()) @db.Timestamp(6)
+  handle                   String              @db.VarChar(50)
+  last_login               DateTime?           @db.Timestamp(6)
+  status                   String              @db.VarChar(3)
+  activation_code          String?             @db.VarChar(32)
+  middle_name              String?             @db.VarChar(64)
+  handle_lower             String?             @db.VarChar(50)
+  timezone_id              Decimal?            @db.Decimal(5, 0)
+  last_site_hit_date       DateTime?           @db.Timestamp(6)
+  name_in_another_language String?             @db.VarChar(64)
+  password                 String?             @db.VarChar(16)
+  open_id                  String?             @db.VarChar(200)
+  reg_source               String?             @db.VarChar(20)
+  utm_source               String?             @db.VarChar(50)
+  utm_medium               String?             @db.VarChar(50)
+  utm_campaign             String?             @db.VarChar(50)
+  dice_connection          dice_connection?
+  user_2fa                 user_2fa?
+  user_achievement         user_achievement[]
+  user_otp_email           user_otp_email[]
+  user_social_login        user_social_login[]
+  user_sso_login           user_sso_login[]
+  user_status              user_status[]
+  user_email_xref          user_email_xref[]
+  emails                   email[]             @relation("UserToEmail")
 
   @@index([activation_code], map: "user_activ_code_idx")
   @@index([handle])
@@ -212,7 +211,7 @@ model user_2fa {
   modified_by  Decimal  @db.Decimal(10, 0)
   modified_at  DateTime @default(now()) @db.Timestamp(6)
   user         user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
-  
+
   @@schema("identity")
 }
 
@@ -244,7 +243,6 @@ model user_group_xref {
   security_status_lu security_status_lu? @relation(fields: [security_status_id], references: [security_status_id], onDelete: NoAction, onUpdate: NoAction, map: "usergroupxref_status_fk")
 
   @@unique([login_id, group_id], map: "user_grp_xref_i2")
-  
   @@schema("identity")
 }
 
@@ -259,7 +257,6 @@ model user_otp_email {
   user       user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([user_id, mode])
-  
   @@schema("identity")
 }
 
@@ -277,7 +274,6 @@ model user_social_login {
 
   @@id([user_id, social_login_provider_id], map: "user_social_prkey")
   @@index([social_user_id, social_login_provider_id])
-  
   @@schema("identity")
 }
 
@@ -292,7 +288,6 @@ model user_sso_login {
 
   @@id([user_id, provider_id], map: "user_sso_prkey") // Primary key
   @@index([sso_user_id, provider_id], map: "idx_user_social_login_sso_user_id_provider_id") // Index only, NOT unique
-  
   @@schema("identity")
 }
 
@@ -305,7 +300,6 @@ model user_status {
   user_status_type_lu user_status_type_lu @relation(fields: [user_status_type_id], references: [user_status_type_id], onDelete: NoAction, onUpdate: NoAction, map: "userstatus_userstatustype_fk")
 
   @@id([user_id, user_status_type_id], map: "userstatus_pk")
-  
   @@schema("identity")
 }
 
@@ -313,7 +307,7 @@ model user_status_lu {
   user_status_id Decimal       @id(map: "u113_26") @db.Decimal(5, 0)
   description    String?       @db.VarChar(100)
   user_status    user_status[]
-  
+
   @@schema("identity")
 }
 
@@ -321,7 +315,7 @@ model user_status_type_lu {
   user_status_type_id Decimal       @id(map: "userstatustypelu_pk") @db.Decimal(3, 0)
   description         String?       @db.VarChar(100)
   user_status         user_status[]
-  
+
   @@schema("identity")
 }
 
@@ -329,13 +323,13 @@ model user_status_type_lu {
 model user_email_xref {
   user_id     Decimal   @db.Decimal(10, 0)
   email_id    Decimal   @db.Decimal(10, 0)
-  is_primary  Boolean   // Assuming boolean based on name, adjust if Decimal(1,0)
+  is_primary  Boolean // Assuming boolean based on name, adjust if Decimal(1,0)
   status_id   Decimal   @db.Decimal(3, 0) // Assuming relates to email_status_lu
   create_date DateTime? @default(now()) @db.Timestamp(6)
   modify_date DateTime? @default(now()) @db.Timestamp(6)
 
-  user  user  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_email_xref_user_fk") // Define relation
-  email email @relation(fields: [email_id], references: [email_id], onDelete: NoAction, onUpdate: NoAction, map: "user_email_xref_email_fk") // Define relation
+  user            user             @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_email_xref_user_fk") // Define relation
+  email           email            @relation(fields: [email_id], references: [email_id], onDelete: NoAction, onUpdate: NoAction, map: "user_email_xref_email_fk") // Define relation
   email_status_lu email_status_lu? @relation(fields: [status_id], references: [status_id]) // Optional relation to status lookup
 
   @@id([user_id, email_id], map: "user_email_xref_pkey") // Define composite primary key
@@ -344,16 +338,15 @@ model user_email_xref {
   @@schema("identity")
 }
 
-
 // -----------------------------------------
 // (Migrated from MySQL DDL)
 // -----------------------------------------
 
 model Client {
-  id          Int      @id @default(autoincrement()) @map("id")
-  clientId    String   @unique @map("client_id")
+  id          Int       @id @default(autoincrement()) @map("id")
+  clientId    String    @unique @map("client_id")
   name        String
-  redirectUri String?  @map("redirect_uri") @db.VarChar(8192)
+  redirectUri String?   @map("redirect_uri") @db.VarChar(8192)
   secret      String?
   createdBy   Int?
   createdAt   DateTime? @db.Timestamp(0) // Use Timestamp(0) if you need second precision like MySQL datetime
@@ -365,12 +358,12 @@ model Client {
 }
 
 model Role {
-  id          Int      @id @default(autoincrement()) @map("id")
-  name        String   @unique @db.VarChar(45)
-  createdBy   Int?
-  createdAt   DateTime? @db.Timestamp(0)
-  modifiedBy  Int?
-  modifiedAt  DateTime? @db.Timestamp(0)
+  id         Int       @id @default(autoincrement()) @map("id")
+  name       String    @unique @db.VarChar(45)
+  createdBy  Int?
+  createdAt  DateTime? @db.Timestamp(0)
+  modifiedBy Int?
+  modifiedAt DateTime? @db.Timestamp(0)
 
   roleAssignments RoleAssignment[] // Relation field
 
@@ -379,14 +372,14 @@ model Role {
 }
 
 model RoleAssignment {
-  id          Int      @id @default(autoincrement()) @map("id")
-  roleId      Int      @map("role_id")
-  subjectId   Int      @map("subject_id")
+  id          Int       @id @default(autoincrement()) @map("id")
+  roleId      Int       @map("role_id")
+  subjectId   Int       @map("subject_id")
   createdBy   Int?
   createdAt   DateTime? @db.Timestamp(0)
   modifiedBy  Int?
   modifiedAt  DateTime? @db.Timestamp(0)
-  subjectType Int      @default(1) @map("subject_type")
+  subjectType Int       @default(1) @map("subject_type")
 
   role Role @relation(fields: [roleId], references: [id], map: "role_id") // Relation field
 

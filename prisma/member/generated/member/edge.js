@@ -177,7 +177,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/generated/member",
+      "value": "/Users/hentrymartin/development/identity-api-v6/prisma/member/generated/member",
       "fromEnvVar": null
     },
     "config": {
@@ -186,12 +186,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "debian-openssl-3.0.x",
+        "value": "darwin-arm64",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/schema.prisma",
+    "sourceFilePath": "/Users/hentrymartin/development/identity-api-v6/prisma/member/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
