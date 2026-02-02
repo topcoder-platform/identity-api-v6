@@ -101,9 +101,14 @@ export class CommonUtils {
    * @param configService Nest config service (or look-alike) used to read env config
    * @returns application domain such as topcoder-dev.com
    */
-  static getAppDomain(
-    configService?: { get<T = any>(key: string): T | undefined },
-  ): string {
+  static getAppDomain(configService?: {
+    get<T = any>(key: string): T | undefined;
+  }): string {
+    const configuredDomain = configService?.get?.('APP_DOMAIN');
+    if (typeof configuredDomain === 'string' && configuredDomain.trim()) {
+      return configuredDomain.trim();
+    }
+
     const envDomain = process.env.APP_DOMAIN;
     if (envDomain && envDomain.trim().length > 0) {
       return envDomain.trim();

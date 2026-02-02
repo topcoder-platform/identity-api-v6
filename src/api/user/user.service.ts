@@ -17,7 +17,11 @@ import {
   user_sso_login as UserSsoLoginModel,
   sso_login_provider as SsoLoginProviderModel,
 } from '@prisma/client';
-import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import { PrismaClient as PrismaClientGroup } from '@prisma/client-group';
+import {
+  PRISMA_CLIENT,
+  PRISMA_CLIENT_GROUP,
+} from '../../shared/prisma/prisma.module';
 import {
   CreateUserBodyDto,
   UpdateUserBodyDto,
@@ -43,6 +47,7 @@ import { MemberStatus } from '../../dto/member';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { addMinutes } from 'date-fns';
+import { MembershipType } from '../group/membership-type.enum';
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -76,6 +81,8 @@ export class UserService {
   constructor(
     @Inject(PRISMA_CLIENT)
     private readonly prismaClient: PrismaClient,
+    @Inject(PRISMA_CLIENT_GROUP)
+    private readonly groupPrismaClient: PrismaClientGroup,
     @Inject(forwardRef(() => ValidationService))
     private readonly validationService: ValidationService,
     @Inject(forwardRef(() => RoleService))
@@ -116,9 +123,8 @@ export class UserService {
     query: UserSearchQueryDto,
   ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const { handle, email, id, active, like } = this.extractSearchFilters(
-      query,
-    );
+    const { handle, email, id, active, like } =
+      this.extractSearchFilters(query);
     const filters: Prisma.userWhereInput[] = [];
 
     // If ID is provided, enforce exact match by user_id
@@ -132,7 +138,9 @@ export class UserService {
         const value = wildcard.value;
         if (value.length > 0) {
           if (wildcard.type === 'startsWith') {
-            filters.push({ handle: { startsWith: value, mode: 'insensitive' } });
+            filters.push({
+              handle: { startsWith: value, mode: 'insensitive' },
+            });
           } else if (wildcard.type === 'endsWith') {
             filters.push({ handle: { endsWith: value, mode: 'insensitive' } });
           } else {
@@ -174,7 +182,7 @@ export class UserService {
               user_email_xref: {
                 some: {
                   email: {
-                    address: addressFilter as any,
+                    address: addressFilter,
                   },
                 },
               },
@@ -182,7 +190,7 @@ export class UserService {
             {
               emails: {
                 some: {
-                  address: addressFilter as any,
+                  address: addressFilter,
                 },
               },
             },
@@ -618,7 +626,8 @@ export class UserService {
   // Generates a cryptographically-strong random password consisting of
   // alphanumeric characters of the requested length.
   private generateRandomPassword(length: number): string {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charset =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     const bytes = crypto.randomBytes(length);
     let result = '';
     for (let i = 0; i < length; i++) {
@@ -829,12 +838,11 @@ export class UserService {
         }
 
         // add user to initial groups
-        await this.addUserToDefaultGroups(prisma, nextUserId);
+        await this.addUserToDefaultGroups(nextUserId);
         if (
           userParams.profile?.provider?.toLowerCase() === WIPRO_SSO_PROVIDER
         ) {
           await this.addUserToGroupByDescription(
-            prisma,
             nextUserId,
             WIPRO_ALL_GROUP_NAME,
           );
@@ -918,7 +926,7 @@ export class UserService {
     // ==========================
     // publish user created event
     // ==========================
-    await this.publishUserCreatedEvent(newUser, userParams, otpForActivation);
+    await this.publishUserCreatedEvent(newUser);
 
     this.logger.log(
       `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
@@ -1079,11 +1087,7 @@ export class UserService {
     }
   }
 
-  private async publishUserCreatedEvent(
-    newUser: UserModel,
-    userParams: UserParamBaseDto,
-    otpForActivation: string,
-  ) {
+  private async publishUserCreatedEvent(newUser: UserModel) {
     try {
       // For 'event.user.created', attributes should be the full camelCased newUser object
       const createdEventAttributes = this.toCamelCase(newUser);
@@ -1277,14 +1281,16 @@ export class UserService {
           where: { user_id: userId },
           data: { modify_date: new Date() },
         });
-        this.logger.log(`No profile changes supplied; updated modify_date for user ${userId}`);
+        this.logger.log(
+          `No profile changes supplied; updated modify_date for user ${userId}`,
+        );
       }
 
       // Update password if requested
       if (needPasswordUpdate) {
         this.logger.debug(`Updating password for: ${userInTx.handle}`);
         // Do not persist plaintext on the in-memory user object, but set a flag for downstream mapping if needed
-        (existingUser as any).password = (cred.password as any);
+        (existingUser as any).password = cred.password as any;
 
         if (securityUserRecord) {
           await prisma.security_user.update({
@@ -1567,7 +1573,7 @@ export class UserService {
     if (emailChanged) {
       const memberUserId = BigInt(userId);
       try {
-        const updateResult = await this.memberPrisma.member.update({
+        await this.memberPrisma.member.update({
           where: { userId: memberUserId },
           data: { email: normalizedEmail },
         });
@@ -2412,10 +2418,9 @@ export class UserService {
 
   /**
    * Add user to default groups.
-   * @param prisma Prisma client
    * @param userId The user ID to add.
    */
-  private async addUserToDefaultGroups(prisma: any, userId: number) {
+  private async addUserToDefaultGroups(userId: number) {
     this.logger.log(`Adding user: ${userId} to default groups`);
     const defaultGroups: number[] = [
       DefaultGroups.MANAGER,
@@ -2424,17 +2429,13 @@ export class UserService {
       DefaultGroups.ANONYMOUS,
     ];
     for (const groupId of defaultGroups) {
-      await this.addUserToGroup(prisma, userId, groupId);
+      await this.addUserToGroup(userId, groupId);
     }
   }
 
-  private async addUserToGroupByDescription(
-    prisma: any,
-    userId: number,
-    groupName: string,
-  ) {
+  private async addUserToGroupByDescription(userId: number, groupName: string) {
     try {
-      const groupRecord = await prisma.security_groups.findFirst({
+      const groupRecord = await this.groupPrismaClient.group.findFirst({
         where: { description: groupName },
       });
       if (!groupRecord) {
@@ -2443,11 +2444,7 @@ export class UserService {
         );
         return;
       }
-      await this.addUserToGroup(
-        prisma,
-        userId,
-        Number(groupRecord.group_id),
-      );
+      await this.addUserToGroup(userId, Number(groupRecord.id));
     } catch (error) {
       this.logger.error(
         `Unable to resolve group '${groupName}' for user ${userId}`,
@@ -2458,26 +2455,21 @@ export class UserService {
 
   /**
    * Add user to group.
-   * @param prisma Prisma client
    * @param userId The user ID
    * @param groupId The group ID
    */
-  private async addUserToGroup(prisma: any, userId: number, groupId: number) {
+  private async addUserToGroup(userId: number, groupId: number) {
     try {
-      const result: { nextval: bigint }[] =
-        await prisma.$queryRaw`SELECT nextval('sequence_user_group_seq'::regclass)`;
-      if (!result || result.length === 0 || !result[0].nextval) {
-        throw new Error('Failed to retrieve next user group ID from sequence.');
-      }
-      const nextUserGroupId = Number(result[0].nextval);
-      this.logger.log(`Next userGroupXref ID: ${nextUserGroupId}`);
-      await prisma.user_group_xref.create({
+      const now = new Date();
+      await this.groupPrismaClient.groupMembership.create({
         data: {
-          user_group_id: nextUserGroupId,
-          group_id: groupId,
-          login_id: userId,
-          create_user_id: Constants.DEFAULT_CREATE_USER_ID,
-          security_status_id: Constants.DEFAULT_SECURITY_STATUS_ID,
+          groupId,
+          memberId: userId,
+          membershipType: MembershipType.User,
+          createdBy: Constants.DEFAULT_CREATE_USER_ID,
+          createdAt: now,
+          modifiedBy: null,
+          modifiedAt: null,
         },
       });
       this.logger.log(`User: ${userId} assigned to groupId: ${groupId}`);

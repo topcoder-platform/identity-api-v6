@@ -38,10 +38,7 @@ export function describeAccess({
     `**JWT access:** ${formatSegment(jwt, 'Any authenticated user.')}`,
   );
 
-  pieces.push(
-    '',
-    `**M2M scopes:** ${formatSegment(m2m, 'Not supported.')}`,
-  );
+  pieces.push('', `**M2M scopes:** ${formatSegment(m2m, 'Not supported.')}`);
 
   if (notes) {
     const noteItems = Array.isArray(notes) ? notes : [notes];

@@ -226,7 +226,7 @@ const createMockUserModel = (
   last_name: lastName || 'User',
   create_date: new Date(),
   modify_date: new Date(),
-  ...( _email
+  ...(_email
     ? {
         primaryEmailAddress: _email,
         primaryEmailStatusId: new Prisma.Decimal(1),
@@ -416,7 +416,11 @@ describe('UserController', () => {
       });
       const query: DTOs.UserSearchQueryDto = { filter: 'handle=mess' };
       const mockRawUsers = [
-        createMockUserModel(4, 'machineUser', 'machine@example.com') as UserModel,
+        createMockUserModel(
+          4,
+          'machineUser',
+          'machine@example.com',
+        ) as UserModel,
       ];
       mockUserService.findUsers.mockResolvedValue(mockRawUsers);
 

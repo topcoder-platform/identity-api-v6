@@ -21,9 +21,10 @@ export class SelfOrAdminGuard implements CanActivate {
     // Accept admin if DB-derived flag indicates admin or roles contain admin
     if (user.isAdmin) return true;
     try {
-      const configuredAdminRole = process.env.ADMIN_ROLE_NAME || 'administrator';
+      const configuredAdminRole =
+        process.env.ADMIN_ROLE_NAME || 'administrator';
       const adminRoleName = configuredAdminRole.toLowerCase();
-      const rawRoles = (user?.roles ?? (user as any)?.role) as
+      const rawRoles = (user?.roles ?? user?.role) as
         | string[]
         | string
         | undefined;
@@ -39,7 +40,7 @@ export class SelfOrAdminGuard implements CanActivate {
       if (hasAdmin) return true;
 
       // Also accept admin if JWT payload contains the admin role
-      const payloadRolesRaw = (user as any)?.payload?.roles as
+      const payloadRolesRaw = user?.payload?.roles as
         | string[]
         | string
         | undefined;
@@ -53,7 +54,7 @@ export class SelfOrAdminGuard implements CanActivate {
         (r) => String(r).toLowerCase() === adminRoleName,
       );
       if (hasAdminFromPayload) return true;
-    } catch (_) {
+    } catch {
       // ignore and continue with self check
     }
 

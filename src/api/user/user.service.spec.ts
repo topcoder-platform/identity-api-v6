@@ -7,7 +7,10 @@ import {
 } from './user.service';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
+import {
+  PRISMA_CLIENT,
+  PRISMA_CLIENT_GROUP,
+} from '../../shared/prisma/prisma.module';
 import { ValidationService } from './validation.service';
 import { RoleService } from '../role/role.service';
 import { EventService } from '../../shared/event/event.service';
@@ -108,6 +111,15 @@ const mockPrismaOltp = {
       return result instanceof Promise ? result : Promise.resolve(result);
     }),
   $queryRaw: jest.fn(),
+};
+
+const mockPrismaGroup = {
+  group: {
+    findFirst: jest.fn(),
+  },
+  groupMembership: {
+    create: jest.fn(),
+  },
 };
 
 const mockValidationService = {
@@ -328,6 +340,7 @@ const createMockUserAchievementModel = (
 describe('UserService', () => {
   let service: UserService;
   let prismaOltp: typeof mockPrismaOltp;
+  let prismaGroup: typeof mockPrismaGroup;
   let validationService: jest.Mocked<ValidationService>;
   let roleService: jest.Mocked<RoleService>;
   let cacheManager: typeof mockCacheManager;
@@ -362,6 +375,7 @@ describe('UserService', () => {
       providers: [
         UserService,
         { provide: PRISMA_CLIENT, useValue: mockPrismaOltp },
+        { provide: PRISMA_CLIENT_GROUP, useValue: mockPrismaGroup },
         { provide: ValidationService, useValue: mockValidationService },
         { provide: ValidationService, useValue: mockValidationService }, // mockValidationService is still provided
 
@@ -377,6 +391,7 @@ describe('UserService', () => {
 
     service = module.get<UserService>(UserService);
     prismaOltp = module.get(PRISMA_CLIENT);
+    prismaGroup = module.get(PRISMA_CLIENT_GROUP);
     validationService = module.get(ValidationService);
     roleService = module.get(RoleService);
     cacheManager = module.get(CACHE_MANAGER);
@@ -396,6 +411,7 @@ describe('UserService', () => {
       ); // "testBase64Key"
       const newService = new UserService(
         prismaOltp as any,
+        prismaGroup as any,
         validationService,
         roleService,
         cacheManager as any,
@@ -415,6 +431,7 @@ describe('UserService', () => {
       );
       const newService = new UserService(
         prismaOltp as any,
+        prismaGroup as any,
         validationService,
         roleService,
         cacheManager as any,
@@ -438,6 +455,7 @@ describe('UserService', () => {
       );
       const newService = new UserService(
         prismaOltp as any,
+        prismaGroup as any,
         validationService,
         roleService,
         cacheManager as any,
@@ -459,6 +477,7 @@ describe('UserService', () => {
       );
       const newService = new UserService(
         prismaOltp as any,
+        prismaGroup as any,
         validationService,
         roleService,
         cacheManager as any,

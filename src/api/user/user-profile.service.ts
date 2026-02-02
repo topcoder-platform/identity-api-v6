@@ -106,9 +106,11 @@ export class UserProfileService {
     }
 
     // Lookup SSO provider from DB (authoritative list for admin UI dropdown)
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
-      where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
+      },
+    );
     if (!providerRecord) {
       this.logger.error(
         `SSO Provider ${profileDto.provider} not found in sso_login_provider table.`,
@@ -175,9 +177,11 @@ export class UserProfileService {
    * @returns the provider id if it is found
    */
   async findProviderIdByName(providerName: string): Promise<number | null> {
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
-      where: { name: { equals: providerName, mode: 'insensitive' } },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: { equals: providerName, mode: 'insensitive' } },
+      },
+    );
     return providerRecord?.sso_login_provider_id
       ? Number(providerRecord?.sso_login_provider_id)
       : null;
@@ -224,9 +228,11 @@ export class UserProfileService {
     }
 
     // Lookup SSO provider from DB (authoritative list for admin UI dropdown)
-    const providerRecord = await this.prismaClient.sso_login_provider.findFirst({
-      where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
-    });
+    const providerRecord = await this.prismaClient.sso_login_provider.findFirst(
+      {
+        where: { name: { equals: profileDto.provider, mode: 'insensitive' } },
+      },
+    );
     if (!providerRecord) {
       throw new NotFoundException(
         `SSO Provider '${profileDto.provider}' not found. Cannot update SSO link.`,

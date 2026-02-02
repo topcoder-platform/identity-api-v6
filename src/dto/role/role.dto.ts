@@ -160,18 +160,27 @@ export class RoleAssignmentResponseDto {
 
 // Query params for listing role members (subjects)
 export class RoleMembersQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by numeric user id', example: 12345 })
+  @ApiPropertyOptional({
+    description: 'Filter by numeric user id',
+    example: 12345,
+  })
   @IsOptional()
   @IsInt()
   @Type(() => Number)
   userId?: number;
 
-  @ApiPropertyOptional({ description: 'Filter by Topcoder handle (exact match)', example: 'someuser' })
+  @ApiPropertyOptional({
+    description: 'Filter by Topcoder handle (exact match)',
+    example: 'someuser',
+  })
   @IsOptional()
   @IsString()
   userHandle?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by email (exact match)', example: 'user@example.com' })
+  @ApiPropertyOptional({
+    description: 'Filter by email (exact match)',
+    example: 'user@example.com',
+  })
   @IsOptional()
   @IsString()
   email?: string;
