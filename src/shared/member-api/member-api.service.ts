@@ -7,8 +7,6 @@ import {
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { firstValueFrom } from 'rxjs';
 import { MemberInfoDto } from '../../dto/member/member.dto';
 import { M2M_AUTH_CLIENT } from './member-api.constants'; // Import M2M client token from constants
@@ -22,13 +20,11 @@ interface M2MAuthClient {
 @Injectable()
 export class MemberApiService {
   private readonly logger = new Logger(MemberApiService.name);
-  private readonly M2M_TOKEN_CACHE_KEY = 'member_api_m2m_token';
   private readonly MEMBER_API_URL: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(M2M_AUTH_CLIENT) private readonly m2mAuthClient: M2MAuthClient,
   ) {
     this.MEMBER_API_URL = this.configService.get<string>('MEMBER_API_URL');
@@ -46,18 +42,6 @@ export class MemberApiService {
    * Gets a valid M2M token for Member API, using the injected M2M client and cache.
    */
   private async getM2mToken(): Promise<string | null> {
-    const cachedToken = await this.cacheManager.get<string>(
-      this.M2M_TOKEN_CACHE_KEY,
-    );
-    if (cachedToken) {
-      this.logger.debug('Using cached M2M token for Member API.');
-      return cachedToken;
-    }
-
-    this.logger.log(
-      'No cached M2M token found for Member API, fetching new one via m2mAuthClient...',
-    );
-
     const clientId = this.configService.get<string>('AUTH0_CLIENT_ID');
     const clientSecret = this.configService.get<string>('AUTH0_CLIENT_SECRET');
 
@@ -74,28 +58,14 @@ export class MemberApiService {
         clientSecret,
       );
 
-      if (newToken) {
-        const cacheTtlSeconds = this.configService.get<number>(
-          'TOKEN_CACHE_TIME',
-          23 * 60 * 60, // Default to 23 hours
-        );
-        const effectiveTtlSeconds = Math.max(60, cacheTtlSeconds - 60); // Cache slightly less
-
-        await this.cacheManager.set(
-          this.M2M_TOKEN_CACHE_KEY,
-          newToken,
-          effectiveTtlSeconds * 1000,
-        );
-        this.logger.log(
-          `Cached new M2M token for Member API for ${effectiveTtlSeconds} seconds.`,
-        );
-        return newToken;
-      } else {
+      if (!newToken) {
         this.logger.error(
           'm2mAuthClient.getMachineToken returned null/empty token without error.',
         );
         return null;
       }
+
+      return newToken;
     } catch (error) {
       this.logger.error(
         `Error fetching M2M token via m2mAuthClient: ${error.message}`,
