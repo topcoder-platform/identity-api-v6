@@ -61,7 +61,9 @@ export class RoleService {
     );
 
     // Ensure role exists
-    const existing = await this.prismaClient.role.findUnique({ where: { id: roleId } });
+    const existing = await this.prismaClient.role.findUnique({
+      where: { id: roleId },
+    });
     if (!existing) {
       throw new NotFoundException(`Role with ID ${roleId} not found.`);
     }
@@ -121,8 +123,13 @@ export class RoleService {
     // identity API returns all role members regardless of audit field values.
     const returnedIds = new Set<number>(pageMembers.map((m) => m.userId));
     const missingIds = pageIds.filter((id) => !returnedIds.has(id));
-    const placeholders: MemberInfoResponseDto[] = missingIds.map((id) =>
-      ({ userId: id, handle: null as any, email: null as any }) as unknown as MemberInfoResponseDto,
+    const placeholders: MemberInfoResponseDto[] = missingIds.map(
+      (id) =>
+        ({
+          userId: id,
+          handle: null as any,
+          email: null as any,
+        }) as unknown as MemberInfoResponseDto,
     );
 
     return { members: [...pageMembers, ...placeholders], total };
@@ -195,8 +202,13 @@ export class RoleService {
         const infos = await this.memberApiService.getUserInfoList(subjectIds);
         const returnedIds = new Set<number>(infos.map((m) => m.userId));
         const missingIds = subjectIds.filter((id) => !returnedIds.has(id));
-        const placeholders = missingIds.map((id) =>
-          ({ userId: id, handle: null as any, email: null as any }) as unknown as MemberInfoResponseDto,
+        const placeholders = missingIds.map(
+          (id) =>
+            ({
+              userId: id,
+              handle: null as any,
+              email: null as any,
+            }) as unknown as MemberInfoResponseDto,
         );
         memberInfos = [...infos, ...placeholders];
       } catch (error) {

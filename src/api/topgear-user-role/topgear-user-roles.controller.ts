@@ -52,8 +52,7 @@ export class TopgearUserRolesController {
       summary:
         'Retrieves Topgear-specific role assignments for the supplied member.',
       jwt: 'Requires a JWT with the `administrator` role.',
-      m2m:
-        'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+      m2m: 'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
     }),
   })
   @ApiParam({
@@ -78,8 +77,7 @@ export class TopgearUserRolesController {
       summary:
         'Returns the details of a single Topgear role assignment for the member.',
       jwt: 'Requires a JWT with the `administrator` role.',
-      m2m:
-        'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+      m2m: 'Requires `read:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
     }),
   })
   @ApiParam({
@@ -115,8 +113,7 @@ export class TopgearUserRolesController {
       summary:
         'Assigns the provided role id to the target member, limited to Topgear contexts.',
       jwt: 'Requires a JWT with the `administrator` role.',
-      m2m:
-        'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+      m2m: 'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
     }),
   })
   @ApiParam({
@@ -148,8 +145,7 @@ export class TopgearUserRolesController {
     description: describeAccess({
       summary: 'Removes the specified Topgear role assignment from the member.',
       jwt: 'Requires a JWT with the `administrator` role.',
-      m2m:
-        'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
+      m2m: 'Requires `write:topgear-user-roles` or a broader scope such as `all:topgear-user-roles`, `all:usersRole`, `all:roles`, or `all:user`.',
     }),
   })
   @ApiParam({
@@ -181,9 +177,9 @@ export class TopgearUserRolesController {
   }
 
   private getAuthenticatedUser(req: AuthenticatedRequest): any {
-    const result:any = (req as any).authUser || (req as any).user;
-    if(result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
-      result.isAdmin=true;
+    const result: any = (req as any).authUser || (req as any).user;
+    if (result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+      result.isAdmin = true;
     }
     return result;
   }

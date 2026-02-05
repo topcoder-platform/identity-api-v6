@@ -2,7 +2,10 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { Inject } from '@nestjs/common';
-import { IdentityProviderDto, SsoLoginProviderDto } from './identity-provider.dto';
+import {
+  IdentityProviderDto,
+  SsoLoginProviderDto,
+} from './identity-provider.dto';
 
 @Injectable()
 export class IdentityProviderService {
@@ -281,7 +284,7 @@ export class IdentityProviderService {
       orderBy: { sso_login_provider_id: 'asc' },
     });
 
-    return results.map(r => ({
+    return results.map((r) => ({
       ssoLoginProviderId: Number(r.sso_login_provider_id),
       name: r.name ?? '',
       type: r.type,

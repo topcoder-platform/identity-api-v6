@@ -32,7 +32,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     isSocial: true,
     isEnterprise: false,
   },
-  'okta-customer':{
+  'okta-customer': {
     id: ProviderId.OKTA,
     key: 'okta-customer',
     isSocial: false,
@@ -110,7 +110,7 @@ export const ProviderTypes: Record<string, ProviderDetails> = {
     isSocial: false,
     isEnterprise: true,
   },
-  "wipro-adfs": {
+  'wipro-adfs': {
     id: ProviderId.ADFS,
     key: 'wipro-adfs',
     isSocial: false,

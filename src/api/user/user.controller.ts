@@ -30,7 +30,7 @@ import { UserProfileService } from './user-profile.service';
 import { AuthFlowService } from './auth-flow.service';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
-import { AuthenticatedUser, JwtStrategy } from '../../core/auth/jwt.strategy'; // For type hints
+import { AuthenticatedUser } from '../../core/auth/jwt.strategy'; // For type hints
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
@@ -135,7 +135,8 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
   // Map activation_code from DB into response credential.activationCode
   // Keep undefined if not present
   const activationCode = user.activation_code ?? undefined;
-  const hasPassword = typeof user.password === 'string' && user.password.length > 0;
+  const hasPassword =
+    typeof user.password === 'string' && user.password.length > 0;
   dto.credential = {
     activationCode,
     hasPassword,
@@ -154,18 +155,24 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
 function getAuthenticatedUser(req: Request): AuthenticatedUser {
   const user: any = (req as any).authUser || (req as any).user;
   const logger = new Logger('getAuthenticatedUser'); // It's a global helper, so create a local logger.
-  logger.debug(`[getAuthenticatedUser] User user: ${JSON.stringify(user, null, 5)}`);
+  logger.debug(
+    `[getAuthenticatedUser] User user: ${JSON.stringify(user, null, 5)}`,
+  );
 
   // Ensure admin detection accounts for both DB roles and JWT-embedded roles
   try {
-    const adminRoleName = (process.env.ADMIN_ROLE_NAME || 'administrator').toLowerCase();
+    const adminRoleName = (
+      process.env.ADMIN_ROLE_NAME || 'administrator'
+    ).toLowerCase();
     const dbRoles: string[] = Array.isArray(user?.roles) ? user.roles : [];
     const jwtRoles: string[] =
       (user?.payload?.['https://topcoder-dev.com/roles'] as string[]) ||
       (user?.payload?.roles as string[]) ||
       [];
 
-    const hasAdminInDb = dbRoles.some((r) => String(r).toLowerCase() === adminRoleName);
+    const hasAdminInDb = dbRoles.some(
+      (r) => String(r).toLowerCase() === adminRoleName,
+    );
     const hasAdminInJwt = Array.isArray(jwtRoles)
       ? jwtRoles.some((r) => String(r).toLowerCase() === adminRoleName)
       : false;
@@ -174,7 +181,9 @@ function getAuthenticatedUser(req: Request): AuthenticatedUser {
       user.isAdmin = true;
     }
   } catch (e) {
-    logger.warn(`[getAuthenticatedUser] Failed to evaluate admin from roles: ${(e as Error).message}`);
+    logger.warn(
+      `[getAuthenticatedUser] Failed to evaluate admin from roles: ${(e as Error).message}`,
+    );
   }
 
   logger.debug(
@@ -548,7 +557,7 @@ export class UserController {
     required: false,
     description: `Request query filter, e.g.: filter=field=value[,field=value].
       Supported filters: id, handle, firstName, lastName, email, status, regSource, utmSource, utmMedium, utmCampaign, active.
-      Example: filter=active=true` ,
+      Example: filter=active=true`,
   })
   @ApiQuery({
     name: 'limit',
@@ -1110,8 +1119,7 @@ export class UserController {
   @ApiOperation({
     summary: 'Get all SSO profiles linked to a user (Admin only).',
     description: describeAccess({
-      summary:
-        'Lists all SSO identities associated with the specified user.',
+      summary: 'Lists all SSO identities associated with the specified user.',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: 'Not supported; use an administrator JWT.',
     }),
@@ -1239,7 +1247,8 @@ export class UserController {
   @ApiOperation({
     summary: 'Get all external profiles for a user.',
     description: describeAccess({
-      summary: 'Lists the external profiles associated with the specified user.',
+      summary:
+        'Lists the external profiles associated with the specified user.',
       jwt: 'Requires the `administrator` role or a JWT for the user being queried.',
       m2m: ['read:user_profiles', 'all:user_profiles'],
     }),
@@ -1917,7 +1926,7 @@ export class UserController {
     summary: 'Update user primary email using a one-time token.',
     description: describeAccess({
       summary:
-        'Consumes a one-time token generated via `oneTimeToken` to update the user\'s primary email.',
+        "Consumes a one-time token generated via `oneTimeToken` to update the user's primary email.",
       jwt: 'Not supported; supply the one-time token in the Authorization header instead.',
       m2m: 'Not applicable.',
     }),
@@ -2079,7 +2088,7 @@ export class UserController {
     summary: 'Update the primary role for the authenticated user (Self only).',
     description: describeAccess({
       summary:
-        'Sets which of the caller\'s roles is marked as primary. Only the user themselves may invoke it.',
+        "Sets which of the caller's roles is marked as primary. Only the user themselves may invoke it.",
       jwt: 'Requires a JWT for the member making the request.',
       m2m: 'Not supported.',
     }),
@@ -2194,8 +2203,7 @@ export class UserController {
   @ApiOperation({
     summary: "Update user's 2FA status (MFA and DICE).",
     description: describeAccess({
-      summary:
-        'Enables or disables MFA/DICE for the specified user.',
+      summary: 'Enables or disables MFA/DICE for the specified user.',
       jwt: 'Requires the `administrator` role or a JWT for the user being updated.',
       m2m: 'Not supported.',
     }),

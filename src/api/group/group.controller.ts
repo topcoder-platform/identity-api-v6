@@ -127,8 +127,7 @@ export class GroupController {
   @ApiOperation({
     summary: 'Create a new security group',
     description: describeAccess({
-      summary:
-        'Creates a security group mapping for authorization services.',
+      summary: 'Creates a security group mapping for authorization services.',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: ['write:groups', 'all:groups'],
     }),
@@ -778,8 +777,7 @@ export class GroupController {
   @ApiOperation({
     summary: 'List members of a group',
     description: describeAccess({
-      summary:
-        'Lists member-type memberships for the requested group.',
+      summary: 'Lists member-type memberships for the requested group.',
       jwt: 'Requires the `administrator` role for private groups; group members can access their own private groups. Public groups are available to any authenticated user.',
       m2m: ['read:groups', 'write:groups', 'all:groups'],
     }),

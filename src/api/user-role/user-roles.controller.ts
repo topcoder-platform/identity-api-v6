@@ -47,8 +47,7 @@ export class UserRolesController {
   @ApiOperation({
     summary: 'List roles assigned to a user by ID or Topcoder member handle',
     description: describeAccess({
-      summary:
-        'Retrieves all role assignments for the identified member.',
+      summary: 'Retrieves all role assignments for the identified member.',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: ['read:usersRole', 'all:usersRole'],
     }),
@@ -136,8 +135,7 @@ export class UserRolesController {
   @ApiOperation({
     summary: 'Remove a role from the specified user',
     description: describeAccess({
-      summary:
-        'Deletes the specified role assignment from the target member.',
+      summary: 'Deletes the specified role assignment from the target member.',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: ['delete:usersRole', 'all:usersRole'],
     }),
@@ -167,9 +165,9 @@ export class UserRolesController {
   }
 
   private getAuthenticatedUser(req: AuthenticatedRequest): any {
-    const result:any = (req as any).authUser || (req as any).user;
-    if(result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
-      result.isAdmin=true;
+    const result: any = (req as any).authUser || (req as any).user;
+    if (result.roles?.includes(process.env.ADMIN_ROLE_NAME)) {
+      result.isAdmin = true;
     }
     return result;
   }

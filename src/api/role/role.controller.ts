@@ -62,8 +62,7 @@ export class RoleController {
         'Searches existing roles using optional filter parameters (e.g., subjectId, roleName).',
       jwt: 'Requires a JWT with the `administrator` role.',
       m2m: ['read:roles', 'all:roles'],
-      notes:
-        'M2M tokens without the read scope receive HTTP 403 (Forbidden).',
+      notes: 'M2M tokens without the read scope receive HTTP 403 (Forbidden).',
     }),
   })
   @ApiResponse({ status: HttpStatus.OK, type: [RoleResponseDto] })
@@ -223,7 +222,9 @@ export class RoleController {
     const isMachine = Boolean(user?.isMachine);
 
     if (!isAdmin && !isMachine) {
-      throw new ForbiddenException('Only administrators can list role members.');
+      throw new ForbiddenException(
+        'Only administrators can list role members.',
+      );
     }
 
     if (isMachine) {
@@ -676,7 +677,10 @@ export class RoleController {
     const result: any = (req as any).authUser || (req as any).user || {};
 
     // Normalize roles to an array of lowercase strings
-    const rawRoles = (result.roles ?? result.role) as string[] | string | undefined;
+    const rawRoles = (result.roles ?? result.role) as
+      | string[]
+      | string
+      | undefined;
     let roles: string[] = [];
     if (Array.isArray(rawRoles)) {
       roles = rawRoles.map((r) => String(r).trim()).filter(Boolean);
