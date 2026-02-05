@@ -47,7 +47,7 @@ import { MemberStatus } from '../../dto/member';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { addMinutes } from 'date-fns';
-import { MembershipType } from '../group/membership-type.enum';
+type GroupIdRow = { id: string };
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -2435,16 +2435,14 @@ export class UserService {
 
   private async addUserToGroupByDescription(userId: number, groupName: string) {
     try {
-      const groupRecord = await this.groupPrismaClient.group.findFirst({
-        where: { description: groupName },
-      });
-      if (!groupRecord) {
+      const groupId = await this.findGroupIdByDescriptionOrName(groupName);
+      if (!groupId) {
         this.logger.warn(
           `Group '${groupName}' not found when assigning user ${userId}.`,
         );
         return;
       }
-      await this.addUserToGroup(userId, Number(groupRecord.id));
+      await this.addUserToGroupByGroupId(userId, groupId);
     } catch (error) {
       this.logger.error(
         `Unable to resolve group '${groupName}' for user ${userId}`,
@@ -2456,29 +2454,125 @@ export class UserService {
   /**
    * Add user to group.
    * @param userId The user ID
-   * @param groupId The group ID
+   * @param groupIdOrOldId The group ID or old numeric ID
    */
-  private async addUserToGroup(userId: number, groupId: number) {
+  private async addUserToGroup(
+    userId: number,
+    groupIdOrOldId: number | string,
+  ) {
     try {
-      const now = new Date();
-      await this.groupPrismaClient.groupMembership.create({
-        data: {
-          groupId,
-          memberId: userId,
-          membershipType: MembershipType.User,
-          createdBy: Constants.DEFAULT_CREATE_USER_ID,
-          createdAt: now,
-          modifiedBy: null,
-          modifiedAt: null,
-        },
-      });
-      this.logger.log(`User: ${userId} assigned to groupId: ${groupId}`);
+      const groupId = await this.resolveGroupId(groupIdOrOldId);
+      if (!groupId) {
+        this.logger.warn(
+          `Group '${groupIdOrOldId}' not found when assigning user ${userId}.`,
+        );
+        return;
+      }
+      await this.addUserToGroupByGroupId(userId, groupId);
     } catch (error) {
       this.logger.error(
-        `Unable to assign userId: ${userId} to groupId: ${groupId}`,
+        `Unable to assign userId: ${userId} to groupId: ${groupIdOrOldId}`,
         error,
       );
       // should we fail when an error occurs?
     }
+  }
+
+  private async addUserToGroupByGroupId(userId: number, groupId: string) {
+    const memberId = String(userId);
+    const createdBy = String(Constants.DEFAULT_CREATE_USER_ID);
+    const membershipType = Constants.memberGroupMembershipName;
+    const affected = await this.groupPrismaClient.$executeRaw`
+      INSERT INTO "groups"."GroupMember" ("groupId", "memberId", "membershipType", "createdBy")
+      VALUES (${groupId}, ${memberId}, ${membershipType}, ${createdBy})
+      ON CONFLICT ("groupId", "memberId") DO NOTHING
+    `;
+    if (affected === 0) {
+      this.logger.debug(
+        `User: ${userId} is already a member of groupId: ${groupId}`,
+      );
+      return;
+    }
+    this.logger.log(`User: ${userId} assigned to groupId: ${groupId}`);
+  }
+
+  private async resolveGroupId(
+    groupIdOrOldId: number | string,
+  ): Promise<string | null> {
+    const idValue = String(groupIdOrOldId).trim();
+    if (!idValue) {
+      return null;
+    }
+
+    try {
+      if (this.isUuid(idValue)) {
+        const byId = await this.groupPrismaClient.$queryRaw<GroupIdRow[]>`
+          SELECT "id"
+          FROM "groups"."Group"
+          WHERE "id" = ${idValue}
+          LIMIT 1
+        `;
+        if (byId.length > 0) {
+          return byId[0].id;
+        }
+      }
+
+      const byOldId = await this.groupPrismaClient.$queryRaw<GroupIdRow[]>`
+        SELECT "id"
+        FROM "groups"."Group"
+        WHERE "oldId" = ${idValue}
+        LIMIT 1
+      `;
+      return byOldId[0]?.id ?? null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to resolve group ID for value '${idValue}'.`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  private async findGroupIdByDescriptionOrName(
+    groupName: string,
+  ): Promise<string | null> {
+    const nameValue = groupName.trim();
+    if (!nameValue) {
+      return null;
+    }
+
+    try {
+      const byDescription = await this.groupPrismaClient.$queryRaw<
+        GroupIdRow[]
+      >`
+        SELECT "id"
+        FROM "groups"."Group"
+        WHERE "description" = ${nameValue}
+        LIMIT 1
+      `;
+      if (byDescription.length > 0) {
+        return byDescription[0].id;
+      }
+
+      const byName = await this.groupPrismaClient.$queryRaw<GroupIdRow[]>`
+        SELECT "id"
+        FROM "groups"."Group"
+        WHERE "name" = ${nameValue}
+        LIMIT 1
+      `;
+      return byName[0]?.id ?? null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to resolve group by name/description '${nameValue}'.`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 }
