@@ -239,14 +239,7 @@ export class AuthFlowService {
       );
       this.logger.log(`Published 'event.user.activated' event for ${userId}`);
 
-      // Send Welcome Email directly, matching legacy Java behavior
-      if (
-        CommonUtils.validateString(user.reg_source) &&
-        !user.reg_source.match(/^tcBusiness$/)
-      ) {
-        // The current Welcome mail should not be sent to customers (connect users).
-        await this.userService.notifyWelcome(userId, primaryEmailAddress);
-      }
+      await this.userService.notifyWelcome(userId, primaryEmailAddress);
 
       // assign a default user role
       await this.userService.assignDefaultUserRole(userId);
