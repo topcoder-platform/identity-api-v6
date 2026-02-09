@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { sanitizeForLogging } from '../util/log-sanitizer.util';
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
@@ -12,7 +13,15 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     this.logger.log(
       `---> ${method} ${originalUrl} - User-Agent: ${userAgent} - IP: ${req.ip}`,
     );
-    this.logger.debug(`---> Request Headers: ${JSON.stringify(headers)}`);
+    this.logger.debug(
+      `---> Request Headers: ${JSON.stringify(sanitizeForLogging(headers))}`,
+    );
+
+    if (this.shouldLogCreateUserBody(method, originalUrl)) {
+      this.logger.debug(
+        `---> Request Body: ${JSON.stringify(sanitizeForLogging(req.body))}`,
+      );
+    }
 
     // Optionally log when the request finishes
     res.on('finish', () => {
@@ -23,5 +32,18 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     });
 
     next();
+  }
+
+  private shouldLogCreateUserBody(
+    method: string,
+    originalUrl: string,
+  ): boolean {
+    const normalizedMethod = method.toUpperCase();
+    if (normalizedMethod !== 'POST') {
+      return false;
+    }
+
+    const pathOnly = originalUrl.split('?')[0];
+    return /\/v6\/users\/?$/.test(pathOnly);
   }
 }

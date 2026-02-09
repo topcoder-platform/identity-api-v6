@@ -6,8 +6,9 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ValidationError } from 'class-validator';
+import { sanitizeForLogging } from '../util/log-sanitizer.util';
 
 @Catch(HttpException)
 export class ValidationExceptionFilter implements ExceptionFilter {
@@ -15,12 +16,13 @@ export class ValidationExceptionFilter implements ExceptionFilter {
 
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
+    const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
     let message = exception.message;
-    let errors: any = null;
+    let errors: Record<string, string> | null = null;
 
     // Handle class-validator ValidationPipe errors specifically
     if (
@@ -57,17 +59,36 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       message = (exceptionResponse as { message?: string }).message || message;
     }
 
+    if (status === HttpStatus.BAD_REQUEST) {
+      const reason = this.extractBadRequestReason(
+        exceptionResponse,
+        message,
+        errors,
+      );
+      this.logger.warn(
+        `400 Bad Request: ${request.method} ${request.originalUrl} - Reason: ${reason}`,
+      );
+
+      if (this.isCreateUserRequest(request.method, request.originalUrl)) {
+        this.logger.warn(
+          `400 Request Body: ${JSON.stringify(sanitizeForLogging(request.body))}`,
+        );
+      }
+    }
+
     response.status(status).json({
       statusCode: status,
       message: message,
       errors: errors, // Include formatted validation errors if present
       timestamp: new Date().toISOString(),
-      path: ctx.getRequest().url,
+      path: request.url,
     });
   }
 
-  private formatValidationErrors(validationErrors: ValidationError[]) {
-    const formattedErrors = {};
+  private formatValidationErrors(
+    validationErrors: ValidationError[],
+  ): Record<string, string> {
+    const formattedErrors: Record<string, string> = {};
     validationErrors.forEach((err) => {
       formattedErrors[err.property] = Object.values(err.constraints || {}).join(
         ', ',
@@ -80,5 +101,42 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       }
     });
     return formattedErrors;
+  }
+
+  private extractBadRequestReason(
+    exceptionResponse: unknown,
+    fallbackMessage: string,
+    errors: Record<string, string> | null,
+  ): string {
+    if (typeof exceptionResponse === 'string') {
+      return exceptionResponse;
+    }
+
+    if (
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'message' in exceptionResponse
+    ) {
+      const responseMessage = (exceptionResponse as { message?: unknown })
+        .message;
+      if (Array.isArray(responseMessage)) {
+        return responseMessage.map((entry) => String(entry)).join('; ');
+      }
+      if (typeof responseMessage === 'string') {
+        return responseMessage;
+      }
+      return JSON.stringify(sanitizeForLogging(responseMessage));
+    }
+
+    if (errors && Object.keys(errors).length > 0) {
+      return JSON.stringify(sanitizeForLogging(errors));
+    }
+
+    return fallbackMessage;
+  }
+
+  private isCreateUserRequest(method: string, originalUrl: string): boolean {
+    const pathOnly = originalUrl.split('?')[0];
+    return method.toUpperCase() === 'POST' && /\/v6\/users\/?$/.test(pathOnly);
   }
 }
