@@ -2227,7 +2227,7 @@ export class UserService {
           const welcomeEmailPayload = {
             data: {
               handle: user.handle,
-              // Add other data fields specific to the welcome template if needed
+              userId: userId,
             },
             from: { email: fromEmail },
             version: 'v3',
