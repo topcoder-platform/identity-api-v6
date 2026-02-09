@@ -2479,12 +2479,13 @@ export class UserService {
   }
 
   private async addUserToGroupByGroupId(userId: number, groupId: string) {
+    const groupMemberId = crypto.randomUUID();
     const memberId = String(userId);
     const createdBy = String(Constants.DEFAULT_CREATE_USER_ID);
     const membershipType = Constants.memberGroupMembershipName;
     const affected = await this.groupPrismaClient.$executeRaw`
-      INSERT INTO "groups"."GroupMember" ("groupId", "memberId", "membershipType", "createdBy")
-      VALUES (${groupId}, ${memberId}, ${membershipType}, ${createdBy})
+      INSERT INTO "groups"."GroupMember" ("id", "groupId", "memberId", "membershipType", "createdBy")
+      VALUES (${groupMemberId}, ${groupId}, ${memberId}, ${membershipType}, ${createdBy})
       ON CONFLICT ("groupId", "memberId") DO NOTHING
     `;
     if (affected === 0) {
