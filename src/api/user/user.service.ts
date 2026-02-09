@@ -2227,10 +2227,10 @@ export class UserService {
           const welcomeEmailPayload = {
             data: {
               handle: user.handle,
-              // Add other data fields specific to the welcome template if needed
+              userId: userId,
             },
             from: { email: fromEmail },
-            version: 'v6',
+            version: 'v3',
             sendgrid_template_id: welcomeTemplateId,
             recipients: [emailAddress],
           };
