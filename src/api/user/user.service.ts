@@ -2484,8 +2484,8 @@ export class UserService {
     const createdBy = String(Constants.DEFAULT_CREATE_USER_ID);
     const membershipType = Constants.memberGroupMembershipName;
     const affected = await this.groupPrismaClient.$executeRaw`
-      INSERT INTO "groups"."GroupMember" ("id", "groupId", "memberId", "membershipType", "createdBy")
-      VALUES (${groupMemberId}, ${groupId}, ${memberId}, ${membershipType}, ${createdBy})
+      INSERT INTO "groups"."GroupMember" ("id", "groupId", "memberId", "membershipType", "roles", "createdAt", "createdBy", "updatedAt", "updatedBy")
+      VALUES (${groupMemberId}, ${groupId}, ${memberId}, ${membershipType}, '{}', NOW(), ${createdBy}, NOW(), ${createdBy})
       ON CONFLICT ("groupId", "memberId") DO NOTHING
     `;
     if (affected === 0) {
