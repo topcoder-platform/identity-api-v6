@@ -822,6 +822,72 @@ describe('UserService', () => {
       expect((result.users[0] as any).ssoUserId).toBe('john.smith@wipro.com');
     });
 
+    it('should apply direct Prisma sorting for supported user columns', async () => {
+      const query: UserSearchQueryDto = {
+        sortBy: 'handle',
+        sortOrder: 'desc',
+      };
+      prismaOltp.user.count.mockResolvedValue(0);
+      prismaOltp.user.findMany.mockResolvedValue([]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+
+      await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 20,
+        orderBy: [{ handle_lower: 'desc' }, { user_id: 'desc' }],
+      });
+      expect(prismaOltp.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('should sort by SSO UserID using the joined sort query and preserve that order', async () => {
+      const query: UserSearchQueryDto = {
+        sortBy: 'ssoUserId',
+        sortOrder: 'asc',
+      };
+      const firstUser = createMockUserModel({ user_id: new Decimal(101) });
+      const secondUser = createMockUserModel({ user_id: new Decimal(202) });
+
+      prismaOltp.user.count.mockResolvedValue(2);
+      prismaOltp.$queryRaw.mockResolvedValue([
+        { user_id: secondUser.user_id },
+        { user_id: firstUser.user_id },
+      ]);
+      prismaOltp.user.findMany.mockResolvedValue([firstUser, secondUser]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+      prismaOltp.user_sso_login.findMany.mockResolvedValue([
+        {
+          user_id: secondUser.user_id,
+          sso_user_id: 'alpha@example.com',
+          provider_id: new Decimal(1),
+        },
+        {
+          user_id: firstUser.user_id,
+          sso_user_id: 'zulu@example.com',
+          provider_id: new Decimal(1),
+        },
+      ]);
+
+      const result = await service.findUsers(query);
+
+      expect(prismaOltp.$queryRaw).toHaveBeenCalled();
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: {
+            in: [202, 101],
+          },
+        },
+      });
+      expect(result.total).toBe(2);
+      expect(result.users.map((user) => Number(user.user_id))).toEqual([
+        202, 101,
+      ]);
+      expect((result.users[0] as any).ssoUserId).toBe('alpha@example.com');
+      expect((result.users[1] as any).ssoUserId).toBe('zulu@example.com');
+    });
+
     it('should use offset and limit', async () => {
       const query: UserSearchQueryDto = { offset: 10, limit: 5 };
       prismaOltp.user.count.mockResolvedValue(0);

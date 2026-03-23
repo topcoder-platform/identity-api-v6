@@ -17,6 +17,7 @@ import {
   IsUrl,
   Length,
   IsInt,
+  IsIn,
   Min,
   IsDate,
 } from 'class-validator';
@@ -587,6 +588,26 @@ export class UserSearchQueryDto {
     description: 'comma-separated list of fields to include in response',
   })
   selector?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'sortBy',
+    type: String,
+    description:
+      'User list sort field. Supported values include id, handle, firstName, statusDesc, createdAt, modifiedAt, email, ssoUserId, and activationCode.',
+  })
+  sortBy?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['asc', 'desc', 'ASC', 'DESC'])
+  @ApiPropertyOptional({
+    name: 'sortOrder',
+    type: String,
+    description: 'Sort direction for sortBy. Accepted values: asc, desc.',
+  })
+  sortOrder?: 'asc' | 'desc';
 }
 
 // --- Added for UserController.deleteSSOUserLogin ---

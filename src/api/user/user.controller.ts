@@ -583,6 +583,19 @@ export class UserController {
     required: false,
     description: 'Offset. Default 0.',
   })
+  @ApiQuery({
+    name: 'sortBy',
+    type: String,
+    required: false,
+    description:
+      'Optional sort field. Supports direct user fields plus joined email and SSO identifiers.',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    type: String,
+    required: false,
+    description: 'Optional sort direction. Accepted values: asc, desc.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'List of users found',
