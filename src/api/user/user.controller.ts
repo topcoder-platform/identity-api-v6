@@ -77,6 +77,11 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
   dto.lastName = user.last_name;
   dto.status = user.status;
   dto.email = user.primaryEmailAddress ?? user.email ?? undefined;
+  dto.ssoUserId =
+    user.ssoUserId ??
+    user.sso_user_id ??
+    user.user_sso_login?.[0]?.sso_user_id ??
+    undefined;
 
   const rawEmailStatus =
     user.primaryEmailStatusId ??
@@ -556,8 +561,15 @@ export class UserController {
     type: String,
     required: false,
     description: `Request query filter, e.g.: filter=field=value[,field=value].
-      Supported filters: id, handle, firstName, lastName, email, status, regSource, utmSource, utmMedium, utmCampaign, active.
+      Supported filters: id, handle, firstName, lastName, email, ssoUserId, status, regSource, utmSource, utmMedium, utmCampaign, active.
       Example: filter=active=true`,
+  })
+  @ApiQuery({
+    name: 'ssoUserId',
+    type: String,
+    required: false,
+    description:
+      'SSO user identifier search term. Matches both SSO user id and SSO user name values.',
   })
   @ApiQuery({
     name: 'limit',

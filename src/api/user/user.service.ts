@@ -123,7 +123,7 @@ export class UserService {
     query: UserSearchQueryDto,
   ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const { handle, email, id, active, like } =
+    const { handle, email, ssoUserId, id, active, like } =
       this.extractSearchFilters(query);
     const filters: Prisma.userWhereInput[] = [];
 
@@ -133,20 +133,13 @@ export class UserService {
     }
 
     if (handle) {
-      const wildcard = this.parseWildcard(handle);
-      if (like || wildcard.hasWildcard) {
-        const value = wildcard.value;
-        if (value.length > 0) {
-          if (wildcard.type === 'startsWith') {
-            filters.push({
-              handle: { startsWith: value, mode: 'insensitive' },
-            });
-          } else if (wildcard.type === 'endsWith') {
-            filters.push({ handle: { endsWith: value, mode: 'insensitive' } });
-          } else {
-            // contains (default)
-            filters.push({ handle: { contains: value, mode: 'insensitive' } });
-          }
+      const hasHandleWildcard = handle.includes('*');
+      if (like || hasHandleWildcard) {
+        const handleFilter = this.buildInsensitiveStringFilter(handle, like);
+        if (handleFilter) {
+          filters.push({
+            handle: handleFilter,
+          });
         }
       } else {
         // exact match on lowered handle for performance/index usage
@@ -155,26 +148,10 @@ export class UserService {
     }
 
     if (email?.trim()) {
-      const wildcard = this.parseWildcard(email.trim());
-      const buildEmailAddressFilter = () => {
-        if (like || wildcard.hasWildcard) {
-          const value = wildcard.value;
-          if (value.length === 0) {
-            // If wildcard resolves to empty, skip adding a filter
-            return undefined as any;
-          }
-          if (wildcard.type === 'startsWith') {
-            return { startsWith: value, mode: 'insensitive' } as const;
-          } else if (wildcard.type === 'endsWith') {
-            return { endsWith: value, mode: 'insensitive' } as const;
-          }
-          return { contains: value, mode: 'insensitive' } as const;
-        }
-        // exact match by default
-        return { equals: wildcard.value, mode: 'insensitive' } as const;
-      };
-
-      const addressFilter = buildEmailAddressFilter();
+      const addressFilter = this.buildInsensitiveStringFilter(
+        email.trim(),
+        like,
+      );
       if (addressFilter) {
         filters.push({
           OR: [
@@ -195,6 +172,23 @@ export class UserService {
               },
             },
           ],
+        });
+      }
+    }
+
+    if (ssoUserId?.trim()) {
+      const ssoFilter = this.buildInsensitiveStringFilter(
+        ssoUserId.trim(),
+        like,
+      );
+
+      if (ssoFilter) {
+        filters.push({
+          user_sso_login: {
+            some: {
+              OR: [{ sso_user_id: ssoFilter }, { sso_user_name: ssoFilter }],
+            },
+          },
         });
       }
     }
@@ -239,10 +233,23 @@ export class UserService {
         },
       });
 
+      const ssoLogins = await this.prismaClient.user_sso_login.findMany({
+        where: {
+          user_id: { in: userIds },
+        },
+        select: {
+          user_id: true,
+          sso_user_id: true,
+          provider_id: true,
+        },
+        orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }],
+      });
+
       const emailMap = new Map<
         string,
         { address: string | null; statusId: Decimal | null }
       >();
+      const ssoUserIdMap = new Map<string, string>();
 
       for (const email of primaryEmails) {
         emailMap.set(email.user_id.toString(), {
@@ -251,11 +258,23 @@ export class UserService {
         });
       }
 
+      for (const ssoLogin of ssoLogins) {
+        const userIdKey = ssoLogin.user_id.toString();
+        if (!ssoUserIdMap.has(userIdKey) && ssoLogin.sso_user_id) {
+          ssoUserIdMap.set(userIdKey, ssoLogin.sso_user_id);
+        }
+      }
+
       for (const user of users) {
         const emailRecord = emailMap.get(user.user_id.toString());
         if (emailRecord) {
           (user as any).primaryEmailAddress = emailRecord.address;
           (user as any).primaryEmailStatusId = emailRecord.statusId;
+        }
+
+        const ssoLoginUserId = ssoUserIdMap.get(user.user_id.toString());
+        if (ssoLoginUserId) {
+          (user as any).ssoUserId = ssoLoginUserId;
         }
       }
 
@@ -270,6 +289,7 @@ export class UserService {
     id?: number;
     handle?: string;
     email?: string;
+    ssoUserId?: string;
     active?: boolean;
     like: boolean;
   } {
@@ -288,6 +308,9 @@ export class UserService {
         'emailAddress',
         'primaryEmail',
       ]);
+    const ssoUserId =
+      query.ssoUserId ??
+      this.getFirstFilterValue(parsedFilters, ['ssoUserId', 'ssoUserName']);
 
     // active filter: true/false or 1/0
     const activeRaw = this.getFirstFilterValue(parsedFilters, ['active']);
@@ -306,7 +329,7 @@ export class UserService {
       like = v === 'true' || v === '1';
     }
 
-    return { id: validId, handle, email, active, like };
+    return { id: validId, handle, email, ssoUserId, active, like };
   }
 
   private parseFilterString(filter?: string): Record<string, string> {
@@ -369,37 +392,88 @@ export class UserService {
   }
 
   /**
-   * Parse a potential wildcard string using '*' semantics.
-   * - 'abc*' => startsWith 'abc'
-   * - '*abc' => endsWith 'abc'
-   * - 'a*b' or contains '*' internally => contains 'ab' (collapsed)
-   * - no '*' => exact with value
+   * Builds a Prisma case-insensitive string filter with optional wildcard support.
+   * @param searchValue Raw search value that may include `*` wildcard characters.
+   * @param like Whether wildcard semantics should be enabled even if `*` is absent.
+   * @returns A Prisma-compatible string filter or undefined when the wildcard resolves to an empty value.
    */
-  private parseWildcard(value: string): {
-    hasWildcard: boolean;
-    type: 'startsWith' | 'endsWith' | 'contains' | 'exact';
-    value: string;
-  } {
-    const idxFirst = value.indexOf('*');
-    if (idxFirst === -1) {
-      return { hasWildcard: false, type: 'exact', value };
+  private buildInsensitiveStringFilter(
+    searchValue: string,
+    like: boolean,
+  ):
+    | {
+        contains?: string;
+        endsWith?: string;
+        equals?: string;
+        mode: Prisma.QueryMode;
+        startsWith?: string;
+      }
+    | undefined {
+    const trimmedValue = searchValue.trim();
+    const hasWildcard = trimmedValue.includes('*');
+
+    if (!like && !hasWildcard) {
+      return {
+        equals: trimmedValue,
+        mode: 'insensitive',
+      };
     }
-    const idxLast = value.lastIndexOf('*');
-    // Remove all '*'
-    const stripped = value.replace(/\*/g, '');
-    if (!stripped) {
-      return { hasWildcard: true, type: 'contains', value: '' };
+
+    if (!hasWildcard) {
+      return {
+        contains: trimmedValue,
+        mode: 'insensitive',
+      };
     }
-    if (idxFirst === 0 && idxLast === value.length - 1) {
-      return { hasWildcard: true, type: 'contains', value: stripped };
+
+    const rawParts = trimmedValue.split('*');
+    const nonEmptyParts = rawParts.filter((part) => part.length > 0);
+
+    if (!nonEmptyParts.length) {
+      return undefined;
     }
-    if (idxFirst === 0) {
-      return { hasWildcard: true, type: 'endsWith', value: stripped };
+
+    const filter: {
+      contains?: string;
+      endsWith?: string;
+      mode: Prisma.QueryMode;
+      startsWith?: string;
+    } = {
+      mode: 'insensitive',
+    };
+
+    if (!trimmedValue.startsWith('*')) {
+      filter.startsWith = rawParts[0];
     }
-    if (idxLast === value.length - 1) {
-      return { hasWildcard: true, type: 'startsWith', value: stripped };
+
+    if (!trimmedValue.endsWith('*')) {
+      filter.endsWith = rawParts[rawParts.length - 1];
     }
-    return { hasWildcard: true, type: 'contains', value: stripped };
+
+    const middleParts = nonEmptyParts.filter((part, index) => {
+      const isFirstPart = index === 0;
+      const isLastPart = index === nonEmptyParts.length - 1;
+
+      if (isFirstPart && !trimmedValue.startsWith('*')) {
+        return false;
+      }
+
+      if (isLastPart && !trimmedValue.endsWith('*')) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (middleParts.length > 0) {
+      filter.contains = middleParts.join('');
+    }
+
+    if (!filter.startsWith && !filter.endsWith && !filter.contains) {
+      filter.contains = nonEmptyParts.join('');
+    }
+
+    return filter;
   }
 
   async findUserById(userId: number): Promise<UserModel | null> {
@@ -700,6 +774,30 @@ export class UserService {
     }
   }
 
+  /**
+   * Converts a handle validation response into the appropriate HTTP exception.
+   * @param validationResponse Result returned by ValidationService.validateHandle.
+   * @throws ConflictException when the handle is already taken or locked.
+   * @throws BadRequestException for all other validation failures.
+   */
+  private assertHandleValidationSucceeded(
+    validationResponse: ValidationResponseDto,
+  ): void {
+    if (validationResponse.valid) {
+      return;
+    }
+
+    if (validationResponse.reasonCode === 'ALREADY_TAKEN') {
+      throw new ConflictException(
+        validationResponse.reason ?? 'Handle is taken',
+      );
+    }
+
+    throw new BadRequestException(
+      `Handle validation failed: ${validationResponse.reason}`,
+    );
+  }
+
   async registerUser(createUserDto: CreateUserBodyDto): Promise<UserModel> {
     const userParams: UserParamBaseDto = createUserDto.param;
 
@@ -718,11 +816,7 @@ export class UserService {
     // handle validation
     const validationResponse: ValidationResponseDto =
       await this.validationService.validateHandle(userParams.handle);
-    if (!validationResponse.valid) {
-      throw new BadRequestException(
-        `Handle validation failed: ${validationResponse.reason}`,
-      );
-    }
+    this.assertHandleValidationSucceeded(validationResponse);
     // email validation
     await this.validationService.validateEmailViaDB(userParams.email);
     // country validation
@@ -1342,11 +1436,7 @@ export class UserService {
       newHandle,
       userId,
     );
-    if (!validationResponse.valid) {
-      throw new BadRequestException(
-        `Handle validation failed: ${validationResponse.reason}`,
-      );
-    }
+    this.assertHandleValidationSucceeded(validationResponse);
 
     // Fetch the user to ensure they exist and get the old handle
     const existingUser = await this.prismaClient.user.findUnique({
@@ -1900,7 +1990,8 @@ export class UserService {
     const existingUserByHandle = await this.prismaClient.user.findFirst({
       where: { handle_lower: handleLower },
     });
-    if (existingUserByHandle) {
+    const lockedHandle = await this.validationService.isHandleLocked(handle);
+    if (existingUserByHandle || lockedHandle) {
       // Handle conflict, e.g., by appending a suffix or throwing an error. For now, simple error.
       // This should be rare if nickname/given_name is somewhat unique or uuid is used.
       this.logger.error(

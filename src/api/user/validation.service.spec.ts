@@ -51,6 +51,10 @@ const mockPrismaOltp = {
     findFirst: jest.fn(),
     count: jest.fn(),
   },
+  invalid_handles: {
+    count: jest.fn(),
+  },
+  $queryRaw: jest.fn(),
   email: {
     findFirst: jest.fn(),
   },
@@ -189,6 +193,8 @@ describe('ValidationService', () => {
   describe('validateHandle', () => {
     it('should return valid if handle is good and available', async () => {
       prismaOltp.user.findFirst.mockResolvedValue(null);
+      prismaOltp.invalid_handles.count.mockResolvedValue(0);
+      prismaOltp.$queryRaw.mockResolvedValue([]);
       const result = await service.validateHandle('new_handle123');
       expect(result).toEqual({ valid: true });
       expect(prismaOltp.user.findFirst).toHaveBeenCalledWith({
@@ -196,43 +202,66 @@ describe('ValidationService', () => {
       });
     });
 
-    it('should throw BadRequestException if handle is empty', async () => {
-      await expect(service.validateHandle('')).rejects.toThrow(
-        new BadRequestException('Handle cannot be empty.'),
-      );
+    it('should return invalid if handle is empty', async () => {
+      await expect(service.validateHandle('')).resolves.toEqual({
+        valid: false,
+        reason: 'Handle is required',
+      });
     });
 
-    it('should throw BadRequestException if handle format is invalid (too short)', async () => {
-      await expect(service.validateHandle('h!')).rejects.toThrow(
-        new BadRequestException(
+    it('should return invalid if handle format is invalid (too short)', async () => {
+      await expect(service.validateHandle('h!')).resolves.toEqual({
+        valid: false,
+        reason: 'Length of Handle in character should be between 3 and 64.',
+        reasonCode: 'INVALID_LENGTH',
+      });
+    });
+
+    it('should return invalid if handle format is invalid (invalid char)', async () => {
+      await expect(service.validateHandle('handle*')).resolves.toEqual({
+        valid: false,
+        reason:
           'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
-        ),
-      );
-    });
-    it('should throw BadRequestException if handle format is invalid (invalid char)', async () => {
-      await expect(service.validateHandle('handle*')).rejects.toThrow(
-        new BadRequestException(
-          'Handle must be 3-64 characters long and can only contain alphanumeric characters and _.-`[]{} symbols.',
-        ),
-      );
+        reasonCode: 'INVALID_FORMAT',
+      });
     });
 
-    it('should throw BadRequestException if handle is reserved', async () => {
-      await expect(service.validateHandle('admin')).rejects.toThrow(
-        new BadRequestException("Handle 'admin' is reserved."),
-      );
-      await expect(service.validateHandle('Support')).rejects.toThrow(
-        new BadRequestException("Handle 'Support' is reserved."),
-      );
+    it('should return invalid if handle is reserved', async () => {
+      await expect(service.validateHandle('admin')).resolves.toEqual({
+        valid: false,
+        reason: 'Please choose another handle, not starting with admin.',
+        reasonCode: 'INVALID_HANDLE',
+      });
+      await expect(service.validateHandle('Support')).resolves.toEqual({
+        valid: false,
+        reason: "Handle 'Support' is reserved",
+        reasonCode: 'INVALID_HANDLE',
+      });
     });
 
-    it('should throw ConflictException if handle already exists', async () => {
+    it('should return invalid if handle already exists', async () => {
       prismaOltp.user.findFirst.mockResolvedValue(
         createMockUserModel({ handle: 'existing_handle' }),
       );
-      await expect(service.validateHandle('existing_handle')).rejects.toThrow(
-        new ConflictException("Handle 'existing_handle' is already taken."),
-      );
+      prismaOltp.invalid_handles.count.mockResolvedValue(0);
+      prismaOltp.$queryRaw.mockResolvedValue([]);
+      await expect(service.validateHandle('existing_handle')).resolves.toEqual({
+        valid: false,
+        reason: "Handle 'existing_handle' has already been taken",
+        reasonCode: 'ALREADY_TAKEN',
+      });
+    });
+
+    it('should return invalid if handle is locked', async () => {
+      prismaOltp.user.findFirst.mockResolvedValue(null);
+      prismaOltp.invalid_handles.count.mockResolvedValue(0);
+      prismaOltp.$queryRaw.mockResolvedValue([{ locked_handle_id: 1 }]);
+
+      await expect(service.validateHandle('deleted_handle')).resolves.toEqual({
+        valid: false,
+        reason: "Handle 'deleted_handle' has already been taken",
+        reasonCode: 'ALREADY_TAKEN',
+      });
     });
   });
 

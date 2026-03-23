@@ -451,6 +451,7 @@ export class UserResponseDto {
   id: string;
   handle: string;
   email?: string; // Primary email
+  ssoUserId?: string;
   emailActive?: boolean;
   firstName?: string;
   lastName?: string;
@@ -547,6 +548,16 @@ export class UserSearchQueryDto {
     description: 'member email',
   })
   email?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    name: 'ssoUserId',
+    type: String,
+    description:
+      'SSO user identifier search term. Matches both SSO user id and SSO user name.',
+  })
+  ssoUserId?: string;
 
   @IsInt()
   @Min(1)
