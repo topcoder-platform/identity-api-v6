@@ -114,6 +114,15 @@ model invalid_handles {
   @@schema("identity")
 }
 
+model locked_handles {
+  locked_handle_id    Int       @id(map: "pk_locked_handles") @default(autoincrement())
+  locked_handle       String    @db.VarChar(50)
+  locked_handle_lower String    @unique(map: "locked_handles_locked_handle_lower_key") @db.VarChar(50)
+  create_date         DateTime? @default(now()) @db.Timestamp(6)
+
+  @@schema("identity")
+}
+
 model security_groups {
   group_id            Decimal           @id(map: "pk_security_groups") @db.Decimal(12, 0)
   description         String            @db.VarChar(254)

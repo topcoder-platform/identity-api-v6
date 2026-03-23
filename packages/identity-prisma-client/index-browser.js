@@ -187,6 +187,13 @@ exports.Prisma.Invalid_handlesScalarFieldEnum = {
   invalid_handle: 'invalid_handle'
 };
 
+exports.Prisma.Locked_handlesScalarFieldEnum = {
+  locked_handle_id: 'locked_handle_id',
+  locked_handle: 'locked_handle',
+  locked_handle_lower: 'locked_handle_lower',
+  create_date: 'create_date'
+};
+
 exports.Prisma.Security_groupsScalarFieldEnum = {
   group_id: 'group_id',
   description: 'description',
@@ -382,6 +389,7 @@ exports.Prisma.ModelName = {
   email_type_lu: 'email_type_lu',
   id_sequences: 'id_sequences',
   invalid_handles: 'invalid_handles',
+  locked_handles: 'locked_handles',
   security_groups: 'security_groups',
   security_status_lu: 'security_status_lu',
   security_user: 'security_user',

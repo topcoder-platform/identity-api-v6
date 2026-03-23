@@ -178,7 +178,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/hentrymartin/development/identity-api-v6/prisma/member/generated/member",
+      "value": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/generated/member",
       "fromEnvVar": null
     },
     "config": {
@@ -187,12 +187,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "debian-openssl-3.0.x",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/hentrymartin/development/identity-api-v6/prisma/member/schema.prisma",
+    "sourceFilePath": "/home/jmgasper/Documents/Git/v6/identity-api-v6/prisma/member/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -254,8 +254,8 @@ exports.PrismaClient = PrismaClient
 Object.assign(exports, Prisma)
 
 // file annotations for bundling tools to include these files
-path.join(__dirname, "libquery_engine-darwin-arm64.dylib.node");
-path.join(process.cwd(), "prisma/member/generated/member/libquery_engine-darwin-arm64.dylib.node")
+path.join(__dirname, "libquery_engine-debian-openssl-3.0.x.so.node");
+path.join(process.cwd(), "prisma/member/generated/member/libquery_engine-debian-openssl-3.0.x.so.node")
 // file annotations for bundling tools to include these files
 path.join(__dirname, "schema.prisma");
 path.join(process.cwd(), "prisma/member/generated/member/schema.prisma")

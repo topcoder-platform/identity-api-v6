@@ -54,6 +54,11 @@ export type id_sequences = $Result.DefaultSelection<Prisma.$id_sequencesPayload>
  */
 export type invalid_handles = $Result.DefaultSelection<Prisma.$invalid_handlesPayload>
 /**
+ * Model locked_handles
+ * 
+ */
+export type locked_handles = $Result.DefaultSelection<Prisma.$locked_handlesPayload>
+/**
  * Model security_groups
  * 
  */
@@ -346,6 +351,16 @@ export class PrismaClient<
     * ```
     */
   get invalid_handles(): Prisma.invalid_handlesDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.locked_handles`: Exposes CRUD operations for the **locked_handles** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Locked_handles
+    * const locked_handles = await prisma.locked_handles.findMany()
+    * ```
+    */
+  get locked_handles(): Prisma.locked_handlesDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.security_groups`: Exposes CRUD operations for the **security_groups** model.
@@ -985,6 +1000,7 @@ export namespace Prisma {
     email_type_lu: 'email_type_lu',
     id_sequences: 'id_sequences',
     invalid_handles: 'invalid_handles',
+    locked_handles: 'locked_handles',
     security_groups: 'security_groups',
     security_status_lu: 'security_status_lu',
     security_user: 'security_user',
@@ -1022,7 +1038,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "achievement_type_lu" | "country" | "dice_connection" | "email" | "email_status_lu" | "email_type_lu" | "id_sequences" | "invalid_handles" | "security_groups" | "security_status_lu" | "security_user" | "social_login_provider" | "sso_login_provider" | "user" | "user_2fa" | "user_achievement" | "user_group_xref" | "user_otp_email" | "user_social_login" | "user_sso_login" | "user_status" | "user_status_lu" | "user_status_type_lu" | "user_email_xref" | "client" | "role" | "roleAssignment"
+      modelProps: "achievement_type_lu" | "country" | "dice_connection" | "email" | "email_status_lu" | "email_type_lu" | "id_sequences" | "invalid_handles" | "locked_handles" | "security_groups" | "security_status_lu" | "security_user" | "social_login_provider" | "sso_login_provider" | "user" | "user_2fa" | "user_achievement" | "user_group_xref" | "user_otp_email" | "user_social_login" | "user_sso_login" | "user_status" | "user_status_lu" | "user_status_type_lu" | "user_email_xref" | "client" | "role" | "roleAssignment"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1615,6 +1631,80 @@ export namespace Prisma {
           count: {
             args: Prisma.invalid_handlesCountArgs<ExtArgs>
             result: $Utils.Optional<Invalid_handlesCountAggregateOutputType> | number
+          }
+        }
+      }
+      locked_handles: {
+        payload: Prisma.$locked_handlesPayload<ExtArgs>
+        fields: Prisma.locked_handlesFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.locked_handlesFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.locked_handlesFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          findFirst: {
+            args: Prisma.locked_handlesFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.locked_handlesFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          findMany: {
+            args: Prisma.locked_handlesFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>[]
+          }
+          create: {
+            args: Prisma.locked_handlesCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          createMany: {
+            args: Prisma.locked_handlesCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.locked_handlesCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>[]
+          }
+          delete: {
+            args: Prisma.locked_handlesDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          update: {
+            args: Prisma.locked_handlesUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          deleteMany: {
+            args: Prisma.locked_handlesDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.locked_handlesUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.locked_handlesUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>[]
+          }
+          upsert: {
+            args: Prisma.locked_handlesUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$locked_handlesPayload>
+          }
+          aggregate: {
+            args: Prisma.Locked_handlesAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateLocked_handles>
+          }
+          groupBy: {
+            args: Prisma.locked_handlesGroupByArgs<ExtArgs>
+            result: $Utils.Optional<Locked_handlesGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.locked_handlesCountArgs<ExtArgs>
+            result: $Utils.Optional<Locked_handlesCountAggregateOutputType> | number
           }
         }
       }
@@ -3128,6 +3218,7 @@ export namespace Prisma {
     email_type_lu?: email_type_luOmit
     id_sequences?: id_sequencesOmit
     invalid_handles?: invalid_handlesOmit
+    locked_handles?: locked_handlesOmit
     security_groups?: security_groupsOmit
     security_status_lu?: security_status_luOmit
     security_user?: security_userOmit
@@ -12469,6 +12560,1022 @@ export namespace Prisma {
      * Omit specific fields from the invalid_handles
      */
     omit?: invalid_handlesOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model locked_handles
+   */
+
+  export type AggregateLocked_handles = {
+    _count: Locked_handlesCountAggregateOutputType | null
+    _avg: Locked_handlesAvgAggregateOutputType | null
+    _sum: Locked_handlesSumAggregateOutputType | null
+    _min: Locked_handlesMinAggregateOutputType | null
+    _max: Locked_handlesMaxAggregateOutputType | null
+  }
+
+  export type Locked_handlesAvgAggregateOutputType = {
+    locked_handle_id: number | null
+  }
+
+  export type Locked_handlesSumAggregateOutputType = {
+    locked_handle_id: number | null
+  }
+
+  export type Locked_handlesMinAggregateOutputType = {
+    locked_handle_id: number | null
+    locked_handle: string | null
+    locked_handle_lower: string | null
+    create_date: Date | null
+  }
+
+  export type Locked_handlesMaxAggregateOutputType = {
+    locked_handle_id: number | null
+    locked_handle: string | null
+    locked_handle_lower: string | null
+    create_date: Date | null
+  }
+
+  export type Locked_handlesCountAggregateOutputType = {
+    locked_handle_id: number
+    locked_handle: number
+    locked_handle_lower: number
+    create_date: number
+    _all: number
+  }
+
+
+  export type Locked_handlesAvgAggregateInputType = {
+    locked_handle_id?: true
+  }
+
+  export type Locked_handlesSumAggregateInputType = {
+    locked_handle_id?: true
+  }
+
+  export type Locked_handlesMinAggregateInputType = {
+    locked_handle_id?: true
+    locked_handle?: true
+    locked_handle_lower?: true
+    create_date?: true
+  }
+
+  export type Locked_handlesMaxAggregateInputType = {
+    locked_handle_id?: true
+    locked_handle?: true
+    locked_handle_lower?: true
+    create_date?: true
+  }
+
+  export type Locked_handlesCountAggregateInputType = {
+    locked_handle_id?: true
+    locked_handle?: true
+    locked_handle_lower?: true
+    create_date?: true
+    _all?: true
+  }
+
+  export type Locked_handlesAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which locked_handles to aggregate.
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of locked_handles to fetch.
+     */
+    orderBy?: locked_handlesOrderByWithRelationInput | locked_handlesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: locked_handlesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` locked_handles from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` locked_handles.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned locked_handles
+    **/
+    _count?: true | Locked_handlesCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: Locked_handlesAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: Locked_handlesSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: Locked_handlesMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: Locked_handlesMaxAggregateInputType
+  }
+
+  export type GetLocked_handlesAggregateType<T extends Locked_handlesAggregateArgs> = {
+        [P in keyof T & keyof AggregateLocked_handles]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateLocked_handles[P]>
+      : GetScalarType<T[P], AggregateLocked_handles[P]>
+  }
+
+
+
+
+  export type locked_handlesGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: locked_handlesWhereInput
+    orderBy?: locked_handlesOrderByWithAggregationInput | locked_handlesOrderByWithAggregationInput[]
+    by: Locked_handlesScalarFieldEnum[] | Locked_handlesScalarFieldEnum
+    having?: locked_handlesScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: Locked_handlesCountAggregateInputType | true
+    _avg?: Locked_handlesAvgAggregateInputType
+    _sum?: Locked_handlesSumAggregateInputType
+    _min?: Locked_handlesMinAggregateInputType
+    _max?: Locked_handlesMaxAggregateInputType
+  }
+
+  export type Locked_handlesGroupByOutputType = {
+    locked_handle_id: number
+    locked_handle: string
+    locked_handle_lower: string
+    create_date: Date | null
+    _count: Locked_handlesCountAggregateOutputType | null
+    _avg: Locked_handlesAvgAggregateOutputType | null
+    _sum: Locked_handlesSumAggregateOutputType | null
+    _min: Locked_handlesMinAggregateOutputType | null
+    _max: Locked_handlesMaxAggregateOutputType | null
+  }
+
+  type GetLocked_handlesGroupByPayload<T extends locked_handlesGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<Locked_handlesGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof Locked_handlesGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], Locked_handlesGroupByOutputType[P]>
+            : GetScalarType<T[P], Locked_handlesGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type locked_handlesSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    locked_handle_id?: boolean
+    locked_handle?: boolean
+    locked_handle_lower?: boolean
+    create_date?: boolean
+  }, ExtArgs["result"]["locked_handles"]>
+
+  export type locked_handlesSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    locked_handle_id?: boolean
+    locked_handle?: boolean
+    locked_handle_lower?: boolean
+    create_date?: boolean
+  }, ExtArgs["result"]["locked_handles"]>
+
+  export type locked_handlesSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    locked_handle_id?: boolean
+    locked_handle?: boolean
+    locked_handle_lower?: boolean
+    create_date?: boolean
+  }, ExtArgs["result"]["locked_handles"]>
+
+  export type locked_handlesSelectScalar = {
+    locked_handle_id?: boolean
+    locked_handle?: boolean
+    locked_handle_lower?: boolean
+    create_date?: boolean
+  }
+
+  export type locked_handlesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"locked_handle_id" | "locked_handle" | "locked_handle_lower" | "create_date", ExtArgs["result"]["locked_handles"]>
+
+  export type $locked_handlesPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "locked_handles"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      locked_handle_id: number
+      locked_handle: string
+      locked_handle_lower: string
+      create_date: Date | null
+    }, ExtArgs["result"]["locked_handles"]>
+    composites: {}
+  }
+
+  type locked_handlesGetPayload<S extends boolean | null | undefined | locked_handlesDefaultArgs> = $Result.GetResult<Prisma.$locked_handlesPayload, S>
+
+  type locked_handlesCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<locked_handlesFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: Locked_handlesCountAggregateInputType | true
+    }
+
+  export interface locked_handlesDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['locked_handles'], meta: { name: 'locked_handles' } }
+    /**
+     * Find zero or one Locked_handles that matches the filter.
+     * @param {locked_handlesFindUniqueArgs} args - Arguments to find a Locked_handles
+     * @example
+     * // Get one Locked_handles
+     * const locked_handles = await prisma.locked_handles.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends locked_handlesFindUniqueArgs>(args: SelectSubset<T, locked_handlesFindUniqueArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Locked_handles that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {locked_handlesFindUniqueOrThrowArgs} args - Arguments to find a Locked_handles
+     * @example
+     * // Get one Locked_handles
+     * const locked_handles = await prisma.locked_handles.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends locked_handlesFindUniqueOrThrowArgs>(args: SelectSubset<T, locked_handlesFindUniqueOrThrowArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Locked_handles that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesFindFirstArgs} args - Arguments to find a Locked_handles
+     * @example
+     * // Get one Locked_handles
+     * const locked_handles = await prisma.locked_handles.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends locked_handlesFindFirstArgs>(args?: SelectSubset<T, locked_handlesFindFirstArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Locked_handles that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesFindFirstOrThrowArgs} args - Arguments to find a Locked_handles
+     * @example
+     * // Get one Locked_handles
+     * const locked_handles = await prisma.locked_handles.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends locked_handlesFindFirstOrThrowArgs>(args?: SelectSubset<T, locked_handlesFindFirstOrThrowArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Locked_handles that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Locked_handles
+     * const locked_handles = await prisma.locked_handles.findMany()
+     * 
+     * // Get first 10 Locked_handles
+     * const locked_handles = await prisma.locked_handles.findMany({ take: 10 })
+     * 
+     * // Only select the `locked_handle_id`
+     * const locked_handlesWithLocked_handle_idOnly = await prisma.locked_handles.findMany({ select: { locked_handle_id: true } })
+     * 
+     */
+    findMany<T extends locked_handlesFindManyArgs>(args?: SelectSubset<T, locked_handlesFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Locked_handles.
+     * @param {locked_handlesCreateArgs} args - Arguments to create a Locked_handles.
+     * @example
+     * // Create one Locked_handles
+     * const Locked_handles = await prisma.locked_handles.create({
+     *   data: {
+     *     // ... data to create a Locked_handles
+     *   }
+     * })
+     * 
+     */
+    create<T extends locked_handlesCreateArgs>(args: SelectSubset<T, locked_handlesCreateArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Locked_handles.
+     * @param {locked_handlesCreateManyArgs} args - Arguments to create many Locked_handles.
+     * @example
+     * // Create many Locked_handles
+     * const locked_handles = await prisma.locked_handles.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends locked_handlesCreateManyArgs>(args?: SelectSubset<T, locked_handlesCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Locked_handles and returns the data saved in the database.
+     * @param {locked_handlesCreateManyAndReturnArgs} args - Arguments to create many Locked_handles.
+     * @example
+     * // Create many Locked_handles
+     * const locked_handles = await prisma.locked_handles.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Locked_handles and only return the `locked_handle_id`
+     * const locked_handlesWithLocked_handle_idOnly = await prisma.locked_handles.createManyAndReturn({
+     *   select: { locked_handle_id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends locked_handlesCreateManyAndReturnArgs>(args?: SelectSubset<T, locked_handlesCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Locked_handles.
+     * @param {locked_handlesDeleteArgs} args - Arguments to delete one Locked_handles.
+     * @example
+     * // Delete one Locked_handles
+     * const Locked_handles = await prisma.locked_handles.delete({
+     *   where: {
+     *     // ... filter to delete one Locked_handles
+     *   }
+     * })
+     * 
+     */
+    delete<T extends locked_handlesDeleteArgs>(args: SelectSubset<T, locked_handlesDeleteArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Locked_handles.
+     * @param {locked_handlesUpdateArgs} args - Arguments to update one Locked_handles.
+     * @example
+     * // Update one Locked_handles
+     * const locked_handles = await prisma.locked_handles.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends locked_handlesUpdateArgs>(args: SelectSubset<T, locked_handlesUpdateArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Locked_handles.
+     * @param {locked_handlesDeleteManyArgs} args - Arguments to filter Locked_handles to delete.
+     * @example
+     * // Delete a few Locked_handles
+     * const { count } = await prisma.locked_handles.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends locked_handlesDeleteManyArgs>(args?: SelectSubset<T, locked_handlesDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Locked_handles.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Locked_handles
+     * const locked_handles = await prisma.locked_handles.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends locked_handlesUpdateManyArgs>(args: SelectSubset<T, locked_handlesUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Locked_handles and returns the data updated in the database.
+     * @param {locked_handlesUpdateManyAndReturnArgs} args - Arguments to update many Locked_handles.
+     * @example
+     * // Update many Locked_handles
+     * const locked_handles = await prisma.locked_handles.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Locked_handles and only return the `locked_handle_id`
+     * const locked_handlesWithLocked_handle_idOnly = await prisma.locked_handles.updateManyAndReturn({
+     *   select: { locked_handle_id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends locked_handlesUpdateManyAndReturnArgs>(args: SelectSubset<T, locked_handlesUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Locked_handles.
+     * @param {locked_handlesUpsertArgs} args - Arguments to update or create a Locked_handles.
+     * @example
+     * // Update or create a Locked_handles
+     * const locked_handles = await prisma.locked_handles.upsert({
+     *   create: {
+     *     // ... data to create a Locked_handles
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Locked_handles we want to update
+     *   }
+     * })
+     */
+    upsert<T extends locked_handlesUpsertArgs>(args: SelectSubset<T, locked_handlesUpsertArgs<ExtArgs>>): Prisma__locked_handlesClient<$Result.GetResult<Prisma.$locked_handlesPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Locked_handles.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesCountArgs} args - Arguments to filter Locked_handles to count.
+     * @example
+     * // Count the number of Locked_handles
+     * const count = await prisma.locked_handles.count({
+     *   where: {
+     *     // ... the filter for the Locked_handles we want to count
+     *   }
+     * })
+    **/
+    count<T extends locked_handlesCountArgs>(
+      args?: Subset<T, locked_handlesCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], Locked_handlesCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Locked_handles.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {Locked_handlesAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends Locked_handlesAggregateArgs>(args: Subset<T, Locked_handlesAggregateArgs>): Prisma.PrismaPromise<GetLocked_handlesAggregateType<T>>
+
+    /**
+     * Group by Locked_handles.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {locked_handlesGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends locked_handlesGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: locked_handlesGroupByArgs['orderBy'] }
+        : { orderBy?: locked_handlesGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, locked_handlesGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetLocked_handlesGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the locked_handles model
+   */
+  readonly fields: locked_handlesFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for locked_handles.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__locked_handlesClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the locked_handles model
+   */
+  interface locked_handlesFieldRefs {
+    readonly locked_handle_id: FieldRef<"locked_handles", 'Int'>
+    readonly locked_handle: FieldRef<"locked_handles", 'String'>
+    readonly locked_handle_lower: FieldRef<"locked_handles", 'String'>
+    readonly create_date: FieldRef<"locked_handles", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * locked_handles findUnique
+   */
+  export type locked_handlesFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter, which locked_handles to fetch.
+     */
+    where: locked_handlesWhereUniqueInput
+  }
+
+  /**
+   * locked_handles findUniqueOrThrow
+   */
+  export type locked_handlesFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter, which locked_handles to fetch.
+     */
+    where: locked_handlesWhereUniqueInput
+  }
+
+  /**
+   * locked_handles findFirst
+   */
+  export type locked_handlesFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter, which locked_handles to fetch.
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of locked_handles to fetch.
+     */
+    orderBy?: locked_handlesOrderByWithRelationInput | locked_handlesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for locked_handles.
+     */
+    cursor?: locked_handlesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` locked_handles from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` locked_handles.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of locked_handles.
+     */
+    distinct?: Locked_handlesScalarFieldEnum | Locked_handlesScalarFieldEnum[]
+  }
+
+  /**
+   * locked_handles findFirstOrThrow
+   */
+  export type locked_handlesFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter, which locked_handles to fetch.
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of locked_handles to fetch.
+     */
+    orderBy?: locked_handlesOrderByWithRelationInput | locked_handlesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for locked_handles.
+     */
+    cursor?: locked_handlesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` locked_handles from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` locked_handles.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of locked_handles.
+     */
+    distinct?: Locked_handlesScalarFieldEnum | Locked_handlesScalarFieldEnum[]
+  }
+
+  /**
+   * locked_handles findMany
+   */
+  export type locked_handlesFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter, which locked_handles to fetch.
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of locked_handles to fetch.
+     */
+    orderBy?: locked_handlesOrderByWithRelationInput | locked_handlesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing locked_handles.
+     */
+    cursor?: locked_handlesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` locked_handles from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` locked_handles.
+     */
+    skip?: number
+    distinct?: Locked_handlesScalarFieldEnum | Locked_handlesScalarFieldEnum[]
+  }
+
+  /**
+   * locked_handles create
+   */
+  export type locked_handlesCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * The data needed to create a locked_handles.
+     */
+    data: XOR<locked_handlesCreateInput, locked_handlesUncheckedCreateInput>
+  }
+
+  /**
+   * locked_handles createMany
+   */
+  export type locked_handlesCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many locked_handles.
+     */
+    data: locked_handlesCreateManyInput | locked_handlesCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * locked_handles createManyAndReturn
+   */
+  export type locked_handlesCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * The data used to create many locked_handles.
+     */
+    data: locked_handlesCreateManyInput | locked_handlesCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * locked_handles update
+   */
+  export type locked_handlesUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * The data needed to update a locked_handles.
+     */
+    data: XOR<locked_handlesUpdateInput, locked_handlesUncheckedUpdateInput>
+    /**
+     * Choose, which locked_handles to update.
+     */
+    where: locked_handlesWhereUniqueInput
+  }
+
+  /**
+   * locked_handles updateMany
+   */
+  export type locked_handlesUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update locked_handles.
+     */
+    data: XOR<locked_handlesUpdateManyMutationInput, locked_handlesUncheckedUpdateManyInput>
+    /**
+     * Filter which locked_handles to update
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * Limit how many locked_handles to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * locked_handles updateManyAndReturn
+   */
+  export type locked_handlesUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * The data used to update locked_handles.
+     */
+    data: XOR<locked_handlesUpdateManyMutationInput, locked_handlesUncheckedUpdateManyInput>
+    /**
+     * Filter which locked_handles to update
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * Limit how many locked_handles to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * locked_handles upsert
+   */
+  export type locked_handlesUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * The filter to search for the locked_handles to update in case it exists.
+     */
+    where: locked_handlesWhereUniqueInput
+    /**
+     * In case the locked_handles found by the `where` argument doesn't exist, create a new locked_handles with this data.
+     */
+    create: XOR<locked_handlesCreateInput, locked_handlesUncheckedCreateInput>
+    /**
+     * In case the locked_handles was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<locked_handlesUpdateInput, locked_handlesUncheckedUpdateInput>
+  }
+
+  /**
+   * locked_handles delete
+   */
+  export type locked_handlesDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
+    /**
+     * Filter which locked_handles to delete.
+     */
+    where: locked_handlesWhereUniqueInput
+  }
+
+  /**
+   * locked_handles deleteMany
+   */
+  export type locked_handlesDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which locked_handles to delete
+     */
+    where?: locked_handlesWhereInput
+    /**
+     * Limit how many locked_handles to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * locked_handles without action
+   */
+  export type locked_handlesDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the locked_handles
+     */
+    select?: locked_handlesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the locked_handles
+     */
+    omit?: locked_handlesOmit<ExtArgs> | null
   }
 
 
@@ -34104,6 +35211,16 @@ export namespace Prisma {
   export type Invalid_handlesScalarFieldEnum = (typeof Invalid_handlesScalarFieldEnum)[keyof typeof Invalid_handlesScalarFieldEnum]
 
 
+  export const Locked_handlesScalarFieldEnum: {
+    locked_handle_id: 'locked_handle_id',
+    locked_handle: 'locked_handle',
+    locked_handle_lower: 'locked_handle_lower',
+    create_date: 'create_date'
+  };
+
+  export type Locked_handlesScalarFieldEnum = (typeof Locked_handlesScalarFieldEnum)[keyof typeof Locked_handlesScalarFieldEnum]
+
+
   export const Security_groupsScalarFieldEnum: {
     group_id: 'group_id',
     description: 'description',
@@ -34907,6 +36024,55 @@ export namespace Prisma {
     NOT?: invalid_handlesScalarWhereWithAggregatesInput | invalid_handlesScalarWhereWithAggregatesInput[]
     invalid_handle_id?: IntWithAggregatesFilter<"invalid_handles"> | number
     invalid_handle?: StringWithAggregatesFilter<"invalid_handles"> | string
+  }
+
+  export type locked_handlesWhereInput = {
+    AND?: locked_handlesWhereInput | locked_handlesWhereInput[]
+    OR?: locked_handlesWhereInput[]
+    NOT?: locked_handlesWhereInput | locked_handlesWhereInput[]
+    locked_handle_id?: IntFilter<"locked_handles"> | number
+    locked_handle?: StringFilter<"locked_handles"> | string
+    locked_handle_lower?: StringFilter<"locked_handles"> | string
+    create_date?: DateTimeNullableFilter<"locked_handles"> | Date | string | null
+  }
+
+  export type locked_handlesOrderByWithRelationInput = {
+    locked_handle_id?: SortOrder
+    locked_handle?: SortOrder
+    locked_handle_lower?: SortOrder
+    create_date?: SortOrderInput | SortOrder
+  }
+
+  export type locked_handlesWhereUniqueInput = Prisma.AtLeast<{
+    locked_handle_id?: number
+    locked_handle_lower?: string
+    AND?: locked_handlesWhereInput | locked_handlesWhereInput[]
+    OR?: locked_handlesWhereInput[]
+    NOT?: locked_handlesWhereInput | locked_handlesWhereInput[]
+    locked_handle?: StringFilter<"locked_handles"> | string
+    create_date?: DateTimeNullableFilter<"locked_handles"> | Date | string | null
+  }, "locked_handle_id" | "locked_handle_lower">
+
+  export type locked_handlesOrderByWithAggregationInput = {
+    locked_handle_id?: SortOrder
+    locked_handle?: SortOrder
+    locked_handle_lower?: SortOrder
+    create_date?: SortOrderInput | SortOrder
+    _count?: locked_handlesCountOrderByAggregateInput
+    _avg?: locked_handlesAvgOrderByAggregateInput
+    _max?: locked_handlesMaxOrderByAggregateInput
+    _min?: locked_handlesMinOrderByAggregateInput
+    _sum?: locked_handlesSumOrderByAggregateInput
+  }
+
+  export type locked_handlesScalarWhereWithAggregatesInput = {
+    AND?: locked_handlesScalarWhereWithAggregatesInput | locked_handlesScalarWhereWithAggregatesInput[]
+    OR?: locked_handlesScalarWhereWithAggregatesInput[]
+    NOT?: locked_handlesScalarWhereWithAggregatesInput | locked_handlesScalarWhereWithAggregatesInput[]
+    locked_handle_id?: IntWithAggregatesFilter<"locked_handles"> | number
+    locked_handle?: StringWithAggregatesFilter<"locked_handles"> | string
+    locked_handle_lower?: StringWithAggregatesFilter<"locked_handles"> | string
+    create_date?: DateTimeNullableWithAggregatesFilter<"locked_handles"> | Date | string | null
   }
 
   export type security_groupsWhereInput = {
@@ -36611,6 +37777,52 @@ export namespace Prisma {
   export type invalid_handlesUncheckedUpdateManyInput = {
     invalid_handle_id?: IntFieldUpdateOperationsInput | number
     invalid_handle?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type locked_handlesCreateInput = {
+    locked_handle: string
+    locked_handle_lower: string
+    create_date?: Date | string | null
+  }
+
+  export type locked_handlesUncheckedCreateInput = {
+    locked_handle_id?: number
+    locked_handle: string
+    locked_handle_lower: string
+    create_date?: Date | string | null
+  }
+
+  export type locked_handlesUpdateInput = {
+    locked_handle?: StringFieldUpdateOperationsInput | string
+    locked_handle_lower?: StringFieldUpdateOperationsInput | string
+    create_date?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type locked_handlesUncheckedUpdateInput = {
+    locked_handle_id?: IntFieldUpdateOperationsInput | number
+    locked_handle?: StringFieldUpdateOperationsInput | string
+    locked_handle_lower?: StringFieldUpdateOperationsInput | string
+    create_date?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type locked_handlesCreateManyInput = {
+    locked_handle_id?: number
+    locked_handle: string
+    locked_handle_lower: string
+    create_date?: Date | string | null
+  }
+
+  export type locked_handlesUpdateManyMutationInput = {
+    locked_handle?: StringFieldUpdateOperationsInput | string
+    locked_handle_lower?: StringFieldUpdateOperationsInput | string
+    create_date?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type locked_handlesUncheckedUpdateManyInput = {
+    locked_handle_id?: IntFieldUpdateOperationsInput | number
+    locked_handle?: StringFieldUpdateOperationsInput | string
+    locked_handle_lower?: StringFieldUpdateOperationsInput | string
+    create_date?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type security_groupsCreateInput = {
@@ -38384,6 +39596,35 @@ export namespace Prisma {
 
   export type invalid_handlesSumOrderByAggregateInput = {
     invalid_handle_id?: SortOrder
+  }
+
+  export type locked_handlesCountOrderByAggregateInput = {
+    locked_handle_id?: SortOrder
+    locked_handle?: SortOrder
+    locked_handle_lower?: SortOrder
+    create_date?: SortOrder
+  }
+
+  export type locked_handlesAvgOrderByAggregateInput = {
+    locked_handle_id?: SortOrder
+  }
+
+  export type locked_handlesMaxOrderByAggregateInput = {
+    locked_handle_id?: SortOrder
+    locked_handle?: SortOrder
+    locked_handle_lower?: SortOrder
+    create_date?: SortOrder
+  }
+
+  export type locked_handlesMinOrderByAggregateInput = {
+    locked_handle_id?: SortOrder
+    locked_handle?: SortOrder
+    locked_handle_lower?: SortOrder
+    create_date?: SortOrder
+  }
+
+  export type locked_handlesSumOrderByAggregateInput = {
+    locked_handle_id?: SortOrder
   }
 
   export type User_group_xrefListRelationFilter = {
