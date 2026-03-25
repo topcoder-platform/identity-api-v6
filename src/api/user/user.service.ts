@@ -48,6 +48,19 @@ import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { addMinutes } from 'date-fns';
 type GroupIdRow = { id: string };
+type UserIdRow = { user_id: bigint | Decimal | number | string };
+type UserSearchFilters = {
+  active?: boolean;
+  email?: string;
+  handle?: string;
+  id?: number;
+  like: boolean;
+  ssoUserId?: string;
+};
+type UserSearchSort = {
+  direction: Prisma.SortOrder;
+  fieldName?: string;
+};
 // Import other needed services like NotificationService, AuthFlowService
 
 // Define a basic structure for the Auth0 profile data we expect
@@ -123,8 +136,9 @@ export class UserService {
     query: UserSearchQueryDto,
   ): Promise<{ users: UserModel[]; total: number }> {
     this.logger.debug(`Finding users with query: ${JSON.stringify(query)}`);
-    const { handle, email, id, active, like } =
-      this.extractSearchFilters(query);
+    const searchFilters = this.extractSearchFilters(query);
+    const sortOptions = this.extractSortOptions(query);
+    const { handle, email, ssoUserId, id, active, like } = searchFilters;
     const filters: Prisma.userWhereInput[] = [];
 
     // If ID is provided, enforce exact match by user_id
@@ -133,20 +147,13 @@ export class UserService {
     }
 
     if (handle) {
-      const wildcard = this.parseWildcard(handle);
-      if (like || wildcard.hasWildcard) {
-        const value = wildcard.value;
-        if (value.length > 0) {
-          if (wildcard.type === 'startsWith') {
-            filters.push({
-              handle: { startsWith: value, mode: 'insensitive' },
-            });
-          } else if (wildcard.type === 'endsWith') {
-            filters.push({ handle: { endsWith: value, mode: 'insensitive' } });
-          } else {
-            // contains (default)
-            filters.push({ handle: { contains: value, mode: 'insensitive' } });
-          }
+      const hasHandleWildcard = handle.includes('*');
+      if (like || hasHandleWildcard) {
+        const handleFilter = this.buildInsensitiveStringFilter(handle, like);
+        if (handleFilter) {
+          filters.push({
+            handle: handleFilter,
+          });
         }
       } else {
         // exact match on lowered handle for performance/index usage
@@ -155,26 +162,10 @@ export class UserService {
     }
 
     if (email?.trim()) {
-      const wildcard = this.parseWildcard(email.trim());
-      const buildEmailAddressFilter = () => {
-        if (like || wildcard.hasWildcard) {
-          const value = wildcard.value;
-          if (value.length === 0) {
-            // If wildcard resolves to empty, skip adding a filter
-            return undefined as any;
-          }
-          if (wildcard.type === 'startsWith') {
-            return { startsWith: value, mode: 'insensitive' } as const;
-          } else if (wildcard.type === 'endsWith') {
-            return { endsWith: value, mode: 'insensitive' } as const;
-          }
-          return { contains: value, mode: 'insensitive' } as const;
-        }
-        // exact match by default
-        return { equals: wildcard.value, mode: 'insensitive' } as const;
-      };
-
-      const addressFilter = buildEmailAddressFilter();
+      const addressFilter = this.buildInsensitiveStringFilter(
+        email.trim(),
+        like,
+      );
       if (addressFilter) {
         filters.push({
           OR: [
@@ -199,6 +190,23 @@ export class UserService {
       }
     }
 
+    if (ssoUserId?.trim()) {
+      const ssoFilter = this.buildInsensitiveStringFilter(
+        ssoUserId.trim(),
+        like,
+      );
+
+      if (ssoFilter) {
+        filters.push({
+          user_sso_login: {
+            some: {
+              OR: [{ sso_user_id: ssoFilter }, { sso_user_name: ssoFilter }],
+            },
+          },
+        });
+      }
+    }
+
     // Filter by active flag (derived from status)
     if (typeof active === 'boolean') {
       if (active) {
@@ -214,12 +222,22 @@ export class UserService {
 
     try {
       const total = await this.prismaClient.user.count({ where: whereClause });
+      const directOrderBy = this.buildUserOrderBy(sortOptions);
 
-      const users = await this.prismaClient.user.findMany({
-        where: whereClause,
-        skip: query.offset ?? 0,
-        take: query.limit ?? Constants.defaultPageSize,
-      });
+      const users =
+        sortOptions.fieldName === 'email' ||
+        sortOptions.fieldName === 'ssoUserId'
+          ? await this.findUsersWithJoinedSort(
+              searchFilters,
+              query,
+              sortOptions,
+            )
+          : await this.prismaClient.user.findMany({
+              where: whereClause,
+              skip: query.offset ?? 0,
+              take: query.limit ?? Constants.defaultPageSize,
+              ...(directOrderBy ? { orderBy: directOrderBy } : {}),
+            });
 
       if (!users.length) {
         return { users, total };
@@ -239,10 +257,23 @@ export class UserService {
         },
       });
 
+      const ssoLogins = await this.prismaClient.user_sso_login.findMany({
+        where: {
+          user_id: { in: userIds },
+        },
+        select: {
+          user_id: true,
+          sso_user_id: true,
+          provider_id: true,
+        },
+        orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }],
+      });
+
       const emailMap = new Map<
         string,
         { address: string | null; statusId: Decimal | null }
       >();
+      const ssoUserIdMap = new Map<string, string>();
 
       for (const email of primaryEmails) {
         emailMap.set(email.user_id.toString(), {
@@ -251,11 +282,23 @@ export class UserService {
         });
       }
 
+      for (const ssoLogin of ssoLogins) {
+        const userIdKey = ssoLogin.user_id.toString();
+        if (!ssoUserIdMap.has(userIdKey) && ssoLogin.sso_user_id) {
+          ssoUserIdMap.set(userIdKey, ssoLogin.sso_user_id);
+        }
+      }
+
       for (const user of users) {
         const emailRecord = emailMap.get(user.user_id.toString());
         if (emailRecord) {
           (user as any).primaryEmailAddress = emailRecord.address;
           (user as any).primaryEmailStatusId = emailRecord.statusId;
+        }
+
+        const ssoLoginUserId = ssoUserIdMap.get(user.user_id.toString());
+        if (ssoLoginUserId) {
+          (user as any).ssoUserId = ssoLoginUserId;
         }
       }
 
@@ -266,13 +309,12 @@ export class UserService {
     }
   }
 
-  private extractSearchFilters(query: UserSearchQueryDto): {
-    id?: number;
-    handle?: string;
-    email?: string;
-    active?: boolean;
-    like: boolean;
-  } {
+  /**
+   * Extracts supported user-search filters from the request query.
+   * @param query Raw request query DTO.
+   * @returns Normalized filter values used by both Prisma and SQL search paths.
+   */
+  private extractSearchFilters(query: UserSearchQueryDto): UserSearchFilters {
     const parsedFilters = this.parseFilterString(query.filter);
     // id filter: support `id` and `userId`
     const idRaw = this.getFirstFilterValue(parsedFilters, ['id', 'userId']);
@@ -288,6 +330,9 @@ export class UserService {
         'emailAddress',
         'primaryEmail',
       ]);
+    const ssoUserId =
+      query.ssoUserId ??
+      this.getFirstFilterValue(parsedFilters, ['ssoUserId', 'ssoUserName']);
 
     // active filter: true/false or 1/0
     const activeRaw = this.getFirstFilterValue(parsedFilters, ['active']);
@@ -306,7 +351,21 @@ export class UserService {
       like = v === 'true' || v === '1';
     }
 
-    return { id: validId, handle, email, active, like };
+    return { id: validId, handle, email, ssoUserId, active, like };
+  }
+
+  /**
+   * Extracts supported sort options from the request query.
+   * @param query Raw request query DTO.
+   * @returns Normalized sort field and direction.
+   */
+  private extractSortOptions(query: UserSearchQueryDto): UserSearchSort {
+    const requestedDirection = query.sortOrder?.toLowerCase();
+
+    return {
+      direction: requestedDirection === 'desc' ? 'desc' : 'asc',
+      fieldName: query.sortBy?.trim() || undefined,
+    };
   }
 
   private parseFilterString(filter?: string): Record<string, string> {
@@ -369,37 +428,408 @@ export class UserService {
   }
 
   /**
-   * Parse a potential wildcard string using '*' semantics.
-   * - 'abc*' => startsWith 'abc'
-   * - '*abc' => endsWith 'abc'
-   * - 'a*b' or contains '*' internally => contains 'ab' (collapsed)
-   * - no '*' => exact with value
+   * Builds a Prisma case-insensitive string filter with optional wildcard support.
+   * @param searchValue Raw search value that may include `*` wildcard characters.
+   * @param like Whether wildcard semantics should be enabled even if `*` is absent.
+   * @returns A Prisma-compatible string filter or undefined when the wildcard resolves to an empty value.
    */
-  private parseWildcard(value: string): {
-    hasWildcard: boolean;
-    type: 'startsWith' | 'endsWith' | 'contains' | 'exact';
-    value: string;
-  } {
-    const idxFirst = value.indexOf('*');
-    if (idxFirst === -1) {
-      return { hasWildcard: false, type: 'exact', value };
+  private buildInsensitiveStringFilter(
+    searchValue: string,
+    like: boolean,
+  ):
+    | {
+        contains?: string;
+        endsWith?: string;
+        equals?: string;
+        mode: Prisma.QueryMode;
+        startsWith?: string;
+      }
+    | undefined {
+    const trimmedValue = searchValue.trim();
+    const hasWildcard = trimmedValue.includes('*');
+
+    if (!like && !hasWildcard) {
+      return {
+        equals: trimmedValue,
+        mode: 'insensitive',
+      };
     }
-    const idxLast = value.lastIndexOf('*');
-    // Remove all '*'
-    const stripped = value.replace(/\*/g, '');
-    if (!stripped) {
-      return { hasWildcard: true, type: 'contains', value: '' };
+
+    if (!hasWildcard) {
+      return {
+        contains: trimmedValue,
+        mode: 'insensitive',
+      };
     }
-    if (idxFirst === 0 && idxLast === value.length - 1) {
-      return { hasWildcard: true, type: 'contains', value: stripped };
+
+    const rawParts = trimmedValue.split('*');
+    const nonEmptyParts = rawParts.filter((part) => part.length > 0);
+
+    if (!nonEmptyParts.length) {
+      return undefined;
     }
-    if (idxFirst === 0) {
-      return { hasWildcard: true, type: 'endsWith', value: stripped };
+
+    const filter: {
+      contains?: string;
+      endsWith?: string;
+      mode: Prisma.QueryMode;
+      startsWith?: string;
+    } = {
+      mode: 'insensitive',
+    };
+
+    if (!trimmedValue.startsWith('*')) {
+      filter.startsWith = rawParts[0];
     }
-    if (idxLast === value.length - 1) {
-      return { hasWildcard: true, type: 'startsWith', value: stripped };
+
+    if (!trimmedValue.endsWith('*')) {
+      filter.endsWith = rawParts[rawParts.length - 1];
     }
-    return { hasWildcard: true, type: 'contains', value: stripped };
+
+    const middleParts = nonEmptyParts.filter((part, index) => {
+      const isFirstPart = index === 0;
+      const isLastPart = index === nonEmptyParts.length - 1;
+
+      if (isFirstPart && !trimmedValue.startsWith('*')) {
+        return false;
+      }
+
+      if (isLastPart && !trimmedValue.endsWith('*')) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (middleParts.length > 0) {
+      filter.contains = middleParts.join('');
+    }
+
+    if (!filter.startsWith && !filter.endsWith && !filter.contains) {
+      filter.contains = nonEmptyParts.join('');
+    }
+
+    return filter;
+  }
+
+  /**
+   * Maps supported UI sort fields to Prisma orderBy clauses.
+   * @param sort Requested sort field and direction.
+   * @returns Prisma orderBy array when the field can be handled directly, otherwise undefined.
+   */
+  private buildUserOrderBy(
+    sort: UserSearchSort,
+  ): Prisma.userOrderByWithRelationInput[] | undefined {
+    if (!sort.fieldName) {
+      return undefined;
+    }
+
+    switch (sort.fieldName) {
+      case 'id':
+        return [{ user_id: sort.direction }];
+      case 'handle':
+        return [{ handle_lower: sort.direction }, { user_id: sort.direction }];
+      case 'firstName':
+        return [
+          { first_name: sort.direction },
+          { last_name: sort.direction },
+          { user_id: sort.direction },
+        ];
+      case 'status':
+      case 'statusDesc':
+        return [{ status: sort.direction }, { user_id: sort.direction }];
+      case 'createdAt':
+        return [{ create_date: sort.direction }, { user_id: sort.direction }];
+      case 'modifiedAt':
+        return [{ modify_date: sort.direction }, { user_id: sort.direction }];
+      case 'activationCode':
+        return [
+          { activation_code: sort.direction },
+          { user_id: sort.direction },
+        ];
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Fetches one page of users ordered by a joined field that Prisma cannot sort directly.
+   * @param searchFilters Normalized request filters.
+   * @param query Pagination query values.
+   * @param sort Requested joined-field sort.
+   * @returns Ordered user models for the requested page.
+   */
+  private async findUsersWithJoinedSort(
+    searchFilters: UserSearchFilters,
+    query: UserSearchQueryDto,
+    sort: UserSearchSort,
+  ): Promise<UserModel[]> {
+    const userIds = await this.findSortedUserIdsByJoinedField(
+      searchFilters,
+      query,
+      sort,
+    );
+
+    if (!userIds.length) {
+      return [];
+    }
+
+    const users = await this.prismaClient.user.findMany({
+      where: {
+        user_id: {
+          in: userIds,
+        },
+      },
+    });
+
+    const positionByUserId = new Map<number, number>();
+    userIds.forEach((userId, index) => positionByUserId.set(userId, index));
+
+    return [...users].sort(
+      (left, right) =>
+        (positionByUserId.get(Number(left.user_id)) ??
+          Number.MAX_SAFE_INTEGER) -
+        (positionByUserId.get(Number(right.user_id)) ??
+          Number.MAX_SAFE_INTEGER),
+    );
+  }
+
+  /**
+   * Selects user ids ordered by a joined email or SSO identifier.
+   * @param searchFilters Normalized request filters.
+   * @param query Pagination query values.
+   * @param sort Requested joined-field sort.
+   * @returns Ordered numeric user ids for the requested page.
+   */
+  private async findSortedUserIdsByJoinedField(
+    searchFilters: UserSearchFilters,
+    query: UserSearchQueryDto,
+    sort: UserSearchSort,
+  ): Promise<number[]> {
+    const whereConditions = this.buildJoinedSortWhereConditions(searchFilters);
+    const whereSql = whereConditions.length
+      ? Prisma.sql`WHERE ${Prisma.join(whereConditions, ' AND ')}`
+      : Prisma.empty;
+    const directionSql =
+      sort.direction === 'desc' ? Prisma.raw('DESC') : Prisma.raw('ASC');
+    const sortColumnSql =
+      sort.fieldName === 'email'
+        ? Prisma.raw('primary_email.address')
+        : Prisma.raw('primary_sso.sso_user_id');
+
+    const rows = await this.prismaClient.$queryRaw<UserIdRow[]>`
+      SELECT u.user_id
+      FROM identity.user u
+      LEFT JOIN LATERAL (
+        SELECT e.address
+        FROM identity.email e
+        WHERE e.user_id = u.user_id
+          AND e.primary_ind = ${Constants.primaryEmailFlag}
+          AND e.email_type_id = ${Constants.standardEmailType}
+        ORDER BY e.email_id ASC
+        LIMIT 1
+      ) primary_email ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT usl.sso_user_id
+        FROM identity.user_sso_login usl
+        WHERE usl.user_id = u.user_id
+        ORDER BY usl.provider_id ASC
+        LIMIT 1
+      ) primary_sso ON TRUE
+      ${whereSql}
+      ORDER BY
+        CASE
+          WHEN ${sortColumnSql} IS NULL OR ${sortColumnSql} = '' THEN 1
+          ELSE 0
+        END ASC,
+        LOWER(COALESCE(${sortColumnSql}, '')) ${directionSql},
+        u.user_id ${directionSql}
+      OFFSET ${query.offset ?? 0}
+      LIMIT ${query.limit ?? Constants.defaultPageSize}
+    `;
+
+    return rows
+      .map((row) => Number(row.user_id))
+      .filter((userId) => Number.isFinite(userId));
+  }
+
+  /**
+   * Builds SQL where conditions that mirror the supported user search filters.
+   * @param searchFilters Normalized request filters.
+   * @returns SQL fragments that can be safely joined with AND.
+   */
+  private buildJoinedSortWhereConditions(
+    searchFilters: UserSearchFilters,
+  ): Prisma.Sql[] {
+    const whereConditions: Prisma.Sql[] = [];
+    const { active, email, handle, id, like, ssoUserId } = searchFilters;
+
+    if (typeof id === 'number' && Number.isFinite(id)) {
+      whereConditions.push(Prisma.sql`u.user_id = ${id}`);
+    }
+
+    const handleCondition = this.buildSqlStringMatchCondition(
+      Prisma.raw('u.handle'),
+      handle,
+      like,
+    );
+    if (handleCondition) {
+      whereConditions.push(handleCondition);
+    }
+
+    const emailCondition = this.buildEmailMatchCondition(email, like);
+    if (emailCondition) {
+      whereConditions.push(emailCondition);
+    }
+
+    const ssoCondition = this.buildSsoMatchCondition(ssoUserId, like);
+    if (ssoCondition) {
+      whereConditions.push(ssoCondition);
+    }
+
+    if (typeof active === 'boolean') {
+      whereConditions.push(
+        active
+          ? Prisma.sql`u.status = ${MemberStatus.ACTIVE}`
+          : Prisma.sql`u.status <> ${MemberStatus.ACTIVE}`,
+      );
+    }
+
+    return whereConditions;
+  }
+
+  /**
+   * Builds a case-insensitive SQL match condition for a single column.
+   * @param column SQL column reference.
+   * @param searchValue Raw search value from the request.
+   * @param like Whether wildcard semantics should be applied.
+   * @returns SQL comparison fragment or undefined when the search term is empty.
+   */
+  private buildSqlStringMatchCondition(
+    column: Prisma.Sql,
+    searchValue?: string,
+    like: boolean = false,
+  ): Prisma.Sql | undefined {
+    const pattern = this.buildSqlIlikePattern(searchValue, like);
+
+    if (!pattern) {
+      return undefined;
+    }
+
+    return Prisma.sql`${column} ILIKE ${pattern} ESCAPE '\\'`;
+  }
+
+  /**
+   * Builds the SQL condition used to search any related email address for a user.
+   * @param searchValue Raw email search value from the request.
+   * @param like Whether wildcard semantics should be applied.
+   * @returns SQL EXISTS fragment or undefined when the search term is empty.
+   */
+  private buildEmailMatchCondition(
+    searchValue?: string,
+    like: boolean = false,
+  ): Prisma.Sql | undefined {
+    const pattern = this.buildSqlIlikePattern(searchValue, like);
+
+    if (!pattern) {
+      return undefined;
+    }
+
+    return Prisma.sql`
+      (
+        EXISTS (
+          SELECT 1
+          FROM identity.user_email_xref uex
+          INNER JOIN identity.email xref_email
+            ON xref_email.email_id = uex.email_id
+          WHERE uex.user_id = u.user_id
+            AND xref_email.address ILIKE ${pattern} ESCAPE '\\'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM identity.email direct_email
+          WHERE direct_email.user_id = u.user_id
+            AND direct_email.address ILIKE ${pattern} ESCAPE '\\'
+        )
+      )
+    `;
+  }
+
+  /**
+   * Builds the SQL condition used to search SSO login identifiers for a user.
+   * @param searchValue Raw SSO search value from the request.
+   * @param like Whether wildcard semantics should be applied.
+   * @returns SQL EXISTS fragment or undefined when the search term is empty.
+   */
+  private buildSsoMatchCondition(
+    searchValue?: string,
+    like: boolean = false,
+  ): Prisma.Sql | undefined {
+    const pattern = this.buildSqlIlikePattern(searchValue, like);
+
+    if (!pattern) {
+      return undefined;
+    }
+
+    return Prisma.sql`
+      EXISTS (
+        SELECT 1
+        FROM identity.user_sso_login usl
+        WHERE usl.user_id = u.user_id
+          AND (
+            usl.sso_user_id ILIKE ${pattern} ESCAPE '\\'
+            OR usl.sso_user_name ILIKE ${pattern} ESCAPE '\\'
+          )
+      )
+    `;
+  }
+
+  /**
+   * Converts the legacy wildcard syntax into a safe SQL ILIKE pattern.
+   * @param searchValue Raw search value from the request.
+   * @param like Whether wildcard semantics should be applied even without `*`.
+   * @returns SQL-ready ILIKE pattern or undefined when nothing meaningful was provided.
+   */
+  private buildSqlIlikePattern(
+    searchValue?: string,
+    like: boolean = false,
+  ): string | undefined {
+    const trimmedValue = searchValue?.trim();
+
+    if (!trimmedValue) {
+      return undefined;
+    }
+
+    const hasWildcard = trimmedValue.includes('*');
+    const literalContent = trimmedValue.replace(/\*/g, '');
+
+    if ((like || hasWildcard) && literalContent.length === 0) {
+      return undefined;
+    }
+
+    const escapedValue = Array.from(trimmedValue)
+      .map((character) => {
+        if (character === '*') {
+          return '%';
+        }
+
+        if (character === '\\' || character === '%' || character === '_') {
+          return `\\${character}`;
+        }
+
+        return character;
+      })
+      .join('');
+
+    if (!like && !hasWildcard) {
+      return escapedValue;
+    }
+
+    if (!hasWildcard) {
+      return `%${escapedValue}%`;
+    }
+
+    return escapedValue;
   }
 
   async findUserById(userId: number): Promise<UserModel | null> {
@@ -700,6 +1130,30 @@ export class UserService {
     }
   }
 
+  /**
+   * Converts a handle validation response into the appropriate HTTP exception.
+   * @param validationResponse Result returned by ValidationService.validateHandle.
+   * @throws ConflictException when the handle is already taken or locked.
+   * @throws BadRequestException for all other validation failures.
+   */
+  private assertHandleValidationSucceeded(
+    validationResponse: ValidationResponseDto,
+  ): void {
+    if (validationResponse.valid) {
+      return;
+    }
+
+    if (validationResponse.reasonCode === 'ALREADY_TAKEN') {
+      throw new ConflictException(
+        validationResponse.reason ?? 'Handle is taken',
+      );
+    }
+
+    throw new BadRequestException(
+      `Handle validation failed: ${validationResponse.reason}`,
+    );
+  }
+
   async registerUser(createUserDto: CreateUserBodyDto): Promise<UserModel> {
     const userParams: UserParamBaseDto = createUserDto.param;
 
@@ -718,11 +1172,7 @@ export class UserService {
     // handle validation
     const validationResponse: ValidationResponseDto =
       await this.validationService.validateHandle(userParams.handle);
-    if (!validationResponse.valid) {
-      throw new BadRequestException(
-        `Handle validation failed: ${validationResponse.reason}`,
-      );
-    }
+    this.assertHandleValidationSucceeded(validationResponse);
     // email validation
     await this.validationService.validateEmailViaDB(userParams.email);
     // country validation
@@ -1342,11 +1792,7 @@ export class UserService {
       newHandle,
       userId,
     );
-    if (!validationResponse.valid) {
-      throw new BadRequestException(
-        `Handle validation failed: ${validationResponse.reason}`,
-      );
-    }
+    this.assertHandleValidationSucceeded(validationResponse);
 
     // Fetch the user to ensure they exist and get the old handle
     const existingUser = await this.prismaClient.user.findUnique({
@@ -1900,7 +2346,8 @@ export class UserService {
     const existingUserByHandle = await this.prismaClient.user.findFirst({
       where: { handle_lower: handleLower },
     });
-    if (existingUserByHandle) {
+    const lockedHandle = await this.validationService.isHandleLocked(handle);
+    if (existingUserByHandle || lockedHandle) {
       // Handle conflict, e.g., by appending a suffix or throwing an error. For now, simple error.
       // This should be rare if nickname/given_name is somewhat unique or uuid is used.
       this.logger.error(

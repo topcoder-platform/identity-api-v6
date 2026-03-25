@@ -185,14 +185,20 @@ export class ValidationService {
       };
     }
 
+    const normalizedHandle = handle.toLowerCase();
+
     // now check if handle is already used by someone else
-    const existingUser = await this.prismaClient.user.findFirst({
-      where: { handle_lower: handle.toLowerCase() },
-    });
+    const [existingUser, lockedHandle] = await Promise.all([
+      this.prismaClient.user.findFirst({
+        where: { handle_lower: normalizedHandle },
+      }),
+      this.isHandleLocked(handle),
+    ]);
 
     if (
-      existingUser &&
-      (!userId || (existingUser?.user_id as unknown as number) != userId)
+      (existingUser &&
+        (!userId || (existingUser?.user_id as unknown as number) != userId)) ||
+      lockedHandle
     ) {
       return {
         valid: false,
@@ -276,6 +282,29 @@ export class ValidationService {
       },
     });
     return count > 0;
+  }
+
+  /**
+   * Checks whether a handle was previously deleted and permanently reserved.
+   * @param handle Handle to check.
+   * @returns True when the handle exists in identity.locked_handles, false otherwise.
+   */
+  async isHandleLocked(handle: string): Promise<boolean> {
+    if (!handle) {
+      return false;
+    }
+
+    const normalizedHandle = handle.toLowerCase();
+    const lockedHandleRows = await this.prismaClient.$queryRaw<
+      Array<{ locked_handle_id: number }>
+    >`
+      SELECT locked_handle_id
+      FROM identity.locked_handles
+      WHERE locked_handle_lower = ${normalizedHandle}
+      LIMIT 1
+    `;
+
+    return lockedHandleRows.length > 0;
   }
 
   async validateEmail(

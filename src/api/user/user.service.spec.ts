@@ -80,6 +80,7 @@ const mockPrismaOltp = {
   user_sso_login: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
+    findMany: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     deleteMany: jest.fn(),
@@ -123,6 +124,7 @@ const mockPrismaGroup = {
 };
 
 const mockValidationService = {
+  validateUser: jest.fn(),
   validateHandle: jest.fn(),
   validateEmail: jest.fn(),
   validateCountry: jest.fn(),
@@ -130,6 +132,7 @@ const mockValidationService = {
   validateProfile: jest.fn(),
   validateReferral: jest.fn(),
   checkEmailAvailabilityForUser: jest.fn(),
+  isHandleLocked: jest.fn(),
   // Add other methods if they are called by UserService
 };
 
@@ -491,18 +494,21 @@ describe('UserService', () => {
 
   describe('findUsers', () => {
     beforeEach(() => {
+      prismaOltp.user.count.mockResolvedValue(0);
       prismaOltp.email.findMany.mockResolvedValue([]);
+      prismaOltp.user_sso_login.findMany.mockResolvedValue([]);
     });
 
     it('should find users by handle', async () => {
       const query: UserSearchQueryDto = { handle: 'test' };
       const mockUsers = [createMockUserModel({ handle: 'test' })];
+      prismaOltp.user.count.mockResolvedValue(mockUsers.length);
       prismaOltp.user.findMany.mockResolvedValue(mockUsers);
       prismaOltp.email.findMany.mockResolvedValue([]);
       const result = await service.findUsers(query);
-      expect(result).toEqual(mockUsers);
+      expect(result).toEqual({ total: mockUsers.length, users: mockUsers });
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
-        where: { handle_lower: 'test' },
+        where: { AND: [{ handle_lower: 'test' }] },
         skip: 0,
         take: 20,
       });
@@ -517,28 +523,58 @@ describe('UserService', () => {
           address: true,
           status_id: true,
         },
+      });
+      expect(prismaOltp.user_sso_login.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: { in: mockUsers.map((user) => user.user_id) },
+        },
+        select: {
+          user_id: true,
+          sso_user_id: true,
+          provider_id: true,
+        },
+        orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }],
       });
     });
 
     it('should find users by email', async () => {
       const query: UserSearchQueryDto = { email: 'test@example.com' };
       const mockUsers = [createMockUserModel({})];
+      prismaOltp.user.count.mockResolvedValue(mockUsers.length);
       prismaOltp.user.findMany.mockResolvedValue(mockUsers);
       prismaOltp.email.findMany.mockResolvedValue([]);
       const result = await service.findUsers(query);
-      expect(result).toEqual(mockUsers);
+      expect(result).toEqual({ total: mockUsers.length, users: mockUsers });
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
         where: {
-          user_email_xref: {
-            some: {
-              email: {
-                address: {
-                  equals: 'test@example.com',
-                  mode: 'insensitive',
+          AND: [
+            {
+              OR: [
+                {
+                  user_email_xref: {
+                    some: {
+                      email: {
+                        address: {
+                          equals: 'test@example.com',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
                 },
-              },
+                {
+                  emails: {
+                    some: {
+                      address: {
+                        equals: 'test@example.com',
+                        mode: 'insensitive',
+                      },
+                    },
+                  },
+                },
+              ],
             },
-          },
+          ],
         },
         skip: 0,
         take: 20,
@@ -555,17 +591,29 @@ describe('UserService', () => {
           status_id: true,
         },
       });
+      expect(prismaOltp.user_sso_login.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: { in: mockUsers.map((user) => user.user_id) },
+        },
+        select: {
+          user_id: true,
+          sso_user_id: true,
+          provider_id: true,
+        },
+        orderBy: [{ user_id: 'asc' }, { provider_id: 'asc' }],
+      });
     });
 
     it('should support legacy filter string for handle search', async () => {
       const query: UserSearchQueryDto = { filter: 'handle=TestUser' } as any;
       const mockUsers = [createMockUserModel({ handle: 'TestUser' })];
+      prismaOltp.user.count.mockResolvedValue(mockUsers.length);
       prismaOltp.user.findMany.mockResolvedValue(mockUsers);
       prismaOltp.email.findMany.mockResolvedValue([]);
 
       const result = await service.findUsers(query);
 
-      expect(result).toEqual(mockUsers);
+      expect(result).toEqual({ total: mockUsers.length, users: mockUsers });
       expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
         where: { AND: [{ handle_lower: 'testuser' }] },
         skip: 0,
@@ -589,6 +637,7 @@ describe('UserService', () => {
       const query: UserSearchQueryDto = {
         filter: 'email=legacy@example.com',
       } as any;
+      prismaOltp.user.count.mockResolvedValue(0);
       prismaOltp.user.findMany.mockResolvedValue([]);
       prismaOltp.email.findMany.mockResolvedValue([]);
 
@@ -629,12 +678,14 @@ describe('UserService', () => {
         take: 20,
       });
       expect(prismaOltp.email.findMany).not.toHaveBeenCalled();
+      expect(prismaOltp.user_sso_login.findMany).not.toHaveBeenCalled();
     });
 
     it('should combine handle and email filters using AND logic', async () => {
       const query: UserSearchQueryDto = {
         filter: 'handle=TestUser,email=legacy@example.com',
       } as any;
+      prismaOltp.user.count.mockResolvedValue(0);
       prismaOltp.user.findMany.mockResolvedValue([]);
       prismaOltp.email.findMany.mockResolvedValue([]);
 
@@ -676,10 +727,170 @@ describe('UserService', () => {
         take: 20,
       });
       expect(prismaOltp.email.findMany).not.toHaveBeenCalled();
+      expect(prismaOltp.user_sso_login.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should support SSO UserID search against sso_user_id and sso_user_name', async () => {
+      const query: UserSearchQueryDto = {
+        filter: 'ssoUserId=external-user',
+      } as any;
+      prismaOltp.user.count.mockResolvedValue(0);
+      prismaOltp.user.findMany.mockResolvedValue([]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+
+      await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            {
+              user_sso_login: {
+                some: {
+                  OR: [
+                    {
+                      sso_user_id: {
+                        equals: 'external-user',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      sso_user_name: {
+                        equals: 'external-user',
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        skip: 0,
+        take: 20,
+      });
+    });
+
+    it('should support wildcard SSO UserID search and attach the returned sso user id', async () => {
+      const query: UserSearchQueryDto = {
+        filter: 'ssoUserId=j*@wipro.com&like=true',
+      } as any;
+      const mockUsers = [createMockUserModel({ user_id: new Decimal(44) })];
+      prismaOltp.user.count.mockResolvedValue(mockUsers.length);
+      prismaOltp.user.findMany.mockResolvedValue(mockUsers);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+      prismaOltp.user_sso_login.findMany.mockResolvedValue([
+        {
+          user_id: mockUsers[0].user_id,
+          sso_user_id: 'john.smith@wipro.com',
+          provider_id: new Decimal(7),
+        },
+      ]);
+
+      const result = await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            {
+              user_sso_login: {
+                some: {
+                  OR: [
+                    {
+                      sso_user_id: {
+                        startsWith: 'j',
+                        endsWith: '@wipro.com',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      sso_user_name: {
+                        startsWith: 'j',
+                        endsWith: '@wipro.com',
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        skip: 0,
+        take: 20,
+      });
+      expect(result.total).toBe(mockUsers.length);
+      expect((result.users[0] as any).ssoUserId).toBe('john.smith@wipro.com');
+    });
+
+    it('should apply direct Prisma sorting for supported user columns', async () => {
+      const query: UserSearchQueryDto = {
+        sortBy: 'handle',
+        sortOrder: 'desc',
+      };
+      prismaOltp.user.count.mockResolvedValue(0);
+      prismaOltp.user.findMany.mockResolvedValue([]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+
+      await service.findUsers(query);
+
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 20,
+        orderBy: [{ handle_lower: 'desc' }, { user_id: 'desc' }],
+      });
+      expect(prismaOltp.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('should sort by SSO UserID using the joined sort query and preserve that order', async () => {
+      const query: UserSearchQueryDto = {
+        sortBy: 'ssoUserId',
+        sortOrder: 'asc',
+      };
+      const firstUser = createMockUserModel({ user_id: new Decimal(101) });
+      const secondUser = createMockUserModel({ user_id: new Decimal(202) });
+
+      prismaOltp.user.count.mockResolvedValue(2);
+      prismaOltp.$queryRaw.mockResolvedValue([
+        { user_id: secondUser.user_id },
+        { user_id: firstUser.user_id },
+      ]);
+      prismaOltp.user.findMany.mockResolvedValue([firstUser, secondUser]);
+      prismaOltp.email.findMany.mockResolvedValue([]);
+      prismaOltp.user_sso_login.findMany.mockResolvedValue([
+        {
+          user_id: secondUser.user_id,
+          sso_user_id: 'alpha@example.com',
+          provider_id: new Decimal(1),
+        },
+        {
+          user_id: firstUser.user_id,
+          sso_user_id: 'zulu@example.com',
+          provider_id: new Decimal(1),
+        },
+      ]);
+
+      const result = await service.findUsers(query);
+
+      expect(prismaOltp.$queryRaw).toHaveBeenCalled();
+      expect(prismaOltp.user.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: {
+            in: [202, 101],
+          },
+        },
+      });
+      expect(result.total).toBe(2);
+      expect(result.users.map((user) => Number(user.user_id))).toEqual([
+        202, 101,
+      ]);
+      expect((result.users[0] as any).ssoUserId).toBe('alpha@example.com');
+      expect((result.users[1] as any).ssoUserId).toBe('zulu@example.com');
     });
 
     it('should use offset and limit', async () => {
       const query: UserSearchQueryDto = { offset: 10, limit: 5 };
+      prismaOltp.user.count.mockResolvedValue(0);
       prismaOltp.user.findMany.mockResolvedValue([]);
       prismaOltp.email.findMany.mockResolvedValue([]);
       await service.findUsers(query);
@@ -689,11 +900,14 @@ describe('UserService', () => {
         take: 5,
       });
       expect(prismaOltp.email.findMany).not.toHaveBeenCalled();
+      expect(prismaOltp.user_sso_login.findMany).not.toHaveBeenCalled();
     });
 
     it('should throw InternalServerErrorException on database error', async () => {
       prismaOltp.user.findMany.mockRejectedValue(new Error('DB Error'));
-      await expect(service.findUsers({})).rejects.toThrow('DB Error');
+      await expect(service.findUsers({})).rejects.toThrow(
+        'Failed to search users.',
+      );
     });
   });
 
@@ -1071,11 +1285,13 @@ describe('UserService', () => {
 
     let mockEncode;
     beforeEach(() => {
+      validationService.validateUser.mockImplementation(() => undefined);
       validationService.validateHandle.mockResolvedValue({ valid: true });
       validationService.validateEmail.mockResolvedValue({ valid: true });
       validationService.validateCountryAndMutate.mockResolvedValue(null);
       validationService.validateProfile.mockResolvedValue();
       validationService.validateReferral.mockResolvedValue(null);
+      validationService.isHandleLocked.mockResolvedValue(false);
 
       prismaOltp.$queryRaw.mockImplementation(async (query) => {
         const sqlString = Array.isArray(query)
@@ -1274,6 +1490,18 @@ describe('UserService', () => {
       );
     });
 
+    it('should throw ConflictException when validation reports a taken handle', async () => {
+      validationService.validateHandle.mockResolvedValueOnce({
+        valid: false,
+        reason: "Handle 'newuser' has already been taken",
+        reasonCode: 'ALREADY_TAKEN',
+      });
+
+      await expect(service.registerUser(createUserDto)).rejects.toThrow(
+        new ConflictException("Handle 'newuser' has already been taken"),
+      );
+    });
+
     it('should throw InternalServerErrorException if sequence_user_seq fails', async () => {
       prismaOltp.$queryRaw.mockImplementation(async (query) => {
         const sqlString = Array.isArray(query)
@@ -1453,6 +1681,7 @@ describe('UserService', () => {
 
     beforeEach(() => {
       validationService.validateHandle.mockResolvedValue({ valid: true });
+      validationService.validateUser.mockImplementation(() => undefined);
       prismaOltp.user.findUnique.mockResolvedValue(mockExistingUser);
       prismaOltp.security_user.findUnique.mockResolvedValue({
         login_id: new Decimal(userId),
@@ -1511,6 +1740,20 @@ describe('UserService', () => {
       await expect(
         service.updateHandle(userIdString, '', mockUser),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ConflictException when validation reports a taken handle', async () => {
+      validationService.validateHandle.mockResolvedValueOnce({
+        valid: false,
+        reason: `Handle '${newHandle}' has already been taken`,
+        reasonCode: 'ALREADY_TAKEN',
+      });
+
+      await expect(
+        service.updateHandle(userIdString, newHandle, mockUser),
+      ).rejects.toThrow(
+        new ConflictException(`Handle '${newHandle}' has already been taken`),
+      );
     });
 
     it('should throw NotFoundException if user not found', async () => {
@@ -2241,6 +2484,7 @@ describe('UserService', () => {
       prismaOltp.user_sso_login.findFirst.mockResolvedValue(null); // Default: no existing SSO login
       prismaOltp.email.findFirst.mockResolvedValue(null); // Default: no existing email
       prismaOltp.user.findFirst.mockResolvedValue(null); // Default: no existing user by handle
+      validationService.isHandleLocked.mockResolvedValue(false);
       prismaOltp.user_sso_login.create.mockResolvedValue({} as any);
       prismaOltp.user.update.mockResolvedValue({} as any); // For updateLastLoginDate
       prismaOltp.$transaction.mockImplementation(<T>(callback): Promise<T> => {
@@ -2340,6 +2584,14 @@ describe('UserService', () => {
       prismaOltp.user.findFirst.mockResolvedValueOnce(
         createMockUserModel({ handle: auth0Profile.nickname }),
       ); // Simulate handle conflict
+      await expect(
+        service.findOrCreateUserByAuth0Profile(auth0Profile),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ConflictException if generated handle is locked', async () => {
+      validationService.isHandleLocked.mockResolvedValueOnce(true);
+
       await expect(
         service.findOrCreateUserByAuth0Profile(auth0Profile),
       ).rejects.toThrow(ConflictException);
