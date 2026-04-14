@@ -11,6 +11,9 @@ import { firstValueFrom } from 'rxjs';
 import { MemberInfoDto } from '../../dto/member/member.dto';
 import { M2M_AUTH_CLIENT } from './member-api.constants'; // Import M2M client token from constants
 
+const MEMBER_LOOKUP_FIELDS = ['userId', 'handle', 'email'] as const;
+const DEFAULT_MEMBER_API_TIMEOUT_MS = 10000;
+
 // Define the interface for the M2M Auth client provided by the module
 // Based on the declaration file src/types/tc-core-library-js.d.ts
 interface M2MAuthClient {
@@ -39,7 +42,7 @@ export class MemberApiService {
   }
 
   /**
-   * Gets a valid M2M token for Member API, using the injected M2M client and cache.
+   * Gets a valid M2M token for the Member API using the injected M2M client.
    */
   private async getM2mToken(): Promise<string | null> {
     const clientId = this.configService.get<string>('AUTH0_CLIENT_ID');
@@ -78,6 +81,9 @@ export class MemberApiService {
   /**
    * Fetches member information for a list of user IDs from the Member API.
    * Handles large lists by batching requests and logs total execution time.
+   * The downstream lookup is intentionally restricted to `userId`, `handle`,
+   * and `email`, and disables stats expansion because that is all identity uses
+   * for role-subject responses.
    *
    * Batching is necessary because the Member API's GET /members endpoint is queried
    * using URL parameters (e.g., ?userIds=1&userIds=2...). Sending a large number
@@ -109,6 +115,13 @@ export class MemberApiService {
     const batchSize = 50; // Reduced batch size to avoid 413/414 errors
     const allMemberInfo: MemberInfoDto[] = [];
     const totalBatches = Math.ceil(uniqueUserIds.length / batchSize);
+    const configuredTimeout = Number(
+      this.configService.get<string | number>('HTTP_TIMEOUT') ??
+        DEFAULT_MEMBER_API_TIMEOUT_MS,
+    );
+    const requestTimeout = Number.isFinite(configuredTimeout)
+      ? configuredTimeout
+      : DEFAULT_MEMBER_API_TIMEOUT_MS;
 
     this.logger.log(
       `Fetching member info for ${uniqueUserIds.length} unique users in ${totalBatches} batches of ${batchSize}...`,
@@ -118,12 +131,16 @@ export class MemberApiService {
       const currentBatchNum = Math.floor(i / batchSize) + 1;
       const batchIds = uniqueUserIds.slice(i, i + batchSize);
 
-      // Construct query string by repeating the key
-      const queryString =
-        batchIds.length > 1
-          ? batchIds.map((id) => `userIds=${encodeURIComponent(id)}`).join('&')
-          : `userId=${encodeURIComponent(batchIds[0])}`;
-      const apiUrl = `${this.MEMBER_API_URL}?${queryString}`;
+      const queryParams = new URLSearchParams();
+      if (batchIds.length > 1) {
+        batchIds.forEach((id) => queryParams.append('userIds', String(id)));
+      } else {
+        queryParams.append('userId', String(batchIds[0]));
+      }
+      queryParams.append('fields', MEMBER_LOOKUP_FIELDS.join(','));
+      queryParams.append('includeStats', 'false');
+
+      const apiUrl = `${this.MEMBER_API_URL}?${queryParams.toString()}`;
 
       // Log base URL and count for the current batch
       this.logger.debug(
@@ -137,8 +154,7 @@ export class MemberApiService {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
-            // Consider adding a reasonable timeout per batch request
-            // timeout: this.configService.get<number>('HTTP_TIMEOUT', 10000),
+            timeout: requestTimeout,
           }),
         );
 
