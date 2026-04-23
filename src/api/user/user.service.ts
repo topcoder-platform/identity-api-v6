@@ -44,6 +44,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { Constants, DefaultGroups } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus } from '../../dto/member';
+import { MemberStatus as MemberDbStatus } from '../../../prisma/member/generated/member';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { addMinutes } from 'date-fns';
@@ -127,6 +128,25 @@ export class UserService {
         // throw new Error('Invalid Base64 encoding for LEGACY_BLOWFISH_KEY.');
         this.legacyBlowfishKey = '';
       }
+    }
+  }
+
+  private mapIdentityStatusToMemberStatus(
+    identityStatus: string,
+  ): MemberDbStatus | undefined {
+    switch (identityStatus) {
+      case MemberStatus.ACTIVE:
+        return MemberDbStatus.ACTIVE;
+      case MemberStatus.UNVERIFIED:
+        return MemberDbStatus.UNVERIFIED;
+      case MemberStatus.INACTIVE_USER_REQUEST:
+        return MemberDbStatus.INACTIVE_USER_REQUEST;
+      case MemberStatus.INACTIVE_DUPLICATE_ACCOUNT:
+        return MemberDbStatus.INACTIVE_DUPLICATE_ACCOUNT;
+      case MemberStatus.INACTIVE_IRREGULAR_ACCOUNT:
+        return MemberDbStatus.INACTIVE_IRREGULAR_ACCOUNT;
+      default:
+        return undefined;
     }
   }
 
@@ -2092,6 +2112,29 @@ export class UserService {
         `Successfully updated status for user ${userId} from ${oldStatus} to ${normalizedNewStatus}`,
       );
 
+      const mappedMemberStatus =
+        this.mapIdentityStatusToMemberStatus(normalizedNewStatus);
+      if (mappedMemberStatus) {
+        try {
+          await this.memberPrisma.member.update({
+            where: { userId: Number(userId) },
+            data: { status: mappedMemberStatus },
+          });
+          this.logger.log(
+            `Updated members.member for user ${userId}: status ${mappedMemberStatus}`,
+          );
+        } catch (memberUpdateError) {
+          this.logger.error(
+            `Failed to sync members.member status for user ${userId}: ${memberUpdateError.message}`,
+            memberUpdateError.stack,
+          );
+        }
+      } else {
+        this.logger.warn(
+          `No members.member status mapping for identity status '${normalizedNewStatus}'`,
+        );
+      }
+
       // create user achievement
       if (CommonUtils.validateString(comment)) {
         await this.createUserAchievement(userId, comment);
@@ -2679,7 +2722,7 @@ export class UserService {
             from: { email: fromEmail },
             version: 'v3',
             sendgrid_template_id: welcomeTemplateId,
-            recipients: [emailAddress],
+            recipients: [emailAddress],           
           };
           await this.eventService.postDirectBusMessage(
             'external.action.email',
