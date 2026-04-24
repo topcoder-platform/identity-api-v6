@@ -1,0 +1,237 @@
+/* eslint-disable no-console */
+import { PrismaClient } from '@prisma/client';
+import {
+  MemberStatus as MemberDbStatus,
+  PrismaClient as MemberPrismaClient,
+} from '../prisma/member/generated/member';
+
+type CliOptions = {
+  apply: boolean;
+  batchSize: number;
+  limit?: number;
+};
+
+type IdentityStatus = string;
+
+const DEFAULT_BATCH_SIZE = 500;
+
+function parseArgs(argv: string[]): CliOptions {
+  const options: CliOptions = {
+    apply: false,
+    batchSize: DEFAULT_BATCH_SIZE,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+
+    if (arg === '--apply') {
+      options.apply = true;
+      continue;
+    }
+
+    if (arg === '--batch-size') {
+      const raw = argv[i + 1];
+      if (!raw) {
+        throw new Error('--batch-size expects a numeric value');
+      }
+      options.batchSize = parsePositiveInt(raw, '--batch-size');
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--batch-size=')) {
+      options.batchSize = parsePositiveInt(
+        arg.substring('--batch-size='.length),
+        '--batch-size',
+      );
+      continue;
+    }
+
+    if (arg === '--limit') {
+      const raw = argv[i + 1];
+      if (!raw) {
+        throw new Error('--limit expects a numeric value');
+      }
+      options.limit = parsePositiveInt(raw, '--limit');
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--limit=')) {
+      options.limit = parsePositiveInt(arg.substring('--limit='.length), '--limit');
+      continue;
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      printUsage();
+      process.exit(0);
+    }
+
+    throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return options;
+}
+
+function parsePositiveInt(value: string, flag: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${flag} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function printUsage(): void {
+  console.log(`Backfill members.member.status from identity.user.status
+
+Usage:
+  npx ts-node scripts/backfill-member-status-from-identity.ts [--apply] [--batch-size N] [--limit N]
+
+Behavior:
+  - Select users where identity.user.status != 'A' (active=false in /v6/users semantics)
+  - Keep only rows where members.member.status is currently ACTIVE
+  - Map identity status to members status and update mismatches
+
+Modes:
+  - default: dry-run (prints summary, no writes)
+  - --apply: perform updates
+`);
+}
+
+function mapIdentityToMemberStatus(
+  identityStatus: IdentityStatus,
+): MemberDbStatus | null {
+  switch (identityStatus) {
+    case 'U':
+      return MemberDbStatus.UNVERIFIED;
+    case '4':
+      return MemberDbStatus.INACTIVE_USER_REQUEST;
+    case '5':
+      return MemberDbStatus.INACTIVE_DUPLICATE_ACCOUNT;
+    case '6':
+      return MemberDbStatus.INACTIVE_IRREGULAR_ACCOUNT;
+    case 'I':
+      // identity has a generic inactive; member DB does not, pick the broad inactive bucket
+      return MemberDbStatus.INACTIVE_USER_REQUEST;
+    default:
+      return null;
+  }
+}
+
+async function main(): Promise<void> {
+  const options = parseArgs(process.argv.slice(2));
+  const identityPrisma = new PrismaClient();
+  const memberPrisma = new MemberPrismaClient();
+
+  let scanned = 0;
+  let candidates = 0;
+  let updates = 0;
+  let skippedUnknownIdentityStatus = 0;
+  let skippedAlreadySynced = 0;
+
+  try {
+    await identityPrisma.$connect();
+    await memberPrisma.$connect();
+
+    console.log(
+      `[config] mode=${options.apply ? 'apply' : 'dry-run'}, batchSize=${options.batchSize}, limit=${options.limit ?? 'none'}`,
+    );
+
+    let cursorUserId: number | undefined;
+
+    while (true) {
+      const users = await identityPrisma.user.findMany({
+        where: { status: { not: 'A' } },
+        select: { user_id: true, status: true },
+        orderBy: { user_id: 'asc' },
+        take: options.batchSize,
+        ...(cursorUserId
+          ? {
+              cursor: { user_id: cursorUserId },
+              skip: 1,
+            }
+          : {}),
+      });
+
+      if (users.length === 0) {
+        break;
+      }
+
+      cursorUserId = Number(users[users.length - 1].user_id);
+      scanned += users.length;
+
+      const userIds = users.map((u) => BigInt(String(u.user_id)));
+      const memberRows = await memberPrisma.member.findMany({
+        where: {
+          userId: { in: userIds },
+          status: MemberDbStatus.ACTIVE,
+        },
+        select: { userId: true, status: true },
+      });
+      const activeMemberIds = new Set(memberRows.map((m) => m.userId.toString()));
+
+      for (const user of users) {
+        if (options.limit && candidates >= options.limit) {
+          break;
+        }
+
+        const idStr = String(user.user_id);
+        if (!activeMemberIds.has(idStr)) {
+          continue;
+        }
+
+        const mappedStatus = mapIdentityToMemberStatus(user.status);
+        if (!mappedStatus) {
+          skippedUnknownIdentityStatus += 1;
+          continue;
+        }
+
+        // We only selected members currently ACTIVE, so this is always a mismatch candidate.
+        candidates += 1;
+
+        if (!options.apply) {
+          if (candidates <= 20) {
+            console.log(`[dry-run] userId=${idStr}, identity=${user.status} -> member=${mappedStatus}`);
+          }
+          continue;
+        }
+
+        const result = await memberPrisma.member.updateMany({
+          where: {
+            userId: BigInt(idStr),
+            status: MemberDbStatus.ACTIVE,
+          },
+          data: {
+            status: mappedStatus,
+          },
+        });
+
+        if (result.count > 0) {
+          updates += result.count;
+        } else {
+          skippedAlreadySynced += 1;
+        }
+      }
+
+      if (options.limit && candidates >= options.limit) {
+        break;
+      }
+    }
+
+    console.log('--- summary ---');
+    console.log(`identity scanned (status != 'A'): ${scanned}`);
+    console.log(`candidate mismatches found: ${candidates}`);
+    console.log(`updated: ${updates}`);
+    console.log(`skipped unknown identity status: ${skippedUnknownIdentityStatus}`);
+    console.log(`skipped already synced/racing: ${skippedAlreadySynced}`);
+    console.log(`mode: ${options.apply ? 'apply' : 'dry-run'}`);
+  } finally {
+    await identityPrisma.$disconnect();
+    await memberPrisma.$disconnect();
+  }
+}
+
+void main().catch((error) => {
+  console.error('[error] Backfill failed:', error);
+  process.exitCode = 1;
+});
