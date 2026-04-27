@@ -14,7 +14,7 @@ type CliOptions = {
 type IdentityStatus = string;
 
 const DEFAULT_BATCH_SIZE = 500;
-
+const TARGET_IDENTITY_STATUSES: IdentityStatus[] = ['I', '4', '5', '6'];
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     apply: false,
@@ -88,7 +88,7 @@ Usage:
   npx ts-node scripts/backfill-member-status-from-identity.ts [--apply] [--batch-size N] [--limit N]
 
 Behavior:
-  - Select users where identity.user.status != 'A' (active=false in /v6/users semantics)
+  - Select users where identity.user.status is one of: I, 4, 5, 6
   - Keep only rows where members.member.status is currently ACTIVE
   - Map identity status to members status and update mismatches
 
@@ -128,6 +128,9 @@ async function main(): Promise<void> {
   let updates = 0;
   let skippedUnknownIdentityStatus = 0;
   let skippedAlreadySynced = 0;
+  let totalMemberRecords = 0;
+  let totalActiveMemberRecords = 0;
+  let totalIdentityRecords = 0;
 
   try {
     await identityPrisma.$connect();
@@ -137,11 +140,20 @@ async function main(): Promise<void> {
       `[config] mode=${options.apply ? 'apply' : 'dry-run'}, batchSize=${options.batchSize}, limit=${options.limit ?? 'none'}`,
     );
 
+    [totalMemberRecords, totalActiveMemberRecords, totalIdentityRecords] =
+      await Promise.all([
+        memberPrisma.member.count(),
+        memberPrisma.member.count({
+          where: { status: MemberDbStatus.ACTIVE },
+        }),
+        identityPrisma.user.count(),
+      ]);
+
     let cursorUserId: number | undefined;
 
     while (true) {
       const users = await identityPrisma.user.findMany({
-        where: { status: { not: 'A' } },
+        where: { status: { in: TARGET_IDENTITY_STATUSES } },
         select: { user_id: true, status: true },
         orderBy: { user_id: 'asc' },
         take: options.batchSize,
@@ -168,7 +180,9 @@ async function main(): Promise<void> {
         },
         select: { userId: true, status: true },
       });
-      const activeMemberIds = new Set(memberRows.map((m) => m.userId.toString()));
+      const memberStatusById = new Map(
+        memberRows.map((m) => [m.userId.toString(), m.status]),
+      );
 
       for (const user of users) {
         if (options.limit && candidates >= options.limit) {
@@ -176,7 +190,8 @@ async function main(): Promise<void> {
         }
 
         const idStr = String(user.user_id);
-        if (!activeMemberIds.has(idStr)) {
+        const currentMemberStatus = memberStatusById.get(idStr);
+        if (!currentMemberStatus) {
           continue;
         }
 
@@ -186,7 +201,6 @@ async function main(): Promise<void> {
           continue;
         }
 
-        // We only selected members currently ACTIVE, so this is always a mismatch candidate.
         candidates += 1;
 
         if (!options.apply) {
@@ -219,7 +233,10 @@ async function main(): Promise<void> {
     }
 
     console.log('--- summary ---');
-    console.log(`identity scanned (status != 'A'): ${scanned}`);
+    console.log(`identity total records: ${totalIdentityRecords}`);
+    console.log(`identity scanned (status in I,4,5,6): ${scanned}`);
+    console.log(`member total records: ${totalMemberRecords}`);
+    console.log(`member total active records: ${totalActiveMemberRecords}`);
     console.log(`candidate mismatches found: ${candidates}`);
     console.log(`updated: ${updates}`);
     console.log(`skipped unknown identity status: ${skippedUnknownIdentityStatus}`);
