@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import {
   MemberStatus as MemberDbStatus,
@@ -15,6 +16,13 @@ type IdentityStatus = string;
 
 const DEFAULT_BATCH_SIZE = 500;
 const TARGET_IDENTITY_STATUSES: IdentityStatus[] = ['I', '4', '5', '6'];
+const APPLY_LOG_FIRST_N = 20;
+const APPLY_LOG_EVERY_N = 500;
+
+type UpdateBucket = {
+  status: MemberDbStatus;
+  userIds: bigint[];
+};
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     apply: false,
@@ -184,6 +192,9 @@ async function main(): Promise<void> {
         memberRows.map((m) => [m.userId.toString(), m.status]),
       );
 
+      const updateBucketsByStatus = new Map<MemberDbStatus, bigint[]>();
+      let batchCandidates = 0;
+
       for (const user of users) {
         if (options.limit && candidates >= options.limit) {
           break;
@@ -202,6 +213,7 @@ async function main(): Promise<void> {
         }
 
         candidates += 1;
+        batchCandidates += 1;
 
         if (!options.apply) {
           if (candidates <= 20) {
@@ -210,20 +222,53 @@ async function main(): Promise<void> {
           continue;
         }
 
-        const result = await memberPrisma.member.updateMany({
-          where: {
-            userId: BigInt(idStr),
-            status: MemberDbStatus.ACTIVE,
-          },
-          data: {
-            status: mappedStatus,
-          },
-        });
+        if (candidates <= APPLY_LOG_FIRST_N) {
+          console.log(
+            `[apply-candidate] userId=${idStr}, identity=${user.status} -> member=${mappedStatus}`,
+          );
+        }
 
-        if (result.count > 0) {
+        const bucket = updateBucketsByStatus.get(mappedStatus) ?? [];
+        bucket.push(BigInt(idStr));
+        updateBucketsByStatus.set(mappedStatus, bucket);
+      }
+
+      if (options.apply) {
+        const updateBuckets: UpdateBucket[] = Array.from(
+          updateBucketsByStatus.entries(),
+        ).map(([status, userIds]) => ({ status, userIds }));
+
+        let batchUpdated = 0;
+        for (const bucket of updateBuckets) {
+          if (bucket.userIds.length === 0) {
+            continue;
+          }
+
+          const result = await memberPrisma.member.updateMany({
+            where: {
+              userId: { in: bucket.userIds },
+              status: MemberDbStatus.ACTIVE,
+            },
+            data: {
+              status: bucket.status,
+            },
+          });
+
+          batchUpdated += result.count;
           updates += result.count;
-        } else {
-          skippedAlreadySynced += 1;
+          if (updates % APPLY_LOG_EVERY_N === 0 || result.count > 0) {
+            console.log(
+              `[apply] batch status=${bucket.status}, attempted=${bucket.userIds.length}, updated=${result.count}, totalUpdated=${updates}`,
+            );
+          }
+        }
+
+        const batchSkipped = batchCandidates - batchUpdated;
+        if (batchSkipped > 0) {
+          skippedAlreadySynced += batchSkipped;
+          console.log(
+            `[apply-skip] batch skipped=${batchSkipped}, likely race/already synced`,
+          );
         }
       }
 
