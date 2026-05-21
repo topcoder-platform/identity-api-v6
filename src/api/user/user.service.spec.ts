@@ -45,6 +45,7 @@ import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
 import { MemberPrismaService } from 'src/shared/member-prisma/member-prisma.service';
 import { Constants } from '../../core/constant/constants';
+import axios from 'axios';
 
 // Null logger to suppress NestJS application logs during tests
 const nullLogger = {
@@ -101,6 +102,9 @@ const mockPrismaOltp = {
     findMany: jest.fn(),
     // Add other methods if used
   },
+  user_otp_email: {
+    create: jest.fn(),
+  },
   achievement_type_lu: {
     findUnique: jest.fn(), // Added for potential use
   },
@@ -127,6 +131,7 @@ const mockValidationService = {
   validateUser: jest.fn(),
   validateHandle: jest.fn(),
   validateEmail: jest.fn(),
+  validateEmailViaDB: jest.fn(),
   validateCountry: jest.fn(),
   validateCountryAndMutate: jest.fn(),
   validateProfile: jest.fn(),
@@ -197,6 +202,15 @@ jest.mock('jsonwebtoken', () => ({
 jest.mock('uuid', () => ({
   v4: jest.fn(),
 }));
+
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    patch: jest.fn(),
+    post: jest.fn(),
+  },
+}));
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock crypto (Node.js built-ino
 let createCipherivError = false;
@@ -1288,10 +1302,13 @@ describe('UserService', () => {
       validationService.validateUser.mockImplementation(() => undefined);
       validationService.validateHandle.mockResolvedValue({ valid: true });
       validationService.validateEmail.mockResolvedValue({ valid: true });
+      validationService.validateEmailViaDB.mockResolvedValue(undefined);
       validationService.validateCountryAndMutate.mockResolvedValue(null);
       validationService.validateProfile.mockResolvedValue();
       validationService.validateReferral.mockResolvedValue(null);
       validationService.isHandleLocked.mockResolvedValue(false);
+      mockedAxios.patch.mockResolvedValue({ data: { id: 'hubspot-contact' } });
+      mockedAxios.post.mockResolvedValue({ data: {} });
 
       prismaOltp.$queryRaw.mockImplementation(async (query) => {
         const sqlString = Array.isArray(query)
@@ -1310,6 +1327,7 @@ describe('UserService', () => {
       );
       prismaOltp.email.findFirst.mockResolvedValue(null); // Assume email doesn't exist for new user
       prismaOltp.email.create.mockResolvedValue(mockCreatedEmail);
+      prismaOltp.user_otp_email.create.mockResolvedValue({});
       roleService.assignRoleByName.mockResolvedValue(undefined);
       cacheManager.set.mockResolvedValue(undefined);
       eventService.postEnvelopedNotification.mockResolvedValue(undefined);
@@ -1326,7 +1344,7 @@ describe('UserService', () => {
       expect(mockValidationService.validateHandle).toHaveBeenCalledWith(
         'newuser',
       );
-      expect(mockValidationService.validateEmail).toHaveBeenCalledWith(
+      expect(mockValidationService.validateEmailViaDB).toHaveBeenCalledWith(
         'newuser@example.com',
       );
       expect(
@@ -1378,6 +1396,54 @@ describe('UserService', () => {
       );
 
       expect(result).toEqual(mockCreatedUser);
+    });
+
+    it('should subscribe registered users to the configured HubSpot newsletter', async () => {
+      const defaultConfigGet = mockConfigService.get.getMockImplementation();
+      mockConfigService.get.mockImplementation((key, defaultValue) => {
+        if (key === 'HUBSPOT_API_KEY') return 'hubspot-token';
+        if (key === 'HUBSPOT_TOPCODER_NEWSLETTER_SUBSCRIPTION_ID')
+          return '12345';
+        if (key === 'HUBSPOT_NEWSLETTER_LEGAL_BASIS')
+          return 'LEGITIMATE_INTEREST_OTHER';
+        if (key === 'HUBSPOT_NEWSLETTER_LEGAL_BASIS_EXPLANATION')
+          return 'New Topcoder user registration.';
+        return defaultConfigGet(key, defaultValue);
+      });
+
+      await service.registerUser(createUserDto);
+
+      const headers = {
+        Authorization: 'Bearer hubspot-token',
+        'Content-Type': 'application/json',
+      };
+      expect(mockedAxios.patch).toHaveBeenCalledWith(
+        'https://api.hubapi.com/crm/v3/objects/contacts/newuser%40example.com',
+        {
+          properties: {
+            email: 'newuser@example.com',
+            firstname: 'New',
+            lastname: 'User',
+          },
+        },
+        {
+          headers,
+          params: { idProperty: 'email' },
+        },
+      );
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'https://api.hubapi.com/communication-preferences/v4/statuses/newuser%40example.com',
+        {
+          subscriptionId: 12345,
+          statusState: 'SUBSCRIBED',
+          legalBasis: 'LEGITIMATE_INTEREST_OTHER',
+          legalBasisExplanation: 'New Topcoder user registration.',
+          channel: 'EMAIL',
+        },
+        { headers },
+      );
+
+      mockConfigService.get.mockImplementation(defaultConfigGet);
     });
 
     it('should store isoAlpha3Code for home and competition country codes', async () => {

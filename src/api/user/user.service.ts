@@ -48,6 +48,7 @@ import { MemberStatus as MemberDbStatus } from '../../../prisma/member/generated
 import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { addMinutes } from 'date-fns';
+import axios, { AxiosError } from 'axios';
 type GroupIdRow = { id: string };
 type UserIdRow = { user_id: bigint | Decimal | number | string };
 type UserSearchFilters = {
@@ -85,6 +86,12 @@ const OTP_ACTIVATION_MODE = 1;
 const ACTIVATION_OTP_EXPIRY_MINUTES = 24 * 60;
 const WIPRO_SSO_PROVIDER = 'wipro-adfs';
 const WIPRO_ALL_GROUP_NAME = 'Wipro - All';
+const HUBSPOT_DEFAULT_BASE_URL = 'https://api.hubapi.com';
+const HUBSPOT_EMAIL_CHANNEL = 'EMAIL';
+const HUBSPOT_SUBSCRIBED_STATUS = 'SUBSCRIBED';
+const HUBSPOT_DEFAULT_NEWSLETTER_LEGAL_BASIS = 'LEGITIMATE_INTEREST_OTHER';
+const HUBSPOT_DEFAULT_NEWSLETTER_LEGAL_BASIS_EXPLANATION =
+  'New Topcoder user registration.';
 
 @Injectable()
 export class UserService {
@@ -1397,6 +1404,7 @@ export class UserService {
     // publish user created event
     // ==========================
     await this.publishUserCreatedEvent(newUser);
+    await this.subscribeRegisteredUserToHubSpotNewsletter(userParams);
 
     this.logger.log(
       `Successfully registered user ${newUser.handle} (ID: ${newUser.user_id.toNumber()}). Status: U. Activation OTP sent for eventing.`,
@@ -1573,6 +1581,142 @@ export class UserService {
       this.logger.error(
         `Failed to publish events for user ${newUser.user_id.toNumber()}: ${eventError.message}`,
         eventError.stack,
+      );
+    }
+  }
+
+  /**
+   * Subscribes a newly registered user to the configured HubSpot newsletter.
+   * @param userParams The registration parameters that contain the user's email and profile data.
+   * @returns A promise that resolves after HubSpot contact upsert and subscription requests complete or are skipped.
+   * @throws This method does not intentionally throw; HubSpot errors are logged so registration can still succeed.
+   */
+  private async subscribeRegisteredUserToHubSpotNewsletter(
+    userParams: UserParamBaseDto,
+  ): Promise<void> {
+    const email = userParams.email?.trim();
+    if (!CommonUtils.validateString(email)) {
+      this.logger.warn(
+        'HubSpot newsletter signup skipped because registration email is missing.',
+      );
+      return;
+    }
+
+    const accessToken = this.configService.get<string>('HUBSPOT_API_KEY');
+    const subscriptionIdConfig = this.configService.get<string>(
+      'HUBSPOT_TOPCODER_NEWSLETTER_SUBSCRIPTION_ID',
+    );
+    if (
+      !CommonUtils.validateString(accessToken) ||
+      !CommonUtils.validateString(subscriptionIdConfig)
+    ) {
+      this.logger.warn(
+        'HubSpot newsletter signup skipped because HUBSPOT_API_KEY or HUBSPOT_TOPCODER_NEWSLETTER_SUBSCRIPTION_ID is not configured.',
+      );
+      return;
+    }
+
+    const subscriptionId = Number(subscriptionIdConfig);
+    if (!Number.isFinite(subscriptionId)) {
+      this.logger.warn(
+        `HubSpot newsletter signup skipped because HUBSPOT_TOPCODER_NEWSLETTER_SUBSCRIPTION_ID is not numeric: ${subscriptionIdConfig}.`,
+      );
+      return;
+    }
+
+    const baseUrl = (
+      this.configService.get<string>(
+        'HUBSPOT_BASE_URL',
+        HUBSPOT_DEFAULT_BASE_URL,
+      ) || HUBSPOT_DEFAULT_BASE_URL
+    ).replace(/\/+$/, '');
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    };
+    const configuredLegalBasis = this.configService.get<string>(
+      'HUBSPOT_NEWSLETTER_LEGAL_BASIS',
+    );
+    const configuredLegalBasisExplanation = this.configService.get<string>(
+      'HUBSPOT_NEWSLETTER_LEGAL_BASIS_EXPLANATION',
+    );
+    const legalBasis = CommonUtils.validateString(configuredLegalBasis)
+      ? configuredLegalBasis
+      : HUBSPOT_DEFAULT_NEWSLETTER_LEGAL_BASIS;
+    const legalBasisExplanation = CommonUtils.validateString(
+      configuredLegalBasisExplanation,
+    )
+      ? configuredLegalBasisExplanation
+      : HUBSPOT_DEFAULT_NEWSLETTER_LEGAL_BASIS_EXPLANATION;
+
+    try {
+      await this.upsertHubSpotContact(baseUrl, headers, email, userParams);
+      await axios.post(
+        `${baseUrl}/communication-preferences/v4/statuses/${encodeURIComponent(email)}`,
+        {
+          subscriptionId,
+          statusState: HUBSPOT_SUBSCRIBED_STATUS,
+          legalBasis,
+          legalBasisExplanation,
+          channel: HUBSPOT_EMAIL_CHANNEL,
+        },
+        { headers },
+      );
+      this.logger.log(
+        `HubSpot newsletter signup completed for registered user ${userParams.handle}.`,
+      );
+    } catch (error) {
+      const hubspotError = error as AxiosError;
+      this.logger.error(
+        `HubSpot newsletter signup failed for registered user ${userParams.handle}: ${hubspotError.message}`,
+        hubspotError.stack,
+      );
+    }
+  }
+
+  /**
+   * Creates or updates a HubSpot contact by email before applying subscription preferences.
+   * @param baseUrl HubSpot API base URL without a trailing slash.
+   * @param headers HTTP headers containing the HubSpot bearer token.
+   * @param email The contact email address used as the unique HubSpot identifier.
+   * @param userParams Registration parameters used to populate standard contact properties.
+   * @returns A promise that resolves when the contact exists in HubSpot.
+   * @throws Rethrows non-404 HubSpot errors so the caller can log the signup failure.
+   */
+  private async upsertHubSpotContact(
+    baseUrl: string,
+    headers: Record<string, string>,
+    email: string,
+    userParams: UserParamBaseDto,
+  ): Promise<void> {
+    const contactProperties = {
+      email,
+      ...(CommonUtils.validateString(userParams.firstName) && {
+        firstname: userParams.firstName,
+      }),
+      ...(CommonUtils.validateString(userParams.lastName) && {
+        lastname: userParams.lastName,
+      }),
+    };
+
+    try {
+      await axios.patch(
+        `${baseUrl}/crm/v3/objects/contacts/${encodeURIComponent(email)}`,
+        { properties: contactProperties },
+        {
+          headers,
+          params: { idProperty: 'email' },
+        },
+      );
+    } catch (error) {
+      if ((error as AxiosError).response?.status !== 404) {
+        throw error;
+      }
+
+      await axios.post(
+        `${baseUrl}/crm/v3/objects/contacts`,
+        { properties: contactProperties },
+        { headers },
       );
     }
   }
@@ -2722,7 +2866,7 @@ export class UserService {
             from: { email: fromEmail },
             version: 'v3',
             sendgrid_template_id: welcomeTemplateId,
-            recipients: [emailAddress],           
+            recipients: [emailAddress],
           };
           await this.eventService.postDirectBusMessage(
             'external.action.email',
