@@ -29,7 +29,7 @@ import {
   // ACTIVATION_OTP_EXPIRY_SECONDS,
   ACTIVATION_OTP_LENGTH,
 } from './user.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from '../../dto/member/member.status.enum';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';

@@ -2,10 +2,13 @@ import { ZendeskAuthPlugin } from './zendesk.service';
 import { ConfigurationService } from '../../config/configuration.service';
 import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
 import { CommonUtils } from '../../shared/util/common.utils';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 
 jest.mock('../../shared/util/common.utils');
-jest.mock('uuid');
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual('node:crypto'),
+  randomUUID: jest.fn(),
+}));
 
 describe('ZendeskAuthPlugin', () => {
   let plugin: ZendeskAuthPlugin;

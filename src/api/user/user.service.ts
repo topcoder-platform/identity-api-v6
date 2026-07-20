@@ -33,7 +33,7 @@ import {
   UserOtpDto,
 } from '../../dto/user/user.dto';
 import { ValidationService } from './validation.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { RoleService } from '../role/role.service';
 import { EventService } from '../../shared/event/event.service';
 import { Cache } from 'cache-manager';
