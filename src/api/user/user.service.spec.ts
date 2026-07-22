@@ -40,7 +40,7 @@ import {
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
 import { MemberPrismaService } from 'src/shared/member-prisma/member-prisma.service';
@@ -193,9 +193,10 @@ jest.mock('jsonwebtoken', () => ({
   verify: jest.fn(), // If you ever use verify
 }));
 
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn(),
+// Mock UUID generation while retaining the other native crypto functions.
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual('node:crypto'),
+  randomUUID: jest.fn(),
 }));
 
 // Mock crypto (Node.js built-ino

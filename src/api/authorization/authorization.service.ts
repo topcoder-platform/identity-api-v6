@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Cache } from 'cache-manager';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { format } from 'date-fns-tz';
 import { Auth0Service } from '../../shared/auth0/auth0.service';
 import {

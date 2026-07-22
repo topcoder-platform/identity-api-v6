@@ -6,11 +6,11 @@ export DATABASE_URL=$(echo -e ${IDENTITY_DB_URL})
 echo "Database - running migrations."
 if $RESET_DB; then
     echo "Resetting DB"
-    npx prisma migrate reset --force
+    node node_modules/prisma/build/index.js migrate reset --force
 else
     echo "Running migrations"
-    npx prisma migrate deploy
+    node node_modules/prisma/build/index.js migrate deploy
 fi
 
 # Start the app
-pnpm start:prod
+exec env NODE_OPTIONS=--openssl-legacy-provider node dist/main
