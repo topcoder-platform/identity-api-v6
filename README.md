@@ -127,6 +127,12 @@ The following table summarizes the environment variables used by the application
 |                            | **SendGrid Integration**                                                    |                               |
 | `SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID` | SendGrid template ID for resend activation email.           | `d-73c29be82bfa4d68beea2208b6a3c4b2` (example) |
 | `SENDGRID_WELCOME_EMAIL_TEMPLATE_ID`         | SendGrid template ID for welcome email.                       | `d-26c8962fb48c42a3997053ebe5954516` (example) |
+|                            | **HubSpot Integration**                                                     |                               |
+| `HUBSPOT_API_KEY`          | HubSpot private app bearer token used for contact and subscription APIs.     | *(empty)*                     |
+| `HUBSPOT_BASE_URL`         | HubSpot API base URL.                                                       | `https://api.hubapi.com`      |
+| `HUBSPOT_TOPCODER_NEWSLETTER_SUBSCRIPTION_ID` | HubSpot communication subscription ID for the Topcoder newsletter. | *(empty)*          |
+| `HUBSPOT_NEWSLETTER_LEGAL_BASIS` | HubSpot legal basis sent when subscribing a new user.                  | `LEGITIMATE_INTEREST_OTHER`   |
+| `HUBSPOT_NEWSLETTER_LEGAL_BASIS_EXPLANATION` | HubSpot legal basis explanation sent when subscribing a new user. | `New Topcoder user registration.` |
 |                            | **Other**                                                                   |                               |
 | `ADMIN_ROLE_NAME`          | Name of the role considered admin                                           | `administrator`               |
 | `LOG_LEVEL`                | Logging level (e.g., `debug`, `info`, `warn`, `error`)                      | `info`                        |
