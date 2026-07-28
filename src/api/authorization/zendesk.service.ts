@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { ConfigurationService } from '../../config/configuration.service';
 import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
 import { CommonUtils } from '../../shared/util/common.utils';

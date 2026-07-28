@@ -29,7 +29,7 @@ import {
 } from './user.service'; // Constants from UserService
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 
 // Constants from AuthFlowService
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
@@ -122,8 +122,9 @@ jest.mock('jsonwebtoken', () => ({
     }
   },
 }));
-jest.mock('uuid', () => ({
-  v4: jest.fn(),
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual('node:crypto'),
+  randomUUID: jest.fn(),
 }));
 
 // --- Helper Functions to Create Mock Models ---

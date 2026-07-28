@@ -18,8 +18,8 @@
 **Prerequisites**
 ---------------
 
-* Node.js (Version 22.13.1 recommended)
-* pnpm (Install globally using npm)
+* Node.js (Version 26.5.0 recommended)
+* pnpm (Version 11.15.1)
 * PostgreSQL Client (`psql`) (Required for importing database dump)
 * Docker (Latest version of Docker Desktop or Docker Engine)
 
@@ -28,15 +28,20 @@
 
 1. Install Node.js and pnpm:
 ```bash
-nvm install 22.13.1
-nvm use 22.13.1
-npm install -g pnpm
+nvm install 26.5.0
+nvm use 26.5.0
+npm install -g pnpm@11.15.1
 ```
 2. Install dependencies:
 ```bash
 pnpm install
 ```
 This command also runs `pnpm run prisma:generate` automatically via the `postinstall` script to generate Prisma clients for both databases.
+
+The production Docker image uses pnpm only in its build stage. At startup, the
+container runs Prisma migrations with the bundled Prisma CLI and then directly
+executes the compiled Node.js application, so npm and pnpm are not required in
+the runtime image.
 
 **Deploying Locally**
 ---------------------
