@@ -126,6 +126,7 @@ The following table summarizes the environment variables used by the application
 | `SLACK_CHANNEL_ID`         | Default Slack channel ID for sending notifications.                             | `C04ENKCU4TZ` (example)                     |
 |                            | **SendGrid Integration**                                                    |                               |
 | `SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID` | SendGrid template ID for resend activation email.           | `d-73c29be82bfa4d68beea2208b6a3c4b2` (example) |
+| `SENDGRID_TEMPLATE_ID_OTP_CODE` | SendGrid template ID shared with wallet one-time-password emails. | `d-2d0ab9f6c9cc4efba50080668a9c35c1` |
 | `SENDGRID_WELCOME_EMAIL_TEMPLATE_ID`         | SendGrid template ID for welcome email.                       | `d-26c8962fb48c42a3997053ebe5954516` (example) |
 | `EMAIL_CHANGE_OTP_EXPIRY_SECONDS` | Lifetime of the code sent to the current primary email. | `600` |
 | `EMAIL_CHANGE_OTP_RESEND_SECONDS` | Minimum delay between current-email code requests. | `60` |
