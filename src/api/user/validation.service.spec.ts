@@ -209,6 +209,16 @@ describe('ValidationService', () => {
       });
     });
 
+    it('should reject an array-valued handle before string operations', async () => {
+      await expect(service.validateHandle(['new_handle123'] as any)).resolves.toEqual(
+        {
+          valid: false,
+          reason: 'Handle is required',
+        },
+      );
+      expect(prismaOltp.user.findFirst).not.toHaveBeenCalled();
+    });
+
     it('should return invalid if handle format is invalid (too short)', async () => {
       await expect(service.validateHandle('h!')).resolves.toEqual({
         valid: false,
@@ -262,6 +272,17 @@ describe('ValidationService', () => {
         reason: "Handle 'deleted_handle' has already been taken",
         reasonCode: 'ALREADY_TAKEN',
       });
+    });
+  });
+
+  describe('numberTrimTokenExtract', () => {
+    it('should ignore non-string and oversized request values', () => {
+      expect(
+        service.numberTrimTokenExtract(new Set(), ['123handle456'] as any),
+      ).toEqual(new Set());
+      expect(
+        service.numberTrimTokenExtract(new Set(), '1'.repeat(65)),
+      ).toEqual(new Set());
     });
   });
 

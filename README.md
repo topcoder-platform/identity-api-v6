@@ -18,7 +18,7 @@
 **Prerequisites**
 ---------------
 
-* Node.js (Version 26.5.0 recommended)
+* Node.js (Version 26.5.1 recommended)
 * pnpm (Version 11.15.1)
 * PostgreSQL Client (`psql`) (Required for importing database dump)
 * Docker (Latest version of Docker Desktop or Docker Engine)
@@ -28,8 +28,8 @@
 
 1. Install Node.js and pnpm:
 ```bash
-nvm install 26.5.0
-nvm use 26.5.0
+nvm install 26.5.1
+nvm use 26.5.1
 npm install -g pnpm@11.15.1
 ```
 2. Install dependencies:
@@ -41,7 +41,9 @@ This command also runs `pnpm run prisma:generate` automatically via the `postins
 The production Docker image uses pnpm only in its build stage. At startup, the
 container runs Prisma migrations with the bundled Prisma CLI and then directly
 executes the compiled Node.js application, so npm and pnpm are not required in
-the runtime image.
+the runtime image. The final Alpine 3.24 image installs the distribution's
+dynamically linked Node.js 26.5.1 package and runs as the unprivileged `app`
+user.
 
 **Deploying Locally**
 ---------------------

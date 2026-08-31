@@ -903,10 +903,14 @@ export class UserService {
       } & { primaryEmail?: { address: string; status_id: Decimal | null } }) // Add primary email info structure
     | null
   > {
-    this.logger.debug(`Finding user by email or handle: ${emailOrHandle}`);
-    if (!emailOrHandle) {
+    if (
+      typeof emailOrHandle !== 'string' ||
+      emailOrHandle.length === 0 ||
+      emailOrHandle.length > Constants.MAX_LENGTH_EMAIL
+    ) {
       throw new BadRequestException('Email or handle cannot be empty.');
     }
+    this.logger.debug(`Finding user by email or handle: ${emailOrHandle}`);
 
     const isEmail = emailOrHandle.includes('@');
     let userId: number | null = null;
@@ -1068,7 +1072,7 @@ export class UserService {
     let otp = '';
     const otpChars = '0123456789';
     for (let i = 0; i < length; i++) {
-      otp += otpChars.charAt(Math.floor(Math.random() * otpChars.length));
+      otp += otpChars.charAt(crypto.randomInt(otpChars.length));
     }
     return otp;
   }
@@ -1078,10 +1082,9 @@ export class UserService {
   private generateRandomPassword(length: number): string {
     const charset =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const bytes = crypto.randomBytes(length);
     let result = '';
     for (let i = 0; i < length; i++) {
-      result += charset[bytes[i] % charset.length];
+      result += charset[crypto.randomInt(charset.length)];
     }
     return result;
   }
@@ -2504,7 +2507,15 @@ export class UserService {
   }
 
   /**
-   * Generate an SSO token compatible with the v3 Java implementation.
+   * Generates an SSO token using an HMAC keyed by the configured SSO secret.
+   * The return shape remains `userId|hex-digest` for cookie/API compatibility,
+   * while the credential is never written to logs or passed through a bare
+   * password hash.
+   * @param userId Numeric Topcoder user identifier
+   * @param password Stored credential material for the user
+   * @param status Current user status
+   * @returns HMAC-protected SSO token
+   * @throws Error when the SSO secret is missing or crypto processing fails
    */
   private generateSSOTokenWithCredentials(
     userId: number,
@@ -2512,29 +2523,15 @@ export class UserService {
     status: string,
   ): string {
     const salt = this.getSSOTokenSalt();
-    console.log('SALT:', salt);
     if (!salt) {
       throw new Error('Failed to generate SSO token. Invalid configuration.');
     }
 
-    console.log(
-      `SALT: ${salt} userId: ${userId} encrypted password: ${password} status: ${status}`,
-    );
-    // Java concatenates strings then gets UTF-8 bytes
-    const plain = Buffer.from(
-      String(salt) + String(userId) + password + status,
-      'utf8',
-    );
-
-    // SHA-256 digest as raw bytes
-    const raw = crypto.createHash('sha256').update(plain).digest(); // Buffer
-
-    // Replicate Java's hex conversion: no zero-padding per byte
-    let hash = '';
-    for (const byte of raw.values()) {
-      hash += (byte & 0xff).toString(16); // no padStart(2, "0")
-    }
-
+    const message = `${userId}:${password}:${status}`;
+    const hash = crypto
+      .createHmac('sha256', salt)
+      .update(message, 'utf8')
+      .digest('hex');
     return `${userId}|${hash}`;
   }
 

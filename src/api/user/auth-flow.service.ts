@@ -29,7 +29,7 @@ import {
   // ACTIVATION_OTP_EXPIRY_SECONDS,
   ACTIVATION_OTP_LENGTH,
 } from './user.service';
-import { randomUUID as uuidv4 } from 'node:crypto';
+import { randomInt, randomUUID as uuidv4 } from 'node:crypto';
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from '../../dto/member/member.status.enum';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
@@ -90,7 +90,7 @@ export class AuthFlowService {
     let otp = '';
     const otpChars = '0123456789';
     for (let i = 0; i < length; i++) {
-      otp += otpChars.charAt(Math.floor(Math.random() * otpChars.length));
+      otp += otpChars.charAt(randomInt(otpChars.length));
     }
     return otp;
   }
@@ -652,10 +652,10 @@ export class AuthFlowService {
     resetPasswordUrlPrefix?: string,
     source?: string,
   ): Promise<any> {
-    this.logger.log(`Initiating password reset for: ${emailOrHandle}`);
-    if (!emailOrHandle) {
+    if (typeof emailOrHandle !== 'string' || emailOrHandle.length === 0) {
       throw new BadRequestException('Email or handle is required.');
     }
+    this.logger.log(`Initiating password reset for: ${emailOrHandle}`);
 
     let user: Awaited<
       ReturnType<typeof this.userService.findUserByEmailOrHandle>
@@ -715,7 +715,7 @@ export class AuthFlowService {
       expirySeconds * 1000,
     );
     this.logger.log(
-      `Password reset token ${resetToken} generated and cached for user ${user.user_id.toNumber()}`,
+      `Password reset token generated and cached for user ${user.user_id.toNumber()}`,
     );
 
     const finalResetUrlPrefix = this.getResetPasswordUrlPrefix(
@@ -771,7 +771,7 @@ export class AuthFlowService {
     };
 
     this.logger.log(
-      `[AuthFlowService] Preparing to send 'userpasswordreset' notification. Attributes: ${JSON.stringify(eventAttributes, null, 2)}`,
+      `[AuthFlowService] Preparing to send 'userpasswordreset' notification for user ${user.user_id.toNumber()}`,
     );
 
     try {
@@ -807,29 +807,34 @@ export class AuthFlowService {
     resetPasswordUrlPrefix: string,
     source: string,
   ): string {
-    if (CommonUtils.validateString(resetPasswordUrlPrefix)) {
-      // Sanitize / ensure domains other than topcoder.com or topcoder-dev.com can't be used.
-      let i = resetPasswordUrlPrefix.indexOf('://');
-      i = i < 0 ? 0 : i + 3;
-      let domainName = resetPasswordUrlPrefix.substring(i);
-      i = domainName.indexOf('/');
-      i = i < 0 ? domainName.length : i;
-      domainName = domainName.substring(0, i);
-      i = domainName.lastIndexOf('.');
-      i = domainName.lastIndexOf('.', i - 1);
-      domainName = domainName.substring(i + 1);
-      if (
-        !(domainName === 'topcoder.com' || domainName === 'topcoder-dev.com')
-      ) {
-        resetPasswordUrlPrefix = null;
+    if (
+      typeof resetPasswordUrlPrefix === 'string' &&
+      CommonUtils.validateString(resetPasswordUrlPrefix)
+    ) {
+      try {
+        const parsedUrl = new URL(resetPasswordUrlPrefix);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const approvedHost = ['topcoder.com', 'topcoder-dev.com'].some(
+          (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+        );
+        if (
+          parsedUrl.protocol === 'https:' &&
+          approvedHost &&
+          !parsedUrl.username &&
+          !parsedUrl.password
+        ) {
+          return resetPasswordUrlPrefix;
+        }
+      } catch {
+        // Invalid or unapproved values use the configured safe default below.
       }
-      return resetPasswordUrlPrefix;
     }
 
     const domain = CommonUtils.validateString(this.authDomain)
       ? this.authDomain
       : 'topcoder.com';
-    return CommonUtils.validateString(source) &&
+    return typeof source === 'string' &&
+      CommonUtils.validateString(source) &&
       source.toLocaleLowerCase() === 'connect'
       ? `https://connect.${domain}/reset-password`
       : `https://www.${domain}/reset-password`;

@@ -218,6 +218,10 @@ jest.mock('crypto', () => {
       update: mockUpdate,
       digest: mockDigest,
     })),
+    createHmac: jest.fn(() => ({
+      update: mockUpdate,
+      digest: mockDigest,
+    })),
   };
 });
 
@@ -1029,6 +1033,13 @@ describe('UserService', () => {
         BadRequestException,
       );
     });
+
+    it('should reject a non-string email or handle parameter', async () => {
+      await expect(
+        service.findUserByEmailOrHandle(['testHandle'] as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaOltp.user.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   describe('encodePasswordLegacy', () => {
@@ -1198,11 +1209,14 @@ describe('UserService', () => {
         status,
       );
 
-      const expectedPlainText = `mock-sso-salt${userId}${password}${status}`;
+      const expectedMessage = `${userId}:${password}:${status}`;
 
       expect((service as any).getSSOTokenSalt).toHaveBeenCalled();
-      expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      expect(mockUpdate).toHaveBeenCalledWith(expectedPlainText, 'utf-8');
+      expect(crypto.createHmac).toHaveBeenCalledWith(
+        'sha256',
+        'mock-sso-salt',
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(expectedMessage, 'utf8');
       expect(mockDigest).toHaveBeenCalledWith('hex');
       expect(token).toBe(`${userId}|sha256HashedValue`);
     });

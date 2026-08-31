@@ -101,11 +101,17 @@ describe('AuthorizationController', () => {
       };
       mockRequest.headers['content-type'] = 'application/x-www-form-urlencoded';
       mockService.createObjectForm.mockResolvedValue(
-        {} as AuthorizationResponse,
+        { id: 'form-id' } as AuthorizationResponse,
       );
 
-      await controller.createObject(mockRequest, mockResponse, formData);
+      const result = await controller.createObject(
+        mockRequest,
+        mockResponse,
+        formData,
+      );
       expect(mockService.createObjectForm).toHaveBeenCalledWith(formData);
+      expect(result).toEqual({ id: 'form-id' });
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
     it('should call handleCreateRequest for json content type', async () => {
