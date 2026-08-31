@@ -2507,14 +2507,14 @@ export class UserService {
   }
 
   /**
-   * Generates an SSO token using an HMAC keyed by the configured SSO secret.
+   * Generates an SSO token using the memory-hard scrypt password KDF.
    * The return shape remains `userId|hex-digest` for cookie/API compatibility,
    * while the credential is never written to logs or passed through a bare
-   * password hash.
+   * fast password hash. The configured SSO secret supplies the KDF salt.
    * @param userId Numeric Topcoder user identifier
    * @param password Stored credential material for the user
    * @param status Current user status
-   * @returns HMAC-protected SSO token
+   * @returns Scrypt-derived SSO token
    * @throws Error when the SSO secret is missing or crypto processing fails
    */
   private generateSSOTokenWithCredentials(
@@ -2528,10 +2528,7 @@ export class UserService {
     }
 
     const message = `${userId}:${password}:${status}`;
-    const hash = crypto
-      .createHmac('sha256', salt)
-      .update(message, 'utf8')
-      .digest('hex');
+    const hash = crypto.scryptSync(message, salt, 32).toString('hex');
     return `${userId}|${hash}`;
   }
 

@@ -218,10 +218,9 @@ jest.mock('crypto', () => {
       update: mockUpdate,
       digest: mockDigest,
     })),
-    createHmac: jest.fn(() => ({
-      update: mockUpdate,
-      digest: mockDigest,
-    })),
+    scryptSync: jest.fn((password, salt, keyLength) =>
+      realCrypto.scryptSync(password, salt, keyLength),
+    ),
   };
 });
 
@@ -1212,17 +1211,16 @@ describe('UserService', () => {
       const expectedMessage = `${userId}:${password}:${status}`;
 
       expect((service as any).getSSOTokenSalt).toHaveBeenCalled();
-      expect(crypto.createHmac).toHaveBeenCalledWith(
-        'sha256',
+      expect(crypto.scryptSync).toHaveBeenCalledWith(
+        expectedMessage,
         'mock-sso-salt',
+        32,
       );
-      expect(mockUpdate).toHaveBeenCalledWith(expectedMessage, 'utf8');
-      expect(mockDigest).toHaveBeenCalledWith('hex');
-      expect(token).toBe(`${userId}|sha256HashedValue`);
+      expect(token).toMatch(/^1\|[0-9a-f]{64}$/);
     });
 
     it('should handle hashing error', () => {
-      mockDigest.mockImplementation(() => {
+      (crypto.scryptSync as jest.Mock).mockImplementationOnce(() => {
         throw new Error('Hashing failed');
       });
 
