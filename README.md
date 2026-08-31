@@ -127,6 +127,12 @@ The following table summarizes the environment variables used by the application
 |                            | **SendGrid Integration**                                                    |                               |
 | `SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID` | SendGrid template ID for resend activation email.           | `d-73c29be82bfa4d68beea2208b6a3c4b2` (example) |
 | `SENDGRID_WELCOME_EMAIL_TEMPLATE_ID`         | SendGrid template ID for welcome email.                       | `d-26c8962fb48c42a3997053ebe5954516` (example) |
+| `EMAIL_CHANGE_OTP_EXPIRY_SECONDS` | Lifetime of the code sent to the current primary email. | `600` |
+| `EMAIL_CHANGE_OTP_RESEND_SECONDS` | Minimum delay between current-email code requests. | `60` |
+| `EMAIL_CHANGE_PROOF_EXPIRY_SECONDS` | Lifetime of the proof issued after the current-email code is verified. | `600` |
+| `EMAIL_CHANGE_VALIDATION_EXPIRY_SECONDS` | Lifetime of the validation link sent to the proposed new email. | `3600` |
+| `EMAIL_CHANGE_VERIFY_URL` | Account-settings validation URL containing the required `<emailChangeToken>` placeholder. | `https://www.topcoder-dev.com/account-settings/changeEmail?action=verify&token=<emailChangeToken>` |
+| `EMAIL_CHANGE_CANCEL_URL` | Destination used by the email template when the member rejects or cancels the change. | `https://www.topcoder-dev.com/account-settings` |
 |                            | **Other**                                                                   |                               |
 | `ADMIN_ROLE_NAME`          | Name of the role considered admin                                           | `administrator`               |
 | `LOG_LEVEL`                | Logging level (e.g., `debug`, `info`, `warn`, `error`)                      | `info`                        |
@@ -165,6 +171,7 @@ The following table summarizes the environment variables used by the application
     - Remove role: `DELETE /v6/user-roles/{userId}/{roleId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
     - Manage role members: `GET /v6/roles/{roleId}/subjects[?page&perPage&userId&userHandle&email]` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
 - User password changes from the profile context use: `PATCH /v6/users/{id}` (credential payload) — `platform-ui/src/libs/core/lib/auth/user-functions/user-xhr.store.ts` and `platform-ui/src/libs/core/lib/auth/user-functions/user-endpoint.config.ts`.
+- Member self-service email changes use `POST /v6/users/{id}/email-change/otp`, `POST /v6/users/{id}/email-change/verify-otp`, and `POST /v6/users/{id}/email-change`. The validation link completes the deferred update through `GET /v6/users/email-change/verify?token=...`.
 
 **community-app**
 

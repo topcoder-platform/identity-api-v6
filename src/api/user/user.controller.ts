@@ -61,6 +61,7 @@ import { CommonUtils } from '../../shared/util/common.utils';
 import { MemberStatus } from '../../dto/member';
 import { describeAccess } from '../../shared/swagger/access-description.util';
 import { setPaginationHeaders } from '../../shared/util/pagination.util';
+import { EmailChangeService } from './email-change.service';
 
 // Helper function to map UserModel to UserResponseDto
 /**
@@ -237,6 +238,7 @@ export class UserController {
     private readonly userProfileService: UserProfileService,
     private readonly authFlowService: AuthFlowService,
     private readonly twoFactorAuthService: TwoFactorAuthService,
+    private readonly emailChangeService: EmailChangeService,
     private readonly validationService: ValidationService,
     private readonly roleService: RoleService,
     @Inject(PRISMA_CLIENT)
@@ -1852,6 +1854,160 @@ export class UserController {
       authUser,
     );
     return mapUserToDto(updatedUser);
+  }
+
+  /**
+   * Sends an ownership OTP to the member's current primary email.
+   * @param resourceId ID of the member requesting an email change.
+   * @param req authenticated request for the member or an administrator.
+   * @returns the lifetime of the generated OTP in seconds.
+   */
+  @Post(':resourceId/email-change/otp')
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
+  @ApiOperation({
+    summary: 'Send a current-email ownership code for an email change.',
+    description: describeAccess({
+      summary:
+        "Sends a short-lived code to the member's existing primary email before a self-service email change.",
+      jwt: 'Requires the administrator role or a JWT for the member being updated.',
+      m2m: 'Not supported.',
+    }),
+  })
+  @ApiParam({ name: 'resourceId', description: 'User ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Ownership code sent.',
+    type: DTOs.EmailChangeOtpSentResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Not Found' })
+  async sendEmailChangeOtp(
+    @Param('resourceId') resourceId: string,
+    @Req() req: Request,
+  ): Promise<DTOs.EmailChangeOtpSentResponseDto> {
+    const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(authUser, true, resourceId);
+    return this.emailChangeService.sendCurrentEmailOtp(resourceId);
+  }
+
+  /**
+   * Verifies a current-email ownership OTP.
+   * @param resourceId ID of the member who requested the code.
+   * @param body request containing the six-digit OTP.
+   * @param req authenticated request for the member or an administrator.
+   * @returns a short-lived proof token used to submit the new address.
+   */
+  @Post(':resourceId/email-change/verify-otp')
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
+  @ApiOperation({
+    summary: 'Verify the current-email ownership code.',
+    description: describeAccess({
+      summary:
+        'Validates the ownership code and returns a one-time proof for the next email-change step.',
+      jwt: 'Requires the administrator role or a JWT for the member being updated.',
+      m2m: 'Not supported.',
+    }),
+  })
+  @ApiParam({ name: 'resourceId', description: 'User ID' })
+  @ApiBody({ type: DTOs.VerifyEmailChangeOtpBodyDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Ownership code verified.',
+    type: DTOs.EmailChangeOtpVerifiedResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'OTP expired' })
+  async verifyEmailChangeOtp(
+    @Param('resourceId') resourceId: string,
+    @Body() body: DTOs.VerifyEmailChangeOtpBodyDto,
+    @Req() req: Request,
+  ): Promise<DTOs.EmailChangeOtpVerifiedResponseDto> {
+    const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(authUser, true, resourceId);
+    this.checkParam(body);
+    return this.emailChangeService.verifyCurrentEmailOtp(
+      resourceId,
+      body.param.otp,
+    );
+  }
+
+  /**
+   * Sends the final validation link to a proposed new primary email.
+   * @param resourceId ID of the member changing their email.
+   * @param body new email plus the current-email verification proof.
+   * @param req authenticated request for the member or an administrator.
+   * @returns the normalized email receiving the validation link.
+   */
+  @Post(':resourceId/email-change')
+  @UseGuards(SelfOrAdminGuard)
+  @SelfOrAdmin('resourceId')
+  @ApiOperation({
+    summary: 'Start validation of a new primary email address.',
+    description: describeAccess({
+      summary:
+        'Consumes the current-email proof and sends a validation link to the proposed new address.',
+      jwt: 'Requires the administrator role or a JWT for the member being updated.',
+      m2m: 'Not supported.',
+    }),
+  })
+  @ApiParam({ name: 'resourceId', description: 'User ID' })
+  @ApiBody({ type: DTOs.InitiateEmailChangeBodyDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'New-email validation sent.',
+    type: DTOs.EmailChangeResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  async initiateEmailChange(
+    @Param('resourceId') resourceId: string,
+    @Body() body: DTOs.InitiateEmailChangeBodyDto,
+    @Req() req: Request,
+  ): Promise<DTOs.EmailChangeResponseDto> {
+    const authUser = getAuthenticatedUser(req);
+    this.checkResourceIdAndAccess(authUser, true, resourceId);
+    this.checkParam(body);
+    return this.emailChangeService.initiateEmailChange(
+      resourceId,
+      body.param.email,
+      body.param.verificationToken,
+    );
+  }
+
+  /**
+   * Completes a pending email change from the new-address validation link.
+   * @param token signed one-time validation token delivered to the new address.
+   * @returns the email address that is now primary.
+   */
+  @Get('email-change/verify')
+  @ApiOperation({
+    summary: 'Complete a pending primary-email change.',
+    description: describeAccess({
+      summary:
+        'Validates the one-time link sent to the new address and only then updates the primary email.',
+      jwt: 'Not required; possession of the signed one-time link is required.',
+      m2m: 'Not applicable.',
+    }),
+  })
+  @ApiQuery({ name: 'token', required: true, type: String })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Email change completed.',
+    type: DTOs.EmailChangeResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Invalid token' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Token expired' })
+  async completeEmailChange(
+    @Query('token') token: string,
+  ): Promise<DTOs.EmailChangeResponseDto> {
+    if (!token) {
+      throw new BadRequestException('token is required.');
+    }
+    return this.emailChangeService.completeEmailChange(token);
   }
 
   /**
