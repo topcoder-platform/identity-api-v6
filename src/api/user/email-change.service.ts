@@ -37,6 +37,8 @@ const DEFAULT_OTP_EXPIRY_SECONDS = 10 * 60;
 const DEFAULT_OTP_RESEND_SECONDS = 60;
 const DEFAULT_PROOF_EXPIRY_SECONDS = 10 * 60;
 const DEFAULT_VALIDATION_EXPIRY_SECONDS = 60 * 60;
+const DEFAULT_SENDGRID_OTP_TEMPLATE_ID =
+  'd-2d0ab9f6c9cc4efba50080668a9c35c1';
 const MAX_OTP_ATTEMPTS = 5;
 
 interface CachedOtp {
@@ -146,7 +148,12 @@ export class EmailChangeService {
 
     const user = await this.prismaClient.user.findUnique({
       where: { user_id: userId },
-      select: { handle: true, status: true },
+      select: {
+        first_name: true,
+        handle: true,
+        last_name: true,
+        status: true,
+      },
     });
 
     if (!user) {
@@ -187,8 +194,12 @@ export class EmailChangeService {
     );
 
     try {
+      const recipientName = [user.first_name, user.last_name]
+        .map((name) => name?.trim())
+        .filter(Boolean)
+        .join(' ') || user.handle;
       await this.sendOtpEmail(
-        user.handle,
+        recipientName,
         currentPrimaryEmail.address,
         otp,
       );
@@ -544,37 +555,33 @@ export class EmailChangeService {
 
   /**
    * Publishes the current-email OTP through the configured SendGrid template.
-   * @param handle Topcoder handle used by the email template.
+   * @param recipientName member name used by the wallet OTP email template.
    * @param email current primary email recipient.
    * @param otp six-digit ownership code.
    * @returns a promise resolved after the event is published.
-   * @throws InternalServerErrorException when the template is not configured.
    */
   private async sendOtpEmail(
-    handle: string,
+    recipientName: string,
     email: string,
     otp: string,
   ): Promise<void> {
-    const sendgridTemplateId = this.configService.get<string>(
-      'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
-    );
-    if (!sendgridTemplateId) {
-      throw new InternalServerErrorException(
-        'Email verification template is not configured.',
-      );
-    }
+    const sendgridTemplateId =
+      this.configService.get<string>('SENDGRID_TEMPLATE_ID_OTP_CODE') ||
+      DEFAULT_SENDGRID_OTP_TEMPLATE_ID;
 
     const domain = CommonUtils.getAppDomain(this.configService);
     await this.eventService.postDirectBusMessage('external.action.email', {
       data: {
-        code: otp,
-        duration: Math.ceil(this.otpExpirySeconds / 60),
-        handle,
+        name: recipientName,
+        otp,
       },
-      from: { email: `Topcoder <noreply@${domain}>` },
+      from: {
+        email: `noreply@${domain}`,
+        name: 'Topcoder',
+      },
       recipients: [email],
       sendgrid_template_id: sendgridTemplateId,
-      version: 'v6',
+      version: 'v3',
     });
   }
 

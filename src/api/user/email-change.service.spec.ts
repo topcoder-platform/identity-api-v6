@@ -38,7 +38,9 @@ describe('EmailChangeService', () => {
     user: {
       findUnique: jest.fn().mockImplementation(({ select }) =>
         Promise.resolve({
+          first_name: 'Justin',
           handle: 'memberHandle',
+          last_name: 'Gasper',
           ...(select?.status && { status: MemberStatus.ACTIVE }),
         }),
       ),
@@ -59,7 +61,6 @@ describe('EmailChangeService', () => {
         EMAIL_CHANGE_PROOF_EXPIRY_SECONDS: '600',
         EMAIL_CHANGE_VALIDATION_EXPIRY_SECONDS: '3600',
         JWT_SECRET: 'email-change-test-secret',
-        SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID: 'template-id',
       };
       return values[key];
     }),
@@ -90,9 +91,21 @@ describe('EmailChangeService', () => {
     });
 
     const otpEmailPayload = eventService.postDirectBusMessage.mock.calls[0][1];
-    const otp = otpEmailPayload.data.code;
+    const otp = otpEmailPayload.data.otp;
     expect(otp).toMatch(/^\d{6}$/);
-    expect(otpEmailPayload.recipients).toEqual(['old@example.com']);
+    expect(otpEmailPayload).toEqual({
+      data: {
+        name: 'Justin Gasper',
+        otp,
+      },
+      from: {
+        email: 'noreply@topcoder-dev.com',
+        name: 'Topcoder',
+      },
+      recipients: ['old@example.com'],
+      sendgrid_template_id: 'd-2d0ab9f6c9cc4efba50080668a9c35c1',
+      version: 'v3',
+    });
 
     const proof = await service.verifyCurrentEmailOtp('2', otp);
     expect(proof.verificationToken).toEqual(expect.any(String));
@@ -146,7 +159,7 @@ describe('EmailChangeService', () => {
 
   it('rejects validation if the primary email changed while pending', async () => {
     await service.sendCurrentEmailOtp('2');
-    const otp = eventService.postDirectBusMessage.mock.calls[0][1].data.code;
+    const otp = eventService.postDirectBusMessage.mock.calls[0][1].data.otp;
     const proof = await service.verifyCurrentEmailOtp('2', otp);
     await service.initiateEmailChange(
       '2',
