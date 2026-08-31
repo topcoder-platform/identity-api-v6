@@ -126,11 +126,15 @@ describe('EmailChangeService', () => {
     const validationUrl = new URL(
       validationCall[1].data.verificationAgreeUrl,
     );
-    const validationToken = validationUrl.searchParams.get('token');
-    expect(validationToken).toEqual(expect.any(String));
+    const validationCode = validationUrl.searchParams.get('code');
+    expect(validationUrl.pathname).toBe(
+      '/account-settings/email-change/verify',
+    );
+    expect(validationCode).toEqual(expect.any(String));
+    expect(validationUrl.searchParams.has('token')).toBe(false);
 
     await expect(
-      service.completeEmailChange(validationToken as string),
+      service.completeEmailChange(validationCode as string),
     ).resolves.toEqual({ email: 'new@example.com' });
     expect(userService.updatePrimaryEmail).toHaveBeenCalledWith(
       '2',
@@ -176,7 +180,7 @@ describe('EmailChangeService', () => {
 
     await expect(
       service.completeEmailChange(
-        validationUrl.searchParams.get('token') as string,
+        validationUrl.searchParams.get('code') as string,
       ),
     ).rejects.toThrow(ForbiddenException);
     expect(userService.updatePrimaryEmail).not.toHaveBeenCalled();

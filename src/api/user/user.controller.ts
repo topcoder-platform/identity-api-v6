@@ -1980,8 +1980,10 @@ export class UserController {
 
   /**
    * Completes a pending email change from the new-address validation link.
-   * @param token signed one-time validation token delivered to the new address.
+   * @param code signed one-time validation code delivered to the new address.
+   * @param legacyToken legacy query parameter accepted for already-issued links.
    * @returns the email address that is now primary.
+   * @throws BadRequestException when neither query parameter is present.
    */
   @Get('email-change/verify')
   @ApiOperation({
@@ -1993,21 +1995,34 @@ export class UserController {
       m2m: 'Not applicable.',
     }),
   })
-  @ApiQuery({ name: 'token', required: true, type: String })
+  @ApiQuery({
+    name: 'code',
+    required: false,
+    type: String,
+    description: 'Signed one-time code from the email validation link.',
+  })
+  @ApiQuery({
+    name: 'token',
+    required: false,
+    type: String,
+    description: 'Deprecated compatibility alias for already-issued links.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Email change completed.',
     type: DTOs.EmailChangeResponseDto,
   })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Invalid token' })
-  @ApiResponse({ status: HttpStatus.GONE, description: 'Token expired' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Invalid code' })
+  @ApiResponse({ status: HttpStatus.GONE, description: 'Code expired' })
   async completeEmailChange(
-    @Query('token') token: string,
+    @Query('code') code?: string,
+    @Query('token') legacyToken?: string,
   ): Promise<DTOs.EmailChangeResponseDto> {
-    if (!token) {
-      throw new BadRequestException('token is required.');
+    const validationCode = code || legacyToken;
+    if (!validationCode) {
+      throw new BadRequestException('code is required.');
     }
-    return this.emailChangeService.completeEmailChange(token);
+    return this.emailChangeService.completeEmailChange(validationCode);
   }
 
   /**
