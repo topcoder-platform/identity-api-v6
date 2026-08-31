@@ -29,6 +29,7 @@ import {
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { EmailChangeService } from './email-change.service';
 
 // --- Mock Services ---
 const mockUserService = {
@@ -73,6 +74,13 @@ const mockTwoFactorAuthService = {
   sendOtpFor2fa: jest.fn(),
   resendOtpEmailFor2fa: jest.fn(),
   checkOtpAndCompleteLogin: jest.fn(),
+};
+
+const mockEmailChangeService = {
+  completeEmailChange: jest.fn(),
+  initiateEmailChange: jest.fn(),
+  sendCurrentEmailOtp: jest.fn(),
+  verifyCurrentEmailOtp: jest.fn(),
 };
 
 const mockValidationService = {
@@ -248,6 +256,7 @@ describe('UserController', () => {
         { provide: UserProfileService, useValue: mockUserProfileService },
         { provide: AuthFlowService, useValue: mockAuthFlowService },
         { provide: TwoFactorAuthService, useValue: mockTwoFactorAuthService },
+        { provide: EmailChangeService, useValue: mockEmailChangeService },
         { provide: ValidationService, useValue: mockValidationService },
         { provide: RoleService, useValue: mockRoleService },
         {
@@ -995,6 +1004,89 @@ describe('UserController', () => {
           mockReq,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('self-service email change', () => {
+    const mockReq = createMockRequest(mockRegularUser, {
+      authorization: 'Bearer user-token',
+    });
+
+    it('sends an OTP to the current email', async () => {
+      mockEmailChangeService.sendCurrentEmailOtp.mockResolvedValue({
+        expiresIn: 600,
+      });
+
+      await expect(controller.sendEmailChangeOtp('2', mockReq)).resolves.toEqual(
+        { expiresIn: 600 },
+      );
+      expect(mockEmailChangeService.sendCurrentEmailOtp).toHaveBeenCalledWith(
+        '2',
+      );
+    });
+
+    it('verifies the current-email OTP', async () => {
+      mockEmailChangeService.verifyCurrentEmailOtp.mockResolvedValue({
+        expiresIn: 600,
+        verificationToken: 'proof-token',
+      });
+
+      await expect(
+        controller.verifyEmailChangeOtp(
+          '2',
+          { param: { otp: '123456' } },
+          mockReq,
+        ),
+      ).resolves.toEqual({
+        expiresIn: 600,
+        verificationToken: 'proof-token',
+      });
+      expect(
+        mockEmailChangeService.verifyCurrentEmailOtp,
+      ).toHaveBeenCalledWith('2', '123456');
+    });
+
+    it('sends validation to the proposed new email', async () => {
+      mockEmailChangeService.initiateEmailChange.mockResolvedValue({
+        email: 'new@example.com',
+      });
+
+      await expect(
+        controller.initiateEmailChange(
+          '2',
+          {
+            param: {
+              email: 'new@example.com',
+              verificationToken: 'proof-token',
+            },
+          },
+          mockReq,
+        ),
+      ).resolves.toEqual({ email: 'new@example.com' });
+      expect(mockEmailChangeService.initiateEmailChange).toHaveBeenCalledWith(
+        '2',
+        'new@example.com',
+        'proof-token',
+      );
+    });
+
+    it('completes the change from the new-email validation token', async () => {
+      mockEmailChangeService.completeEmailChange.mockResolvedValue({
+        email: 'new@example.com',
+      });
+
+      await expect(
+        controller.completeEmailChange('validation-token'),
+      ).resolves.toEqual({ email: 'new@example.com' });
+      expect(mockEmailChangeService.completeEmailChange).toHaveBeenCalledWith(
+        'validation-token',
+      );
+    });
+
+    it('rejects a validation request without a token', async () => {
+      await expect(controller.completeEmailChange('')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
