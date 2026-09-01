@@ -124,10 +124,10 @@ export class ValidationService {
     handle: string,
     userId: number = null,
   ): Promise<DTOs.ValidationResponseDto> {
-    this.logger.log(`Validating handle: ${handle}`);
-    if (!handle) {
+    if (typeof handle !== 'string' || handle.length === 0) {
       return { valid: false, reason: 'Handle is required' };
     }
+    this.logger.log(`Validating handle: ${handle}`);
     if (
       handle.length < Constants.MIN_LENGTH_HANDLE ||
       handle.length > Constants.MAX_LENGTH_HANDLE
@@ -946,16 +946,28 @@ export class ValidationService {
     }
   }
 
-  private isDigit(char) {
+  private isDigit(char: string): boolean {
     return /^\d$/.test(char);
   }
 
+  /**
+   * Extracts handle variants by removing leading and trailing digits.
+   * Only primitive strings within the supported handle length are processed,
+   * which bounds the nested extraction work for request-derived values.
+   * @param ignoreTokens Tokens already emitted by earlier extraction passes
+   * @param handle Candidate handle to process
+   * @returns Newly extracted unique handle variants
+   */
   numberTrimTokenExtract(
     ignoreTokens: Set<string>,
     handle: string,
   ): Set<string> {
     const extractedTokens = new Set<string>();
-    if (handle == null || handle.length == 0) {
+    if (
+      typeof handle !== 'string' ||
+      handle.length === 0 ||
+      handle.length > Constants.MAX_LENGTH_HANDLE
+    ) {
       return extractedTokens;
     }
 

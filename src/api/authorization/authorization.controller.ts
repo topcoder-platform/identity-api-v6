@@ -140,7 +140,7 @@ export class AuthorizationController {
   })
   async createObject(
     @Req() req: Request,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Body() body: AuthorizationCreateRequest | AuthorizationForm,
   ) {
     const contentType = req.headers['content-type'];
@@ -154,7 +154,7 @@ export class AuthorizationController {
         body as AuthorizationCreateRequest,
       );
     }
-    res.json(ret);
+    return ret;
   }
 
   /**

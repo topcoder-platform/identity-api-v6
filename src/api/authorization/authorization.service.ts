@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -47,6 +48,11 @@ const AUTH_REFRESH_LOG_DATE_FORMAT = 'yyyy-MM-dd_HH:mm:ss';
 const AUTH_REFRESH_LOG_KEY_PREFIX = 'identity:';
 const AUTH_REFRESH_LOG_KEY_DELIM = ',';
 
+type CachedAuthorizationState = {
+  redirectUrl: string;
+  state: string;
+};
+
 @Injectable()
 export class AuthorizationService {
   private readonly logger = new Logger(AuthorizationService.name);
@@ -81,30 +87,40 @@ export class AuthorizationService {
     const redirectUri = req.hostname;
     let protocol = req.secure ? 'https' : 'http';
     if (
-      redirectUri != null &&
-      tcRedirectDomains.some((t) => redirectUri.includes(t))
+      typeof redirectUri === 'string' &&
+      this.isTopcoderHostname(redirectUri)
     ) {
       protocol = 'https';
     }
-    let redirectUrl = req.headers['referer'];
-    if (nextParam) {
-      redirectUrl = nextParam;
-    }
-    if (!CommonUtils.validateString(redirectUrl)) {
-      redirectUrl = Constants.defaultRedirectUrl;
-    }
+    const referer = req.headers['referer'];
+    const requestedRedirect =
+      typeof nextParam === 'string'
+        ? nextParam
+        : typeof referer === 'string'
+          ? referer
+          : Constants.defaultRedirectUrl;
+    const redirectUrl = this.getApprovedRedirectUrl(
+      requestedRedirect,
+      Constants.defaultRedirectUrl,
+    );
     const state = Buffer.from(
       CommonUtils.generateAlphaNumericString(Constants.defaultAuthStateLength),
     ).toString('base64');
 
-    await this.cacheManager.set(AUTH0_STATE_CACHE_PREFIX_KEY + state, state);
+    await this.cacheManager.set(AUTH0_STATE_CACHE_PREFIX_KEY + state, {
+      redirectUrl,
+      state,
+    } satisfies CachedAuthorizationState);
 
-    const returlUrl =
-      `https://${domain}/authorize?client_id=${clientId}` +
-      `&redirect_uri=${protocol}://${redirectUri}/v6/authorizations?redirectUrl=${redirectUrl}` +
-      `&audience=${protocol}://${redirectUri}/v6&scope=openid profile offline_access` +
-      `&response_type=code&state=${state}` +
-      `&prompt=none`;
+    const returlUrl = this.createAuth0AuthorizeUrl(
+      domain,
+      clientId,
+      protocol,
+      redirectUri,
+      redirectUrl,
+      state,
+      true,
+    );
     // set response
     res.redirect(302, returlUrl);
     return;
@@ -121,50 +137,59 @@ export class AuthorizationService {
     res: Response,
     dto: GetTokenQueryDto,
   ) {
+    if (typeof dto?.state !== 'string' || dto.state.trim().length === 0) {
+      throw new BadRequestException(
+        'The state code should be non-null and non-empty string',
+      );
+    }
+    const redirectUrl = this.getApprovedRedirectUrl(dto.redirectUrl);
+    const cachedState = await this.cacheManager.get<
+      string | CachedAuthorizationState
+    >(AUTH0_STATE_CACHE_PREFIX_KEY + dto.state);
+    if (cachedState == null) {
+      throw new InternalServerErrorException('The state code is not found.');
+    }
+    if (
+      (typeof cachedState === 'string' && cachedState !== dto.state) ||
+      (typeof cachedState === 'object' &&
+        (cachedState.state !== dto.state ||
+          cachedState.redirectUrl !== redirectUrl))
+    ) {
+      throw new BadRequestException('Invalid authorization state.');
+    }
+
     if (dto.error && dto.error === 'login_required') {
       const domain = this.auth0.domain;
       const clientId = this.auth0.clientId;
       const redirectUri = req.hostname;
       let protocol = req.secure ? 'https' : 'http';
       if (
-        redirectUri != null &&
-        tcRedirectDomains.some((t) => redirectUri.includes(t))
+        typeof redirectUri === 'string' &&
+        this.isTopcoderHostname(redirectUri)
       ) {
         protocol = 'https';
       }
-      const resultUrl =
-        `https://${domain}/authorize?client_id=${clientId}` +
-        `&redirect_uri=${protocol}://${redirectUri}/v6/authorizations?redirectUrl=${dto.redirectUrl}` +
-        `&audience=${protocol}://${redirectUri}/v6&scope=openid profile offline_access` +
-        `&response_type=code&state=${dto.state}`;
+      const resultUrl = this.createAuth0AuthorizeUrl(
+        domain,
+        clientId,
+        protocol,
+        redirectUri,
+        redirectUrl,
+        dto.state,
+        false,
+      );
       res.redirect(resultUrl);
       return;
     }
-    if (dto.code == null || dto.code.trim().length === 0) {
+    if (typeof dto.code !== 'string' || dto.code.trim().length === 0) {
       throw new BadRequestException(
         'The authorization code should be non-null and non-empty string',
       );
     }
-    if (dto.redirectUrl == null || dto.redirectUrl.trim().length === 0) {
-      throw new BadRequestException(
-        'The redirect url code should be non-null and non-empty string',
-      );
-    }
-    if (dto.state == null || dto.state.trim().length === 0) {
-      throw new BadRequestException(
-        'The state code should be non-null and non-empty string',
-      );
-    }
-    const cachedState = await this.cacheManager.get<string>(
-      AUTH0_STATE_CACHE_PREFIX_KEY + dto.state,
-    );
-    if (cachedState == null) {
-      throw new InternalServerErrorException('The state code is not found.');
-    }
 
     const credential: Auth0Credential = await this.auth0.getToken(
       dto.code,
-      dto.redirectUrl,
+      redirectUrl,
     );
 
     await this.cacheManager.set(
@@ -181,8 +206,108 @@ export class AuthorizationService {
     res.cookie(Constants.tcSsoCookieName, token, cookieOptions);
 
     await this.cacheManager.del(AUTH0_STATE_CACHE_PREFIX_KEY + dto.state);
-    res.redirect(dto.redirectUrl);
+    res.redirect(redirectUrl);
     return credential;
+  }
+
+  /**
+   * Validates a browser redirect destination against Topcoder-owned hosts.
+   * HTTPS is mandatory except for loopback hosts outside production, enabling
+   * local development without permitting arbitrary external redirects.
+   * @param value Request-derived destination to validate
+   * @param fallback Optional trusted fallback used when validation fails
+   * @returns A parsed and normalized approved URL
+   * @throws BadRequestException when no approved destination is available
+   */
+  private getApprovedRedirectUrl(value: unknown, fallback?: string): string {
+    try {
+      if (typeof value !== 'string' || value.length > 2048) {
+        throw new Error('Invalid redirect value');
+      }
+      const parsed = new URL(value);
+      const hostname = parsed.hostname.toLowerCase();
+      const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+      const approvedProtocol =
+        parsed.protocol === 'https:' ||
+        (parsed.protocol === 'http:' &&
+          isLoopback &&
+          process.env.NODE_ENV !== 'production');
+      if (
+        !approvedProtocol ||
+        (!this.isTopcoderHostname(hostname) && !isLoopback) ||
+        parsed.username ||
+        parsed.password
+      ) {
+        throw new Error('Unapproved redirect value');
+      }
+      return parsed.toString();
+    } catch {
+      if (fallback !== undefined && fallback !== value) {
+        return this.getApprovedRedirectUrl(fallback);
+      }
+      throw new BadRequestException('Unregistered URI to redirect');
+    }
+  }
+
+  /**
+   * Checks whether a hostname is an approved root domain or true subdomain.
+   * The deployment's configured auth domain is trusted in addition to the
+   * standard Topcoder domains so non-production tenants continue to work.
+   * @param hostname Hostname to check
+   * @returns True only for allowlisted Topcoder domain boundaries
+   */
+  private isTopcoderHostname(hostname: string): boolean {
+    const normalizedHostname = hostname.toLowerCase().replace(/\.$/, '');
+    const configuredDomain = this.config.getCommon().authDomain;
+    const approvedDomains =
+      typeof configuredDomain === 'string' && configuredDomain.length > 0
+        ? [...tcRedirectDomains, configuredDomain.toLowerCase()]
+        : tcRedirectDomains;
+    return approvedDomains.some(
+      (domain) =>
+        normalizedHostname === domain ||
+        normalizedHostname.endsWith(`.${domain}`),
+    );
+  }
+
+  /**
+   * Constructs the Auth0 authorize URL using URLSearchParams so nested callback
+   * and destination values cannot inject additional authorization parameters.
+   * @param domain Auth0 tenant domain
+   * @param clientId Auth0 client identifier
+   * @param protocol Identity API callback protocol
+   * @param redirectHost Identity API callback host
+   * @param redirectUrl Approved post-authentication browser destination
+   * @param state CSRF state value
+   * @param promptNone Whether to request silent authentication
+   * @returns Encoded Auth0 authorize URL
+   */
+  private createAuth0AuthorizeUrl(
+    domain: string,
+    clientId: string,
+    protocol: string,
+    redirectHost: string,
+    redirectUrl: string,
+    state: string,
+    promptNone: boolean,
+  ): string {
+    const callback = new URL(
+      '/v6/authorizations',
+      `${protocol}://${redirectHost}`,
+    );
+    callback.searchParams.set('redirectUrl', redirectUrl);
+
+    const authorize = new URL('/authorize', `https://${domain}`);
+    authorize.searchParams.set('client_id', clientId);
+    authorize.searchParams.set('redirect_uri', callback.toString());
+    authorize.searchParams.set('audience', `${protocol}://${redirectHost}/v6`);
+    authorize.searchParams.set('scope', 'openid profile offline_access');
+    authorize.searchParams.set('response_type', 'code');
+    authorize.searchParams.set('state', state);
+    if (promptNone) {
+      authorize.searchParams.set('prompt', 'none');
+    }
+    return authorize.toString();
   }
 
   /**
