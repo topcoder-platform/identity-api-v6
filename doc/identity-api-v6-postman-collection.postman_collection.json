@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "bb325d16-db81-40c0-b33b-ec5640fd9f6a",
 		"name": "identity-api-v6-postman-collection",
-		"description": "Comprehensive Postman collection for testing all endpoints in the Topcoder Identity API v6",
+		"description": "Comprehensive Postman collection for testing all endpoints in the Topcoder Identity API v6. Authentication variables are intentionally empty; supply test credentials through a local Postman environment and never commit live tokens.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "1574174"
 	},
@@ -108,7 +108,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"param\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"target\": \"1\",\n    \"externalToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiNDAxNDEyMzUiLCJyb2xlcyI6WyJhZG1pbmlzdHJhdG9yIiwiVG9wY29kZXIgVXNlciJdLCJoYW5kbGUiOiJUb255SiIsImVtYWlsIjoidGplZnRocytmaXhAdG9wY29kZXIuY29tIiwic2NvcGVzIjpbInJlYWQ6dXNlcnMiLCJ3cml0ZTp1c2VycyJdLCJpZGVudGl0aWVzIjpbeyJpZGVudGl0eUlkIjoiNDAxNDEyMzUiLCJ1c2VyX2lkIjoiNDAxNDEyMzUiLCJjb25uZWN0aW9uIjoiVEMtVXNlci1EYXRhYmFzZSIsInByb3ZpZGVyIjoiYWQiLCJpZGVudGl0eVR5cGUiOiJ0b3Bjb2RlciIsImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX1dLCJpYXQiOjE3NTMyNzAzNTAsImV4cCI6MTc1Mzk2MTU1MH0.5iKcfWP8kkIP9wsWQegb6DZl5nQKKnxhnN3AyokX1S0\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
+							"raw": "{\n  \"param\": {\n    \"token\": \"{{authToken}}\",\n    \"refreshToken\": \"{{refreshToken}}\",\n    \"target\": \"1\",\n    \"externalToken\": \"{{externalToken}}\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -154,7 +154,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"param\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"target\": \"1\",\n    \"externalToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMDAwMDAwMjciLCJyb2xlcyI6WyJUb3Bjb2RlciBUYWxlbnQiLCJUb3Bjb2RlciBVc2VyIiwiYWRtaW5pc3RyYXRvciIsIkNvbm5lY3QgQWRtaW4iLCJDb25uZWN0IE1hbmFnZXIiLCJHYW1pZmljYXRpb24gQWRtaW4iLCJUYXhGb3JtIEFkbWluIiwiUHJvZ3JhbSBNYW5hZ2VyIl0sImlzcyI6Imh0dHBzOi8vYXBpLnRvcGNvZGVyLWRldi5jb20iLCJpYXQiOjE3NTMyNTk0NjksImV4cCI6MTc1MzMwMjY2OSwianRpIjoiY2NiYWYxODMtNDI2Ny00NTFhLWJkZDktMjM3ZTgwMzE2YTA3In0.BOHMA1mRjdxCqVKOTpz03atByjsjm2RkPNQCv2ucosE\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
+							"raw": "{\n  \"param\": {\n    \"token\": \"{{authToken}}\",\n    \"refreshToken\": \"{{refreshToken}}\",\n    \"target\": \"1\",\n    \"externalToken\": \"{{externalToken}}\",\n    \"zendeskJwt\": \"zendesk_jwt_token\"\n  }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1610,7 +1610,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n        \"userId\": 40159250,\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n}",
+									"raw": "{\n        \"userId\": 40159250,\n        \"resendToken\": \"{{resendToken}}\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -1655,7 +1655,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n        \"userId\": 40159253,\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n}",
+									"raw": "{\n        \"userId\": 40159253,\n        \"resendToken\": \"{{resendToken}}\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -1700,7 +1700,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"param\": {\n        \"userId\": 40159253,\n        \"otp\": \"025450\",\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwidXNlcklkIjoiNDAxNTkyNTMiLCJzdWIiOiI0MDE1OTI1MyIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiLCJUb3Bjb2RlciBVc2VyIl0sImhhbmRsZSI6IlRvbnlKIiwiZW1haWwiOiJ0amVmdGhzK2ZpeEB0b3Bjb2Rlci5jb20iLCJzY29wZXMiOlsicmVhZDp1c2VycyIsIndyaXRlOnVzZXJzIl0sImlhdCI6MTc1MzMxOTQ3OSwiZXhwIjoxNzU0MDEwNjc5fQ.YAeJ22RikVyIlP9pKHbuKCDObTmWhYLfZcpZWxt4OE0\"\n    }\n  \n}",
+									"raw": "{\n    \"param\": {\n        \"userId\": 40159253,\n        \"otp\": \"025450\",\n        \"resendToken\": \"{{resendToken}}\"\n    }\n  \n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -3541,7 +3541,17 @@
 		},
 		{
 			"key": "authToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiNDAxNDEyMzUiLCJyb2xlcyI6WyJhZG1pbmlzdHJhdG9yIiwiVG9wY29kZXIgVXNlciJdLCJoYW5kbGUiOiJUb255SiIsImVtYWlsIjoidGplZnRocytmaXhAdG9wY29kZXIuY29tIiwic2NvcGVzIjpbInJlYWQ6dXNlcnMiLCJ3cml0ZTp1c2VycyJdLCJpYXQiOjE3NTMyNTM0NTgsImV4cCI6MTc1Mzk0NDY1OH0.tltWXF7NtObKSbDOm7JYP76ATjVMW43b0NDMFlhIK8M",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "externalToken",
+			"value": "",
 			"type": "string"
 		},
 		{
@@ -3571,12 +3581,12 @@
 		},
 		{
 			"key": "oneTimeToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAxMjYiLCJhdWQiOiJvbmV0aW1lX2VtYWlsX3VwZGF0ZSIsImp0aSI6IjI4MTE0OTkyLWUxYTgtNDEwNS1iNzcxLTNmNGU4MDBlMmI2YiIsImlhdCI6MTc1MzI4NDI3NiwiZXhwIjoxNzUzMjg0ODc2fQ.ecSASFjNCUSpBw7YiXq0-Hun-pcQ0VF2F2fmLqoQd8g",
+			"value": "",
 			"type": "string"
 		},
 		{
 			"key": "resendToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAxMjYiLCJhdWQiOiIyZmFlbWFpbCIsImlhdCI6MTc1MzI4NjM4MiwiZXhwIjoxNzUzMjg2OTgyfQ.tO-MvmSXPmSIvCH3fDU0S1uYvaTa5vmwi4ywOYZ5QyA"
+			"value": ""
 		}
 	]
 }
