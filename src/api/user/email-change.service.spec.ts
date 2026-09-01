@@ -123,6 +123,7 @@ describe('EmailChangeService', () => {
       'member.action.email.profile.emailchange.verification',
     );
     expect(validationCall[1].recipients).toEqual(['new@example.com']);
+    expect(validationCall[1].version).toBe('v3');
     const validationUrl = new URL(
       validationCall[1].data.verificationAgreeUrl,
     );
