@@ -619,6 +619,7 @@ export class EmailChangeService {
           verificationDisagreeUrl: cancelUrl,
         },
         recipients: [email],
+        version: 'v3',
       },
     );
   }

@@ -154,7 +154,7 @@ The source HTML for the proposed-address confirmation message is stored at
 service topic map so `member.action.email.profile.emailchange.verification`
 uses the SendGrid template created from that file.
 
-The template consumes the following substitutions published by
+The template consumes the following dynamic template data published by
 `EmailChangeService`:
 
 - `subject`: email subject configured as `Topcoder - Email Change Verification`.
