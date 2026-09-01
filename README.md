@@ -132,8 +132,8 @@ The following table summarizes the environment variables used by the application
 | `EMAIL_CHANGE_OTP_RESEND_SECONDS` | Minimum delay between current-email code requests. | `60` |
 | `EMAIL_CHANGE_PROOF_EXPIRY_SECONDS` | Lifetime of the proof issued after the current-email code is verified. | `600` |
 | `EMAIL_CHANGE_VALIDATION_EXPIRY_SECONDS` | Lifetime of the validation link sent to the proposed new email. | `3600` |
-| `EMAIL_CHANGE_VERIFY_URL` | Account-settings validation URL containing the required `<emailChangeToken>` placeholder. | `https://www.topcoder-dev.com/account-settings/changeEmail?action=verify&token=<emailChangeToken>` |
-| `EMAIL_CHANGE_CANCEL_URL` | Destination used by the email template when the member rejects or cancels the change. | `https://www.topcoder-dev.com/account-settings` |
+| `EMAIL_CHANGE_VERIFY_URL` | Account-settings validation URL containing `<emailChangeCode>` (`<emailChangeToken>` remains supported for legacy configuration). | `https://www.topcoder-dev.com/account-settings/email-change/verify?code=<emailChangeCode>` |
+| `EMAIL_CHANGE_CANCEL_URL` | Compatibility destination retained in the email event payload; the new confirmation template does not perform cancellation. | `https://www.topcoder-dev.com/account-settings` |
 |                            | **Other**                                                                   |                               |
 | `ADMIN_ROLE_NAME`          | Name of the role considered admin                                           | `administrator`               |
 | `LOG_LEVEL`                | Logging level (e.g., `debug`, `info`, `warn`, `error`)                      | `info`                        |
@@ -146,6 +146,25 @@ The following table summarizes the environment variables used by the application
 - Set `SOURCE_IDENTITY_PG_URL` (legacy) and `IDENTITY_DB_URL` (target) before running; `USER_SOCIAL_LOGIN_BATCH_SIZE` tunes pagination.
 - Flags available: `--dry-run` (log only), `--truncate` (clear target before load; ignored during dry-run), and `--insert-missing-only` (skip rows that already exist in the target).
 - Ensure `identity.social_login_provider` is migrated first so foreign keys resolve during import.
+
+### Change-email validation template
+
+The source HTML for the proposed-address confirmation message is stored at
+`docs/email-templates/change-email-validation.html`. Configure the email
+service topic map so `member.action.email.profile.emailchange.verification`
+uses the SendGrid template created from that file.
+
+The template consumes the following substitutions published by
+`EmailChangeService`:
+
+- `subject`: email subject configured as `Topcoder - Email Change Verification`.
+- `userHandle`: handle of the member who requested the change.
+- `verificationAgreeUrl`: account-settings URL containing the signed one-time
+  validation code.
+
+`verificationDisagreeUrl` remains in the event payload for compatibility, but
+the new template tells an unintended recipient to ignore the message because
+no email change occurs until the confirmation link succeeds.
 
 
 **Downstream Usage**
@@ -172,7 +191,7 @@ The following table summarizes the environment variables used by the application
     - Remove role: `DELETE /v6/user-roles/{userId}/{roleId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
     - Manage role members: `GET /v6/roles/{roleId}/subjects[?page&perPage&userId&userHandle&email]` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
 - User password changes from the profile context use: `PATCH /v6/users/{id}` (credential payload) — `platform-ui/src/libs/core/lib/auth/user-functions/user-xhr.store.ts` and `platform-ui/src/libs/core/lib/auth/user-functions/user-endpoint.config.ts`.
-- Member self-service email changes use `POST /v6/users/{id}/email-change/otp`, `POST /v6/users/{id}/email-change/verify-otp`, and `POST /v6/users/{id}/email-change`. The validation link completes the deferred update through `GET /v6/users/email-change/verify?token=...`.
+- Member self-service email changes use `POST /v6/users/{id}/email-change/otp`, `POST /v6/users/{id}/email-change/verify-otp`, and `POST /v6/users/{id}/email-change`. The account-settings validation page completes the deferred update through `GET /v6/users/email-change/verify?code=...`; `token` remains a compatibility query alias for already-issued links.
 
 **community-app**
 

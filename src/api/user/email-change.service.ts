@@ -589,7 +589,7 @@ export class EmailChangeService {
    * Publishes the validation link to the proposed new address.
    * @param handle Topcoder handle used by the email template.
    * @param email proposed new email recipient.
-   * @param validationToken signed one-time validation token.
+   * @param validationToken signed one-time validation code embedded in the account-settings URL.
    * @returns a promise resolved after the event is published.
    */
   private async sendNewEmailValidation(
@@ -600,14 +600,14 @@ export class EmailChangeService {
     const domain = CommonUtils.getAppDomain(this.configService);
     const verificationUrlTemplate =
       this.configService.get<string>('EMAIL_CHANGE_VERIFY_URL') ||
-      `https://www.${domain}/account-settings/changeEmail?action=verify&token=<emailChangeToken>`;
+      `https://www.${domain}/account-settings/email-change/verify?code=<emailChangeCode>`;
     const cancelUrl =
       this.configService.get<string>('EMAIL_CHANGE_CANCEL_URL') ||
       `https://www.${domain}/account-settings`;
-    const verificationAgreeUrl = verificationUrlTemplate.replace(
-      '<emailChangeToken>',
-      encodeURIComponent(validationToken),
-    );
+    const encodedValidationCode = encodeURIComponent(validationToken);
+    const verificationAgreeUrl = verificationUrlTemplate
+      .replace('<emailChangeCode>', encodedValidationCode)
+      .replace('<emailChangeToken>', encodedValidationCode);
 
     await this.eventService.postDirectBusMessage(
       EMAIL_CHANGE_NOTIFICATION_TOPIC,
