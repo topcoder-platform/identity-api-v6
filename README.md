@@ -151,10 +151,41 @@ The following table summarizes the environment variables used by the application
 
 ### Change-email validation template
 
+The email-change OTP, ownership proof, and pending validation record use the
+shared Redis cache configured by `REDIS_HOST` and `REDIS_PORT`. Every API
+instance must connect to the same Redis instance. The cache uses the Keyv
+`stores` configuration required by `@nestjs/cache-manager` 3 and
+`cache-manager` 6; the older `store` option silently falls back to memory.
+Redis keys are isolated under the `identity-api-v6` namespace, and cache TTLs
+are in milliseconds. Requests created before a deployment that replaces an
+in-memory cache must be started again.
+
+To test the flow across two independent API instances, start an isolated local
+Redis server and run:
+
+```sh
+REDIS_CACHE_TEST_PORT=6380 pnpm exec jest --runInBand --runTestsByPath src/shared/cache/redis-cache.integration.spec.ts
+```
+
+The integration suite uses real Redis with mocked email delivery and user
+updates. It checks shared OTP/proof/pending state, validation after the issuing
+instance stops, replay rejection, expiration, deletion, and failed writes.
+
 The source HTML for the proposed-address confirmation message is stored at
 `docs/email-templates/change-email-validation.html`. Configure the email
 service topic map so `member.action.email.profile.emailchange.verification`
 uses the SendGrid template created from that file.
+
+The event uses `version: 'v3'`, so the mapped template must be a SendGrid
+Dynamic Template with an ID beginning with `d-`. A legacy template expects
+substitutions and can leave the placeholders unfilled with this payload.
+
+For `email-service-v6`, update `EMAIL_TEMPLATE_MAP` in the running service's
+configuration. In production, this is the SSM parameter
+`/config/email-service-v6/appvar/EMAIL_TEMPLATE_MAP`. The legacy
+`tc-email-service` parameter `TEMPLATE_MAP` is a separate configuration.
+After updating the SSM parameter, redeploy the email service tasks so they
+load the new value.
 
 The template consumes the following dynamic template data published by
 `EmailChangeService`:
