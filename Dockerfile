@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_VERSION=26.5.0
+ARG NODE_VERSION=26.5.1
 ARG PNPM_VERSION=11.15.1
 
 FROM node:${NODE_VERSION}-alpine AS build
@@ -21,12 +21,13 @@ RUN node node_modules/prisma/build/index.js generate --schema=prisma/schema.pris
     && node node_modules/prisma/build/index.js generate --schema=prisma/group/schema.prisma \
     && node node_modules/prisma/build/index.js generate --schema=prisma/member/schema.prisma
 
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM alpine:3.24 AS runtime
 
+ARG NODE_VERSION
 RUN apk upgrade --no-cache \
-    && apk add --no-cache bash \
-    && rm -rf /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm /usr/local/bin/npx
+    && apk add --no-cache bash nodejs-current=${NODE_VERSION}-r0 \
+    && addgroup -S -g 10001 app \
+    && adduser -S -D -H -u 10001 -G app app
 
 ARG RESET_DB_ARG=false
 ENV RESET_DB=$RESET_DB_ARG
@@ -36,10 +37,11 @@ ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 ENV NODE_ENV=production
 
 WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/appStartUp.sh ./appStartUp.sh
+COPY --from=build --chown=app:app /app/dist ./dist
+COPY --from=build --chown=app:app /app/node_modules ./node_modules
+COPY --from=build --chown=app:app /app/prisma ./prisma
+COPY --from=build --chown=app:app /app/package.json ./package.json
+COPY --from=build --chown=app:app /app/appStartUp.sh ./appStartUp.sh
 RUN chmod +x appStartUp.sh
+USER app
 CMD ["./appStartUp.sh"]

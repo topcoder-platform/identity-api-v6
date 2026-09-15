@@ -3,6 +3,9 @@ import * as jwt from 'jsonwebtoken';
 import * as tokenValidator from 'tc-core-library-js';
 import _ from 'lodash';
 import { Constants } from '../../core/constant/constants';
+import { randomInt } from 'node:crypto';
+
+const MAX_HASH_INPUT_LENGTH = 8192;
 
 export class CommonUtils {
   private constructor() {}
@@ -20,8 +23,20 @@ export class CommonUtils {
     }
   }
 
-  static hashCode(obj: any): number {
+  /**
+   * Computes the legacy 32-bit Java-style hash used for authorization IDs.
+   * Input is JSON serialized and capped before iteration so callers cannot
+   * force unbounded CPU work through a request payload.
+   * @param obj Serializable value to hash
+   * @returns Signed 32-bit hash compatible with the existing implementation
+   * @throws BadRequestException when the value is not serializable or exceeds
+   * the supported serialized size
+   */
+  static hashCode(obj: unknown): number {
     const str = JSON.stringify(obj);
+    if (typeof str !== 'string' || str.length > MAX_HASH_INPUT_LENGTH) {
+      throw new BadRequestException('Authorization payload is too large.');
+    }
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
@@ -91,7 +106,7 @@ export class CommonUtils {
     const chars = Constants.ALPHABET_ALPHA_EN + Constants.ALPHABET_DIGITS_EN;
     let result = '';
     for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+      result += chars.charAt(randomInt(chars.length));
     }
     return result;
   }

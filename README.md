@@ -18,7 +18,7 @@
 **Prerequisites**
 ---------------
 
-* Node.js (Version 26.5.0 recommended)
+* Node.js (Version 26.5.1 recommended)
 * pnpm (Version 11.15.1)
 * PostgreSQL Client (`psql`) (Required for importing database dump)
 * Docker (Latest version of Docker Desktop or Docker Engine)
@@ -28,8 +28,8 @@
 
 1. Install Node.js and pnpm:
 ```bash
-nvm install 26.5.0
-nvm use 26.5.0
+nvm install 26.5.1
+nvm use 26.5.1
 npm install -g pnpm@11.15.1
 ```
 2. Install dependencies:
@@ -41,7 +41,9 @@ This command also runs `pnpm run prisma:generate` automatically via the `postins
 The production Docker image uses pnpm only in its build stage. At startup, the
 container runs Prisma migrations with the bundled Prisma CLI and then directly
 executes the compiled Node.js application, so npm and pnpm are not required in
-the runtime image.
+the runtime image. The final Alpine 3.24 image installs the distribution's
+dynamically linked Node.js 26.5.1 package and runs as the unprivileged `app`
+user.
 
 **Deploying Locally**
 ---------------------
@@ -126,7 +128,14 @@ The following table summarizes the environment variables used by the application
 | `SLACK_CHANNEL_ID`         | Default Slack channel ID for sending notifications.                             | `C04ENKCU4TZ` (example)                     |
 |                            | **SendGrid Integration**                                                    |                               |
 | `SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID` | SendGrid template ID for resend activation email.           | `d-73c29be82bfa4d68beea2208b6a3c4b2` (example) |
+| `SENDGRID_TEMPLATE_ID_OTP_CODE` | SendGrid template ID shared with wallet one-time-password emails. | `d-2d0ab9f6c9cc4efba50080668a9c35c1` |
 | `SENDGRID_WELCOME_EMAIL_TEMPLATE_ID`         | SendGrid template ID for welcome email.                       | `d-26c8962fb48c42a3997053ebe5954516` (example) |
+| `EMAIL_CHANGE_OTP_EXPIRY_SECONDS` | Lifetime of the code sent to the current primary email. | `600` |
+| `EMAIL_CHANGE_OTP_RESEND_SECONDS` | Minimum delay between current-email code requests. | `60` |
+| `EMAIL_CHANGE_PROOF_EXPIRY_SECONDS` | Lifetime of the proof issued after the current-email code is verified. | `600` |
+| `EMAIL_CHANGE_VALIDATION_EXPIRY_SECONDS` | Lifetime of the validation link sent to the proposed new email. | `3600` |
+| `EMAIL_CHANGE_VERIFY_URL` | Account-settings validation URL containing `<emailChangeCode>` (`<emailChangeToken>` remains supported for legacy configuration). | `https://www.topcoder-dev.com/account-settings/email-change/verify?code=<emailChangeCode>` |
+| `EMAIL_CHANGE_CANCEL_URL` | Compatibility destination retained in the email event payload; the new confirmation template does not perform cancellation. | `https://www.topcoder-dev.com/account-settings` |
 |                            | **Other**                                                                   |                               |
 | `ADMIN_ROLE_NAME`          | Name of the role considered admin                                           | `administrator`               |
 | `LOG_LEVEL`                | Logging level (e.g., `debug`, `info`, `warn`, `error`)                      | `info`                        |
@@ -139,6 +148,25 @@ The following table summarizes the environment variables used by the application
 - Set `SOURCE_IDENTITY_PG_URL` (legacy) and `IDENTITY_DB_URL` (target) before running; `USER_SOCIAL_LOGIN_BATCH_SIZE` tunes pagination.
 - Flags available: `--dry-run` (log only), `--truncate` (clear target before load; ignored during dry-run), and `--insert-missing-only` (skip rows that already exist in the target).
 - Ensure `identity.social_login_provider` is migrated first so foreign keys resolve during import.
+
+### Change-email validation template
+
+The source HTML for the proposed-address confirmation message is stored at
+`docs/email-templates/change-email-validation.html`. Configure the email
+service topic map so `member.action.email.profile.emailchange.verification`
+uses the SendGrid template created from that file.
+
+The template consumes the following dynamic template data published by
+`EmailChangeService`:
+
+- `subject`: email subject configured as `Topcoder - Email Change Verification`.
+- `userHandle`: handle of the member who requested the change.
+- `verificationAgreeUrl`: account-settings URL containing the signed one-time
+  validation code.
+
+`verificationDisagreeUrl` remains in the event payload for compatibility, but
+the new template tells an unintended recipient to ignore the message because
+no email change occurs until the confirmation link succeeds.
 
 
 **Downstream Usage**
@@ -165,6 +193,7 @@ The following table summarizes the environment variables used by the application
     - Remove role: `DELETE /v6/user-roles/{userId}/{roleId}` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
     - Manage role members: `GET /v6/roles/{roleId}/subjects[?page&perPage&userId&userHandle&email]` — `platform-ui/src/apps/admin/src/lib/services/roles.service.ts`.
 - User password changes from the profile context use: `PATCH /v6/users/{id}` (credential payload) — `platform-ui/src/libs/core/lib/auth/user-functions/user-xhr.store.ts` and `platform-ui/src/libs/core/lib/auth/user-functions/user-endpoint.config.ts`.
+- Member self-service email changes use `POST /v6/users/{id}/email-change/otp`, `POST /v6/users/{id}/email-change/verify-otp`, and `POST /v6/users/{id}/email-change`. The account-settings validation page completes the deferred update through `GET /v6/users/email-change/verify?code=...`; `token` remains a compatibility query alias for already-issued links.
 
 **community-app**
 

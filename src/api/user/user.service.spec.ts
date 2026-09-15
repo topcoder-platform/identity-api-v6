@@ -218,6 +218,9 @@ jest.mock('crypto', () => {
       update: mockUpdate,
       digest: mockDigest,
     })),
+    scryptSync: jest.fn((password, salt, keyLength) =>
+      realCrypto.scryptSync(password, salt, keyLength),
+    ),
   };
 });
 
@@ -1029,6 +1032,13 @@ describe('UserService', () => {
         BadRequestException,
       );
     });
+
+    it('should reject a non-string email or handle parameter', async () => {
+      await expect(
+        service.findUserByEmailOrHandle(['testHandle'] as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaOltp.user.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   describe('encodePasswordLegacy', () => {
@@ -1198,17 +1208,19 @@ describe('UserService', () => {
         status,
       );
 
-      const expectedPlainText = `mock-sso-salt${userId}${password}${status}`;
+      const expectedMessage = `${userId}:${password}:${status}`;
 
       expect((service as any).getSSOTokenSalt).toHaveBeenCalled();
-      expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      expect(mockUpdate).toHaveBeenCalledWith(expectedPlainText, 'utf-8');
-      expect(mockDigest).toHaveBeenCalledWith('hex');
-      expect(token).toBe(`${userId}|sha256HashedValue`);
+      expect(crypto.scryptSync).toHaveBeenCalledWith(
+        expectedMessage,
+        'mock-sso-salt',
+        32,
+      );
+      expect(token).toMatch(/^1\|[0-9a-f]{64}$/);
     });
 
     it('should handle hashing error', () => {
-      mockDigest.mockImplementation(() => {
+      (crypto.scryptSync as jest.Mock).mockImplementationOnce(() => {
         throw new Error('Hashing failed');
       });
 

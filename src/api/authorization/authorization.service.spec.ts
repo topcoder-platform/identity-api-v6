@@ -86,6 +86,7 @@ describe('AuthorizationService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockCacheManager.get.mockResolvedValue('state123');
 
     parseHeaderSpy = jest
       .spyOn(CommonUtils, 'parseJWTHeader')
@@ -175,14 +176,37 @@ describe('AuthorizationService', () => {
       } as any;
       const mockRes = { redirect: jest.fn() } as any;
 
-      await service.loginRedirect(mockReq, mockRes, 'http://another-test.com');
+      await service.loginRedirect(
+        mockReq,
+        mockRes,
+        'https://connect.topcoder.com/challenges',
+      );
 
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
       expect(mockRes.redirect.mock.calls[0][1]).toContain(
-        'http://another-test.com',
+        'connect.topcoder.com',
       );
+    });
+
+    it('should replace an attacker-controlled redirect with the safe default', async () => {
+      const mockReq = {
+        hostname: 'topcoder.com',
+        secure: true,
+        headers: {},
+      } as any;
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await service.loginRedirect(
+        mockReq,
+        mockRes,
+        'https://topcoder.com.attacker.example/phish',
+      );
+
+      const authorizeUrl = mockRes.redirect.mock.calls[0][1];
+      expect(authorizeUrl).toContain('www.topcoder.com');
+      expect(authorizeUrl).not.toContain('attacker.example');
     });
 
     it('should redirect to topcoder if redirect url is empty', async () => {
@@ -199,8 +223,12 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
-      expect(mockRes.redirect.mock.calls[0][1]).toContain(
-        'https://www.topcoder.com',
+      const authorizeUrl = new URL(mockRes.redirect.mock.calls[0][1]);
+      const callbackUrl = new URL(
+        authorizeUrl.searchParams.get('redirect_uri')!,
+      );
+      expect(callbackUrl.searchParams.get('redirectUrl')).toBe(
+        'https://www.topcoder.com/',
       );
     });
   });
@@ -218,11 +246,44 @@ describe('AuthorizationService', () => {
         state: 'state123',
         redirectUrl: 'https://test.com',
       };
+      mockCacheManager.get.mockResolvedValue('state123');
 
       await service.getTokenByAuthorizationCode(mockReq, mockRes, dto);
 
       expect(mockRes.redirect).toHaveBeenCalled();
       expect(mockRes.redirect.mock.calls[0][0]).toContain('test.auth0.com');
+    });
+
+    it('should reject an external callback redirect', async () => {
+      const mockReq = { get: () => 'test.com' } as any;
+      const mockRes = {} as any;
+      const dto: GetTokenQueryDto = {
+        code: 'valid-code',
+        state: 'state123',
+        redirectUrl: 'https://topcoder.com.attacker.example/phish',
+      };
+
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject a redirect that differs from the state-bound URL', async () => {
+      const mockReq = { get: () => 'test.com' } as any;
+      const mockRes = {} as any;
+      const dto: GetTokenQueryDto = {
+        code: 'valid-code',
+        state: 'state123',
+        redirectUrl: 'https://www.topcoder.com/changed',
+      };
+      mockCacheManager.get.mockResolvedValue({
+        state: 'state123',
+        redirectUrl: 'https://www.topcoder.com/original',
+      });
+
+      await expect(
+        service.getTokenByAuthorizationCode(mockReq, mockRes, dto),
+      ).rejects.toThrow('Invalid authorization state.');
     });
 
     it('should throw BadRequestException for missing code', async () => {
@@ -305,8 +366,10 @@ describe('AuthorizationService', () => {
 
       expect(mockAuth0Service.getToken).toHaveBeenCalled();
       expect(mockCacheManager.set).toHaveBeenCalled();
-      expect(mockRes.cookie).toHaveBeenCalledTimes(3);
-      expect(mockRes.redirect).toHaveBeenCalledWith(dto.redirectUrl);
+      expect(mockRes.cookie).toHaveBeenCalledTimes(2);
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        new URL(dto.redirectUrl!).toString(),
+      );
     });
   });
 

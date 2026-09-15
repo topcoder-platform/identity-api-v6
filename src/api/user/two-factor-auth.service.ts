@@ -22,6 +22,7 @@ import { AuthFlowService } from './auth-flow.service'; // For OTP completion
 import * as jwt from 'jsonwebtoken';
 import { RoleService } from '../role/role.service';
 import { addMinutes, isBefore } from 'date-fns';
+import { randomInt } from 'node:crypto';
 
 export const TFA_OTP_CACHE_PREFIX_KEY = 'USER_2FA_OTP';
 export const TFA_OTP_RESEND_TOKEN_CACHE_PREFIX_KEY = 'USER_2FA_RESEND_OTP';
@@ -65,7 +66,7 @@ export class TwoFactorAuthService {
     let otp = '';
     const digits = '0123456789';
     for (let i = 0; i < length; i++) {
-      otp += digits.charAt(Math.floor(Math.random() * digits.length));
+      otp += digits.charAt(randomInt(digits.length));
     }
     return otp;
   }

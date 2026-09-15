@@ -30,6 +30,8 @@ import {
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID as uuidv4 } from 'node:crypto';
+import { ValidationService } from './validation.service';
+import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 
 // Constants from AuthFlowService
 const OTP_ACTIVATION_JWT_AUDIENCE = 'emailactivation';
@@ -109,6 +111,15 @@ const mockEventService = {
 
 const mockRoleService = {
   findAll: jest.fn(),
+};
+const mockValidationService = {
+  validateEmail: jest.fn(),
+  validatePassword: jest.fn(),
+};
+const mockMemberPrisma = {
+  member: {
+    update: jest.fn(),
+  },
 };
 
 // Mock external libraries
@@ -217,6 +228,8 @@ describe('AuthFlowService', () => {
         { provide: UserService, useValue: mockUserService },
         { provide: EventService, useValue: mockEventService },
         { provide: RoleService, useValue: mockRoleService },
+        { provide: ValidationService, useValue: mockValidationService },
+        { provide: MemberPrismaService, useValue: mockMemberPrisma },
       ],
     })
       .setLogger(nullLogger)
@@ -252,6 +265,8 @@ describe('AuthFlowService', () => {
             userService,
             eventService,
             roleService,
+            mockValidationService as any,
+            mockMemberPrisma as any,
           ),
       ).toThrow('JWT_SECRET environment variable not set');
     });
@@ -269,6 +284,8 @@ describe('AuthFlowService', () => {
             userService,
             eventService,
             roleService,
+            mockValidationService as any,
+            mockMemberPrisma as any,
           ),
       );
     });
@@ -796,6 +813,22 @@ describe('AuthFlowService', () => {
           data: expect.objectContaining({
             handle: mockUser.handle,
             resetToken: expect.any(String),
+          }),
+        }),
+      );
+    });
+    it('should replace an array or unapproved reset URL with the safe default', async () => {
+      await service.initiatePasswordReset(
+        emailOrHandle,
+        ['https://topcoder.com.attacker.example/reset'] as any,
+        ['connect'] as any,
+      );
+
+      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
+        'userpasswordreset',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            resetPassworUrlPrefix: 'https://www.topcoder.com/reset-password',
           }),
         }),
       );

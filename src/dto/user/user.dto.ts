@@ -352,6 +352,63 @@ export class UpdateEmailBodyDto {
   param: UserParamBaseDto;
 }
 
+/** Six-digit current-email code submitted by the member. */
+export class VerifyEmailChangeOtpParamDto {
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/, { message: 'OTP must contain exactly six digits.' })
+  otp: string;
+}
+
+/** Request envelope used to verify current-email ownership. */
+export class VerifyEmailChangeOtpBodyDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => VerifyEmailChangeOtpParamDto)
+  param: VerifyEmailChangeOtpParamDto;
+}
+
+/** Proposed email and one-time proof from the current-email OTP step. */
+export class InitiateEmailChangeParamDto {
+  @IsEmail()
+  @IsNotEmpty()
+  @MaxLength(100)
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  verificationToken: string;
+}
+
+/** Request envelope used to send validation to a proposed new email. */
+export class InitiateEmailChangeBodyDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => InitiateEmailChangeParamDto)
+  param: InitiateEmailChangeParamDto;
+}
+
+/** Lifetime returned after an email-change OTP is sent. */
+export class EmailChangeOtpSentResponseDto {
+  @IsInt()
+  @Min(1)
+  expiresIn: number;
+}
+
+/** One-time proof returned after the current-email OTP is verified. */
+export class EmailChangeOtpVerifiedResponseDto extends EmailChangeOtpSentResponseDto {
+  @IsString()
+  @IsNotEmpty()
+  verificationToken: string;
+}
+
+/** Normalized primary email returned by email-change endpoints. */
+export class EmailChangeResponseDto {
+  @IsEmail()
+  email: string;
+}
+
 // POST /users/{resourceId}/profiles
 export class CreateProfileBodyDto {
   @IsDefined()

@@ -2,6 +2,7 @@
 	"info": {
 		"_postman_id": "609bbaa5-915b-4074-8708-7fea8d8bd9ba",
 		"name": "User Controller Issues",
+		"description": "Authentication variables are intentionally empty. Supply test credentials through a local Postman environment and never commit live tokens to this collection.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "46836291",
 		"_collection_link": "https://pinoydream.postman.co/workspace/Pinoydream's-Workspace~f0c1fd49-90ba-45d1-852b-c1b0eabc86f7/collection/46836291-609bbaa5-915b-4074-8708-7fea8d8bd9ba?action=share&source=collection_link&creator=46836291"
@@ -733,7 +734,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ODc3MDAwNyIsInVzZXJJZCI6Ijg4NzcwMDA3IiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwiaWF0IjoxNzU3NTMwNjExLCJleHAiOjE3NTc1MzQyMTF9.oJN5UcR9gQs6cjo4qFoBB2J4w2ozhvUcuflJBSeFYWo\",\r\n        \"userId\": 88770007,\r\n        \"otp\": \"724424\"\r\n    }\r\n}",
+							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"{{resendToken}}\",\r\n        \"userId\": 88770007,\r\n        \"otp\": \"724424\"\r\n    }\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -768,7 +769,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ODc3MDAwOCIsInVzZXJJZCI6Ijg4NzcwMDA4IiwiYXVkIjoiZW1haWxhY3RpdmF0aW9uIiwiaWF0IjoxNzU3NTMxMjA2LCJleHAiOjE3NTc1MzQ4MDZ9.X6ZPKnz2MIjnnXnnJxhRebzJL5m-nhSEm6xWQr03Tdo\",\r\n        \"userId\": 88770008\r\n    }\r\n}",
+							"raw": "{\r\n    \"param\": {\r\n        \"resendToken\": \"{{resendToken}}\",\r\n        \"userId\": 88770008\r\n    }\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1093,27 +1094,31 @@
 		},
 		{
 			"key": "adminToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiMTEyMjMzIiwicm9sZXMiOiJhZG1pbmlzdHJhdG9yLFRvcGNvZGVyIFVzZXIiLCJoYW5kbGUiOiJndW5kYW0iLCJlbWFpbCI6Imd1bmRhbUBlbWFpbC5jb20iLCJzY29wZSI6IiIsImd0eSI6ImF1dGhvcml6YXRpb25fY29kZSIsInN1YiI6ImFkbWluIHVzZXIiLCJpYXQiOjE3NTc1MTY0MTQsImV4cCI6MTc1NzU0NTIxNH0.-gFSwXeeFzdW4KG1yYJMDgj3C_JrjowGOVQCGj41TFk"
+			"value": ""
 		},
 		{
 			"key": "readMachToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJyZWFkOnVzZXJfcHJvZmlsZXMiLCJndHkiOiJjbGllbnRfY3JlZGVudGlhbHMiLCJzdWIiOiJyZWFkIG1hY2hpbmUiLCJpYXQiOjE3NTc1MTY0MTQsImV4cCI6MTc1NzU0NTIxNH0.cyHD9mzznxNWuxf3vkdPNyGQb0dhb8_krtpQUzZ714Y"
+			"value": ""
 		},
 		{
 			"key": "createMachToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJjcmVhdGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6ImNyZWF0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.1T8vATPXM1ScOaKHAAGH-nAOgnjMjcbz5xpXgc49oz8"
+			"value": ""
 		},
 		{
 			"key": "updateMachToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJ1cGRhdGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6InVwZGF0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.uO5-v-fSyjADGjokDI2xD5Z578ObDFqqLbLe6cacWA4"
+			"value": ""
 		},
 		{
 			"key": "deleteMachToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiaGFuZGxlIjoiZ3VuZGFtIiwiZW1haWwiOiJndW5kYW1AZW1haWwuY29tIiwic2NvcGUiOiJkZWxldGU6dXNlcl9wcm9maWxlcyIsImd0eSI6ImNsaWVudF9jcmVkZW50aWFscyIsInN1YiI6ImRlbGV0ZSBtYWNoaW5lIiwiaWF0IjoxNzU3NTE2NDE0LCJleHAiOjE3NTc1NDUyMTR9.rgS7cNSB-RXdrwtSz5VmHC9og5Jbd-EIvePjcG7f0bw"
+			"value": ""
 		},
 		{
 			"key": "nonAdminToken",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwidXNlcklkIjoiODg3NzQzOTYiLCJyb2xlcyI6IlRvcGNvZGVyIFVzZXIiLCJoYW5kbGUiOiJqbWdhc3BlciIsImVtYWlsIjoiam1nYXNwZXJAZW1haWwuY29tIiwic2NvcGUiOiIiLCJndHkiOiJhdXRob3JpemF0aW9uX2NvZGUiLCJzdWIiOiJub25hZG1pbiB1c2VyIiwiaWF0IjoxNzU3NTE2OTYzLCJleHAiOjE3NTc1NDU3NjN9.SiKY4n7W2Cs7fE8dlafDMM5zXz2Qk3Qc32satX9Iu6M"
+			"value": ""
+		},
+		{
+			"key": "resendToken",
+			"value": ""
 		}
 	]
 }

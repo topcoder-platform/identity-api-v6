@@ -17,6 +17,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ScopesGuard } from '../../auth/guards/scopes.guard';
 import { SelfOrAdminGuard } from '../../auth/guards/self-or-admin.guard';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
+import { EmailChangeService } from './email-change.service';
 // Assuming NotificationService and CacheService are global or provided elsewhere
 
 @Module({
@@ -36,6 +37,7 @@ import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
     UserProfileService,
     AuthFlowService,
     TwoFactorAuthService,
+    EmailChangeService,
     ValidationService,
     RolesGuard,
     ScopesGuard,
@@ -49,6 +51,7 @@ import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
     UserProfileService,
     AuthFlowService,
     TwoFactorAuthService,
+    EmailChangeService,
     ValidationService,
   ],
 })

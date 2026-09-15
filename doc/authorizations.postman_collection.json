@@ -2,6 +2,7 @@
 	"info": {
 		"_postman_id": "2e9bf804-b86c-41c9-9129-28b1a2a05cb0",
 		"name": "authorizations",
+		"description": "Set the accessToken placeholder through a local Postman environment and never commit live tokens to this collection.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "28573934"
 	},
@@ -219,7 +220,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXv6flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"value": "{{accessToken}}",
 							"type": "string"
 						}
 					]
@@ -263,7 +264,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FwaS50b3Bjb2Rlci1kZXYuY29tIiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwiZXhwIjoxODQ1MzkzMjI2LCJ1c2VySWQiOiI0MDE0MTM5NCIsInJvbGVzIjpbImFkbWluaXN0cmF0b3IiXSwiaGFuZGxlIjoidGVzdGFkbWluIiwiZW1haWwiOiJ0ZXN0YWRtaW5AdG9wY29kZXIuY29tIiwic2NvcGVzIjpbXSwiaWF0IjoxNzUwMjMxMTU5fQ.WN3RXPt12RCLXv6flpkUeNh9p28BCNHbgnPcK-ZTj1c",
+							"value": "{{accessToken}}",
 							"type": "string"
 						}
 					]
@@ -285,6 +286,13 @@
 				}
 			},
 			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
 		}
 	]
 }
