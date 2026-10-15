@@ -217,6 +217,7 @@ Swagger: when running locally, the Identity API docs are available at `http://lo
   - Validate username/email + password during login: `POST /v6/users/login` (form data).
   - Fetch user profile and roles to embed into tokens: `POST /v6/users/roles` (form data).
   - Registration flow: create users via `POST /v6/users`, then activate with `PUT /v6/users/activate`; resend activation via `POST /v6/users/resendActivationEmail`.
+  - Social registration accepts the Auth0 action's legacy `param.profile.providerType` (for example, `github` or `google-oauth2`) and `param.profile.emailVerified` fields. These are normalized to `provider` and `isEmailVerified` before validation. Explicit canonical fields take precedence, including `isEmailVerified: false`; an omitted verification flag defaults to `false`. Provider support, required profile fields, and account activation checks still apply.
 
 Notes:
 - Endpoints above are intentionally callable by Auth0 without a bearer token and are documented in the code (`identity-api-v6/src/api/user/user.controller.ts`).  These endpoints are restricted to only Auth0 IP addresses
