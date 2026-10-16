@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import {
   IsString,
   IsEmail,
@@ -60,7 +60,17 @@ export class CountryDto {
   isoAlpha3Code?: string;
 }
 
+/**
+ * External identity used for registration and profile linking. Incoming Auth0
+ * payloads may use providerType and emailVerified instead of provider and
+ * isEmailVerified; normalize these aliases before validation. Explicit canonical
+ * fields take precedence, and providerType is later derived by ValidationService.
+ */
 export class UserProfileDto {
+  @Expose({ toClassOnly: true })
+  @Transform(({ value, obj }) => value ?? obj.providerType, {
+    toClassOnly: true,
+  })
   @IsString()
   @IsNotEmpty()
   provider: string; // e.g., 'github', 'google-oauth2', 'wipro-adfs'
@@ -79,12 +89,16 @@ export class UserProfileDto {
 
   @IsString()
   @IsOptional()
-  providerType?: string; // 'social' or 'enterprise' (derived)
+  providerType?: string; // Legacy provider key on input; category after validation
 
   @IsObject()
   @IsOptional()
   context?: Record<string, any>; // For things like access tokens
 
+  @Expose({ toClassOnly: true })
+  @Transform(({ value, obj }) => value ?? obj.emailVerified ?? false, {
+    toClassOnly: true,
+  })
   @IsOptional()
   @IsBoolean()
   isEmailVerified?: boolean = false;
