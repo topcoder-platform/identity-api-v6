@@ -1,3 +1,4 @@
+import { hasServiceScopes } from '../../shared/auth/auth.helpers';
 import {
   Controller,
   Get,
@@ -30,7 +31,7 @@ import { UserProfileService } from './user-profile.service';
 import { AuthFlowService } from './auth-flow.service';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy'; // For type hints
+import { AuthenticatedUser } from '../../core/auth/auth.types'; // For type hints
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { ADMIN_ROLE, SCOPES } from '../../auth/constants';
@@ -156,74 +157,11 @@ function mapUserToDto(user: any): DTOs.UserResponseDto {
  * @param req The Express Request object.
  * @returns The AuthenticatedUser object.
  * @throws UnauthorizedException if user is not authenticated.
- * @throws InternalServerErrorException if user object is incomplete.
  */
 function getAuthenticatedUser(req: Request): AuthenticatedUser {
   const user: any = (req as any).authUser || (req as any).user;
-  const logger = new Logger('getAuthenticatedUser'); // It's a global helper, so create a local logger.
-  logger.debug(
-    `[getAuthenticatedUser] User user: ${JSON.stringify(user, null, 5)}`,
-  );
+  if (!user) throw new UnauthorizedException('Authentication required.');
 
-  // Ensure admin detection accounts for both DB roles and JWT-embedded roles
-  try {
-    const adminRoleName = (
-      process.env.ADMIN_ROLE_NAME || 'administrator'
-    ).toLowerCase();
-    const dbRoles: string[] = Array.isArray(user?.roles) ? user.roles : [];
-    const jwtRoles: string[] =
-      (user?.payload?.['https://topcoder-dev.com/roles'] as string[]) ||
-      (user?.payload?.roles as string[]) ||
-      [];
-
-    const hasAdminInDb = dbRoles.some(
-      (r) => String(r).toLowerCase() === adminRoleName,
-    );
-    const hasAdminInJwt = Array.isArray(jwtRoles)
-      ? jwtRoles.some((r) => String(r).toLowerCase() === adminRoleName)
-      : false;
-
-    if (!user.isAdmin && (hasAdminInDb || hasAdminInJwt)) {
-      user.isAdmin = true;
-    }
-  } catch (e) {
-    logger.warn(
-      `[getAuthenticatedUser] Failed to evaluate admin from roles: ${(e as Error).message}`,
-    );
-  }
-
-  logger.debug(
-    `[getAuthenticatedUser] Attempting to get authenticated user. req.user present: ${!!user}`,
-  );
-  if (user) {
-    logger.debug(
-      `[getAuthenticatedUser] req.user content: ${JSON.stringify(user)}`,
-    );
-  } else {
-    logger.warn(
-      `[getAuthenticatedUser] req.user is NOT present. Headers: ${JSON.stringify(req.headers)}`,
-    );
-  }
-
-  if (!user) {
-    // This should ideally not happen if AuthGuard('jwt') is effective
-    throw new UnauthorizedException(
-      'User not authenticated or user context is missing.',
-    );
-  }
-
-  // Basic check for essential properties. Adjust as per your AuthenticatedUser interface definition from jwt.strategy.ts
-  // if user is machine, no userId, handle, or roles, should ignore the following
-  /**
-  if (!user.userId || !user.handle || !user.roles) {
-    throw new InternalServerErrorException(
-      'Authenticated user object is incomplete.',
-    );
-  }
-  */
-  if (user.isMachine && !user.scopes) {
-    throw new InternalServerErrorException('Machine token is missing scopes');
-  }
   return user;
 }
 
@@ -256,6 +194,7 @@ export class UserController {
     }
   }
 
+  /** Enforce member admin policy or explicit service grants; throws 400/403 on denial. */
   private checkAccess(
     user: AuthenticatedUser | undefined,
     isAdminRequired: boolean = false,
@@ -272,11 +211,13 @@ export class UserController {
     // if machine, scopes are required to be checked
     if (user.isMachine) {
       if (Array.isArray(allowedScopes) && allowedScopes.length > 0) {
-        if (!user.scopes?.some((scope) => allowedScopes.includes(scope))) {
+        if (!hasServiceScopes(user, allowedScopes)) {
           throw new ForbiddenException(
             `Missing required scope(s): ${allowedScopes.join(', ')}`,
           );
         }
+      } else {
+        throw new ForbiddenException('Member authentication required');
       }
     } else {
       if (isAdminRequired && !user.isAdmin) {
@@ -285,6 +226,8 @@ export class UserController {
     }
   }
 
+  /** Authorize a positive resource ID for its member owner, administrator or scoped service.
+   * Returns void; throws 400 for invalid input and 403 for denied access. */
   private checkResourceIdAndAccess(
     user: AuthenticatedUser | undefined,
     isAdminRequired: boolean = false,
@@ -304,7 +247,7 @@ export class UserController {
       );
     }
     // check if self, then should be fine (normalize both sides to string)
-    if (String(resourceId) === String(user.userId)) {
+    if (!user.isMachine && String(resourceId) === String(user.userId)) {
       return;
     }
     this.checkAccess(user, isAdminRequired, allowedScopes);

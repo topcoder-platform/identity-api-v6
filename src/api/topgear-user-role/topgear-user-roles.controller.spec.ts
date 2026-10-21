@@ -30,7 +30,7 @@ describe('TopgearUserRolesController', () => {
   });
 
   const createRequest = (userOverrides: Partial<any> = {}) => ({
-    authUser: { isAdmin: false, scope: '', userId: 999, ...userOverrides },
+    authUser: { kind: userOverrides.scope ? 'service' : 'user', isMachine: !!userOverrides.scope, isAdmin: false, scopes: userOverrides.scope ? userOverrides.scope.split(' ') : [], userId: userOverrides.scope ? undefined : 999, ...userOverrides },
   });
 
   describe('listTopgearUserRoles', () => {
@@ -90,7 +90,7 @@ describe('TopgearUserRolesController', () => {
       serviceMock.assignRoleToUser.mockResolvedValue(dto);
 
       const req = createRequest({
-        scope: 'write:topgear-user-roles',
+        isAdmin: true,
         userId: 1234,
       });
 

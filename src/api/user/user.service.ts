@@ -38,7 +38,7 @@ import { RoleService } from '../role/role.service';
 import { EventService } from '../../shared/event/event.service';
 import { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Constants, DefaultGroups } from '../../core/constant/constants';

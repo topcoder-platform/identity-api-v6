@@ -17,7 +17,7 @@ const DEFAULT_MEMBER_API_TIMEOUT_MS = 10000;
 // Define the interface for the M2M Auth client provided by the module
 // Based on the declaration file src/types/tc-core-library-js.d.ts
 interface M2MAuthClient {
-  getMachineToken(clientId: string, clientSecret: string): Promise<string>;
+  getMachineToken(): Promise<string>;
 }
 
 @Injectable()
@@ -42,39 +42,15 @@ export class MemberApiService {
   }
 
   /**
-   * Gets a valid M2M token for the Member API using the injected M2M client.
+   * Gets a verified cached Keycloak token using the injected persistent provider.
+   * Takes no parameters; returns a token or null on failure, never throws.
    */
   private async getM2mToken(): Promise<string | null> {
-    const clientId = this.configService.get<string>('AUTH0_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('AUTH0_CLIENT_SECRET');
-
-    if (!clientId || !clientSecret) {
-      this.logger.error(
-        'AUTH0_CLIENT_ID or AUTH0_CLIENT_SECRET missing in config. Cannot fetch M2M token.',
-      );
-      return null; // Cannot proceed without credentials
-    }
-
     try {
-      const newToken = await this.m2mAuthClient.getMachineToken(
-        clientId,
-        clientSecret,
-      );
-
-      if (!newToken) {
-        this.logger.error(
-          'm2mAuthClient.getMachineToken returned null/empty token without error.',
-        );
-        return null;
-      }
-
-      return newToken;
-    } catch (error) {
-      this.logger.error(
-        `Error fetching M2M token via m2mAuthClient: ${error.message}`,
-        error.stack,
-      );
-      return null; // Return null on fetch failure
+      return await this.m2mAuthClient.getMachineToken();
+    } catch {
+      this.logger.error('Keycloak service authentication failed');
+      return null;
     }
   }
 

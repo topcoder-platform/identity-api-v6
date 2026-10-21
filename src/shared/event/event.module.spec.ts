@@ -14,14 +14,13 @@ describe('EventModule', () => {
   let module: TestingModule;
 
   const mockConfig = {
-    AUTH0_URL: 'https://auth0.example.com',
-    AUTH0_AUDIENCE: 'test-audience',
+    KEYCLOAK_TOKEN_URL: 'https://keycloak.example.test/m2m/token',
+    KEYCLOAK_AUDIENCE: 'test-audience',
     TOKEN_CACHE_TIME: '3600',
-    AUTH0_CLIENT_ID: 'test-client-id',
-    AUTH0_CLIENT_SECRET: 'test-client-secret',
+    KEYCLOAK_CLIENT_ID: 'test-client-id',
+    KEYCLOAK_CLIENT_SECRET: 'test-client-secret',
     BUSAPI_URL: 'https://bus-api.example.com',
     KAFKA_ERROR_TOPIC: 'error-topic',
-    AUTH0_PROXY_SERVER_URL: 'https://proxy.example.com',
     HTTP_TIMEOUT: 5000,
     HTTP_MAX_REDIRECTS: 5,
   };
@@ -57,21 +56,20 @@ describe('EventModule', () => {
 
       expect(busApiClient).toBeDefined();
       expect(mockBusApi).toHaveBeenCalledWith({
-        AUTH0_URL: mockConfig.AUTH0_URL,
-        AUTH0_AUDIENCE: mockConfig.AUTH0_AUDIENCE,
+        AUTH0_URL: mockConfig.KEYCLOAK_TOKEN_URL,
+        AUTH0_AUDIENCE: mockConfig.KEYCLOAK_AUDIENCE,
         TOKEN_CACHE_TIME: mockConfig.TOKEN_CACHE_TIME,
-        AUTH0_CLIENT_ID: mockConfig.AUTH0_CLIENT_ID,
-        AUTH0_CLIENT_SECRET: mockConfig.AUTH0_CLIENT_SECRET,
+        AUTH0_CLIENT_ID: mockConfig.KEYCLOAK_CLIENT_ID,
+        AUTH0_CLIENT_SECRET: mockConfig.KEYCLOAK_CLIENT_SECRET,
         BUSAPI_URL: mockConfig.BUSAPI_URL,
         KAFKA_ERROR_TOPIC: mockConfig.KAFKA_ERROR_TOPIC,
-        AUTH0_PROXY_SERVER_URL: mockConfig.AUTH0_PROXY_SERVER_URL,
       });
     });
 
     it('should log warnings for missing required configuration', async () => {
       const incompleteConfig = {
         ...mockConfig,
-        AUTH0_CLIENT_ID: undefined,
+        KEYCLOAK_CLIENT_ID: undefined,
         BUSAPI_URL: undefined,
       };
 

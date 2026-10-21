@@ -3,67 +3,23 @@ import { HttpModule } from '@nestjs/axios';
 import { MemberApiService } from './member-api.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager'; // Import CacheModule
-import m2mAuth from 'tc-core-library-js/lib/auth/m2m'; // Use default import
+import { auth } from 'tc-core-library-js';
 import { Logger } from '@nestjs/common';
 import { M2M_AUTH_CLIENT } from './member-api.constants'; // Import from constants file
 
-// Define the provider for the M2M Auth client
+/** Construct one shared-core provider from Nest Keycloak configuration; throws on invalid configuration. */
 const m2mAuthProvider: Provider = {
   provide: M2M_AUTH_CLIENT, // Use the imported token
   useFactory: (configService: ConfigService) => {
-    const logger = new Logger('M2MAuthProvider');
-    const options = {
-      AUTH0_URL: configService.get<string>('AUTH0_URL'),
-      AUTH0_AUDIENCE: configService.get<string>('AUTH0_AUDIENCE'),
-      TOKEN_CACHE_TIME: configService.get<number>('TOKEN_CACHE_TIME'), // Library might expect number
-      AUTH0_CLIENT_ID: configService.get<string>('AUTH0_CLIENT_ID'), // Needed for getMachineToken
-      AUTH0_CLIENT_SECRET: configService.get<string>('AUTH0_CLIENT_SECRET'), // Needed for getMachineToken
-      AUTH0_PROXY_SERVER_URL: configService.get<string>(
-        'AUTH0_PROXY_SERVER_URL',
-      ),
-    };
-
-    // --- Add Debug Logging ---
-    logger.debug('--- M2M Auth Options Loaded ---');
-    logger.debug(`AUTH0_URL: ${options.AUTH0_URL}`);
-    logger.debug(`AUTH0_AUDIENCE: ${options.AUTH0_AUDIENCE}`);
-    logger.debug(`AUTH0_CLIENT_ID: ${options.AUTH0_CLIENT_ID}`);
-    logger.debug(
-      `AUTH0_CLIENT_SECRET: ${options.AUTH0_CLIENT_SECRET ? '<present>' : '<missing or empty>'}`,
-    ); // Log presence, not value
-    logger.debug(`AUTH0_PROXY_SERVER_URL: ${options.AUTH0_PROXY_SERVER_URL}`);
-    logger.debug(`TOKEN_CACHE_TIME: ${options.TOKEN_CACHE_TIME}`);
-    logger.debug('-------------------------------');
-    // --- End Debug Logging ---
-
-    // Validate essential options for getMachineToken
-    const requiredKeys: (keyof typeof options)[] = [
-      'AUTH0_URL',
-      'AUTH0_AUDIENCE',
-      'AUTH0_CLIENT_ID',
-      'AUTH0_CLIENT_SECRET',
-    ];
-    for (const key of requiredKeys) {
-      if (!options[key]) {
-        logger.warn(
-          `M2M Auth Config Missing/Empty: ${key}. Check environment variables.`,
-        );
-        // Depending on strictness, could throw an error here
-      }
-    }
-
-    logger.log(`Initializing M2M Auth client.`);
-    try {
-      // tc-core-library-js's m2m expects options object directly
-      // It returns the initialized utility object/function set
-      return m2mAuth(options);
-    } catch (error) {
-      logger.error(
-        `Failed to initialize M2M Auth client: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+    return auth.m2m({
+      M2M_PROVIDER: configService.get<string>('M2M_PROVIDER'),
+      KEYCLOAK_ISSUER: configService.get<string>('KEYCLOAK_ISSUER'),
+      KEYCLOAK_AUDIENCE: configService.get<string>('KEYCLOAK_AUDIENCE'),
+      KEYCLOAK_TOKEN_URL: configService.get<string>('KEYCLOAK_TOKEN_URL'),
+      KEYCLOAK_CLIENT_ID: configService.get<string>('KEYCLOAK_CLIENT_ID'),
+      KEYCLOAK_CLIENT_SECRET: configService.get<string>('KEYCLOAK_CLIENT_SECRET'),
+      KEYCLOAK_SCOPE: configService.get<string>('KEYCLOAK_SCOPE'),
+    });
   },
   inject: [ConfigService],
 };

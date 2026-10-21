@@ -73,20 +73,21 @@ export class CommonUtils {
     return `https://api.${authDomain}`;
   }
 
+  /** Verify raw access tokens through shared core for authorization records.
+   * @param token Encoded token to verify.
+   * @param validIssuers Explicit trusted member issuer list.
+   * @param secret Existing member HMAC secret.
+   * @returns Normalized verified principal; throws sanitized validation errors.
+   */
   static async verifyJwtToken(
     token: string,
     validIssuers: string[],
     secret: string,
   ): Promise<Record<string, any>> {
-    const validator = tokenValidator.auth.verifier(validIssuers);
-    return new Promise((resolve, reject) => {
-      validator.validateToken(token, secret, (err, decoded) => {
-        if (err) {
-          return reject(new Error(err));
-        }
-        resolve(decoded);
-      });
-    });
+    return tokenValidator.auth.createValidator({
+      VALID_ISSUERS: validIssuers, AUTH_SECRET: secret,
+    }).verify(token);
+
   }
 
   static pick<T>(obj: T, keys: string[]) {

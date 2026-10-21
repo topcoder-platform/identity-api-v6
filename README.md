@@ -52,8 +52,8 @@ user.
 ```bash
 cp .env.sample .env
 # update `AUTH_SECRET` to `ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP`
-# update `AUTH0_CLIENT_SECRET` to `ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP`
-# update `AUTH0_CLIENT_ID` to `jGIf2pd3f44B1jqvOai30BIKTZanYBfU`
+# Set the member-login Auth0 setting from the authorized secret store.
+# Set the member-login Auth0 setting from the authorized secret store.
 # update `LEGACY_BLOWFISH_KEY` to `dGhpc2lzRGVmYXVmZlZhbHVl`
 ```
 2. Start the Docker containers for the databases and Redis:
@@ -222,3 +222,43 @@ Swagger: when running locally, the Identity API docs are available at `http://lo
 Notes:
 - Endpoints above are intentionally callable by Auth0 without a bearer token and are documented in the code (`identity-api-v6/src/api/user/user.controller.ts`).  These endpoints are restricted to only Auth0 IP addresses
 - Roles added to JWTs are then consumed by apps like Work Manager and Community App to gate features, as well as all services, to validate user access to specific functionality.
+
+
+## Keycloak M2M branch
+
+`keycloak_m2M` pins shared core `4.0.0-keycloak.0` at
+`c262f4aca971904f308085bdeaaed35cdf3cfa7d`, including the Bus wrapper dependency.
+Configure `M2M_PROVIDER=keycloak`, `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE`,
+`KEYCLOAK_TOKEN_URL` (managed HTTPS endpoint), `KEYCLOAK_CLIENT_ID`,
+`KEYCLOAK_CLIENT_SECRET`, and `KEYCLOAK_SCOPE` before rollout. The Identity
+workload needs `read:user_profiles` and `write:bus_api` for its outbound operations.
+Bus wrapper options retain legacy AUTH0 field names solely for compatibility;
+their values come only from Keycloak configuration. Auth0 member authorization
+code/refresh/revocation and verification workflows remain separate and unchanged.
+
+All supplied API bearer tokens and authorization-record token verification use
+shared core. Public routes allow absent credentials, but invalid supplied tokens
+return 401. Members require explicit `VALID_ISSUERS` (JSON array), `AUTH_SECRET`
+for HMAC tokens, and `AUTH_USER_AUDIENCES` (JSON array) or explicit
+`ALLOW_LEGACY_USER_AUDIENCE=true`. The unused Passport strategy and its second
+JWT/JWKS/cache implementation were removed. Member IDs remain strings in the
+Identity API adapter; service principals have no member ID, role or administrator
+privileges. Legacy `JWT_VALIDATION_MODE`/`JWT_JWKS_URI` do not control API validation.
+
+Scopes are exact and case-sensitive, with the documented operation/all aliases
+accepted explicitly. Members cannot gain service permissions from scope claims.
+Member-only operations deny services even when no scope policy is listed;
+Group reads require `read:groups`, `write:groups` or `all:groups` for services.
+Identity's existing `auth0`, `read:usersRole`, `all:usersRole` and other mixed-case
+grants must be provisioned with their exact spelling. No wildcard expansion occurs.
+
+Run `nvm use`, `pnpm lint`, `pnpm build`, `pnpm test:keycloak`, and the unit tests.
+CI deployment filters exclude this branch; no Identity application is deployed.
+
+Validation: lint, SWC build, five signed-token/real-HTTP/provider checks and live
+DEV inbound/direct/nested-Bus validation pass. The unit suite reports 485 passing
+and 66 failing; all 66 failure titles also fail on unchanged `ccde1d31` with
+independent frozen dependencies (480 passing/66 failing). Standalone TypeScript
+checking retains 30 baseline diagnostics in old tests; an existing invalid
+Topgear scope constant was removed, reducing the baseline count from 31.
+No database connection or member/role/event mutation is used by the auth checks.

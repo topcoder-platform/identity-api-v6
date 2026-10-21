@@ -1,3 +1,4 @@
+import { hasServiceScopes } from '../../shared/auth/auth.helpers';
 import {
   Controller,
   Get,
@@ -706,27 +707,12 @@ export class RoleController {
     return result;
   }
 
-  private extractScopes(user: any): Set<string> {
-    const raw = user?.scopes ?? user?.scope;
-    if (Array.isArray(raw)) {
-      return new Set(raw as string[]);
-    }
-    if (typeof raw === 'string') {
-      return new Set(
-        raw
-          .split(/[ ,]/)
-          .map((scope) => scope.trim())
-          .filter(Boolean),
-      );
-    }
-    return new Set();
-  }
 
+  /** Match explicit grants on a service principal; empty policies deny access. */
   private hasAnyScope(user: any, requiredScopes: string[]): boolean {
     if (!requiredScopes.length) {
-      return true;
+      return false;
     }
-    const scopes = this.extractScopes(user);
-    return requiredScopes.some((scope) => scopes.has(scope));
+    return hasServiceScopes(user, requiredScopes);
   }
 }

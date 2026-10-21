@@ -9,7 +9,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import {
   RoleResponseDto,
   CreateRoleBodyDto,

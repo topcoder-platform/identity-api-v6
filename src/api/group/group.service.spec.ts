@@ -22,7 +22,7 @@ import {
   GroupMemberDto,
   GroupMembershipResponseDto,
 } from 'src/dto/group/group-membership.dto';
-import { AuthenticatedUser } from 'src/core/auth/jwt.strategy';
+import { AuthenticatedUser } from 'src/core/auth/auth.types';
 import { MembershipType, MembershipTypeHelper } from './membership-type.enum';
 import { Constants } from '../../core/constant/constants';
 
@@ -62,6 +62,7 @@ const mockAdminUser: AuthenticatedUser = {
   userId: '1',
   roles: ['administrator'],
   scopes: ['read:groups', 'write:groups', 'all:groups'],
+  kind: 'user',
   isMachine: false,
   isAdmin: true, // assuming admin user
   payload: {}, // or use the appropriate structure expected by your app
@@ -71,6 +72,7 @@ const mockRegularUser: AuthenticatedUser = {
   userId: '2',
   roles: ['user'],
   scopes: [],
+  kind: 'user',
   isMachine: false,
   isAdmin: false, // assuming admin user
   payload: {}, // or use the appropriate structure expected by your app
@@ -79,6 +81,7 @@ const mockRegularUser: AuthenticatedUser = {
 const mockMachineUserWithWriteScope: AuthenticatedUser = {
   userId: 'machine-1',
   scopes: ['write:groups'],
+  kind: 'service',
   isMachine: true,
   roles: [],
   isAdmin: false, // assuming admin user
@@ -88,6 +91,7 @@ const mockMachineUserWithWriteScope: AuthenticatedUser = {
 const mockMachineUserWithReadScope: AuthenticatedUser = {
   userId: 'machine-2',
   scopes: ['read:groups'],
+  kind: 'service',
   isMachine: true,
   roles: [],
   isAdmin: false, // assuming admin user
@@ -97,6 +101,7 @@ const mockMachineUserWithReadScope: AuthenticatedUser = {
 const mockMachineUserWithoutScope: AuthenticatedUser = {
   userId: 'machine-3',
   scopes: ['other:scope'],
+  kind: 'service',
   isMachine: true,
   roles: [],
   isAdmin: false, // assuming admin user

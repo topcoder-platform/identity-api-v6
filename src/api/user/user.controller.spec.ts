@@ -18,7 +18,7 @@ import {
   InternalServerErrorException,
   NotImplementedException,
 } from '@nestjs/common';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import * as DTOs from '../../dto/user/user.dto';
 import { Request } from 'express';
 import {

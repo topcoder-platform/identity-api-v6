@@ -15,7 +15,7 @@ import { EventService } from '../../shared/event/event.service';
 import { UserService } from './user.service';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import * as DTOs from '../../dto/user/user.dto';
 import { SlackService } from '../../shared/slack/slack.service';
 import { AuthFlowService } from './auth-flow.service'; // For OTP completion

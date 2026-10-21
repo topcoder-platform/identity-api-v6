@@ -4,7 +4,6 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis';
 import { EventModule } from './shared/event/event.module';
 import { RoleModule } from './api/role/role.module';
-import { AuthModule } from './core/auth/auth.module';
 import { UserModule } from './api/user/user.module';
 import { GroupModule } from './api/group/group.module';
 import { MemberPrismaModule } from './shared/member-prisma/member-prisma.module';
@@ -34,7 +33,6 @@ import { TopgearUserRolesModule } from './api/topgear-user-role/topgear-user-rol
       inject: [ConfigService],
     }),
     EventModule,
-    AuthModule,
     // CoreModule,
     // SharedModule,
     // --> Add API modules here <--

@@ -1,3 +1,4 @@
+import { auth, Principal } from 'tc-core-library-js';
 import {
   CanActivate,
   ExecutionContext,
@@ -7,10 +8,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { SCOPES_KEY } from '../decorators/scopes.decorator';
 
+/** Enforces all declared grants on verified service principals only. */
 @Injectable()
 export class ScopesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
+  /** Check declared scopes for the execution context; returns true or throws ForbiddenException. */
   canActivate(context: ExecutionContext): boolean {
     const required = this.reflector.getAllAndOverride<string[]>(SCOPES_KEY, [
       context.getHandler(),
@@ -22,18 +25,7 @@ export class ScopesGuard implements CanActivate {
     const user = req.authUser || req.user;
     if (!user) throw new ForbiddenException('Missing auth user');
 
-    const rawScopes = (user.scopes ?? user.scope) as
-      | string[]
-      | string
-      | undefined;
-    const scopes: string[] = Array.isArray(rawScopes)
-      ? rawScopes
-      : String(rawScopes || '')
-          .split(' ')
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-    const ok = required.every((s) => scopes.includes(s));
+    const ok = auth.hasScopes(user as Principal, required);
     if (!ok) throw new ForbiddenException('Missing required scope(s)');
     return true;
   }

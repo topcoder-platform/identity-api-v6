@@ -1,68 +1,35 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { auth, Principal } from 'tc-core-library-js';
 
-// Define a simple structure for the authenticated user object expected in the request
-// Adjust this based on your actual JWT payload structure
-interface AuthenticatedUser {
-  userId: string | number; // User ID from token
-  roles: string[]; // Roles from token
-  scope?: string; // Scopes from token (often space-separated)
-  isMachine?: boolean; // Flag if it's an M2M token
+/** Match any explicitly accepted, case-sensitive service grant through shared core.
+ * @param user Normalized principal from authentication middleware.
+ * @param scopes Accepted grants for the operation; empty lists deny service access.
+ * @returns Whether a verified service principal has an accepted grant; never throws.
+ */
+export function hasServiceScopes(user: unknown, scopes: string[]): boolean {
+  return scopes.length > 0 && auth.hasScopes(user as Principal, scopes, 'any');
 }
 
-/**
- * Checks if the authenticated user has the required permissions.
- *
- * Checks performed:
- * 1. User must be authenticated.
- * 2. If targetUserId is provided, checks if the user matches the target OR has admin role/scope.
- * 3. If targetUserId is null/undefined, checks if the user has admin role/scope.
- *
- * @param authUser The authenticated user object from the request (e.g., req.user).
- * @param allowedScopes Array of scopes that grant permission (for machine tokens).
- * @param adminRoles Array of role names considered admin.
- * @param targetUserId Optional ID of the resource being accessed (if checking self vs. admin).
+/** Authorize a member owner/admin or a service with an explicit accepted grant.
+ * @param authUser Normalized authenticated identity.
+ * @param allowedScopes Any one of these grants authorizes a service.
+ * @param adminRoles Case-insensitive member administrator role names.
+ * @param targetUserId Optional member resource owner ID.
+ * @returns Nothing when authorized.
+ * @throws UnauthorizedException if absent; ForbiddenException if denied.
  */
 export function checkAdminOrScope(
-  authUser: AuthenticatedUser | undefined,
+  authUser: { kind?: string; userId?: string | number; roles?: string[] } | undefined,
   allowedScopes: string[] = [],
-  adminRoles: string[] = ['admin', 'administrator'], // Example admin roles
+  adminRoles: string[] = ['admin', 'administrator'],
   targetUserId?: string | number | null,
 ): void {
-  if (!authUser) {
-    throw new UnauthorizedException('Authentication required.');
+  if (!authUser) throw new UnauthorizedException('Authentication required.');
+  if (authUser.kind === 'service') {
+    if (hasServiceScopes(authUser, allowedScopes)) return;
+  } else if (authUser.kind === 'user') {
+    if (targetUserId != null && String(authUser.userId) === String(targetUserId)) return;
+    if (authUser.roles?.some(role => adminRoles.includes(role.toLowerCase()))) return;
   }
-
-  const userIdNum =
-    typeof authUser.userId === 'string'
-      ? parseInt(authUser.userId, 10)
-      : authUser.userId;
-  const targetUserIdNum = targetUserId
-    ? typeof targetUserId === 'string'
-      ? parseInt(targetUserId, 10)
-      : targetUserId
-    : null;
-
-  // Check if user is accessing their own resource
-  if (targetUserIdNum !== null && userIdNum === targetUserIdNum) {
-    return; // User is accessing their own resource
-  }
-
-  // Check if user is an admin
-  if (
-    authUser.roles &&
-    authUser.roles.some((role) => adminRoles.includes(role.toLowerCase()))
-  ) {
-    return; // User is an admin
-  }
-
-  // Check if user is a machine client with required scope
-  if (authUser.isMachine && authUser.scope) {
-    const scopes = authUser.scope.split(' ');
-    if (allowedScopes.some((allowedScope) => scopes.includes(allowedScope))) {
-      return; // Machine client has required scope
-    }
-  }
-
-  // If none of the above conditions are met, throw Forbidden
   throw new ForbiddenException('Insufficient permissions.');
 }

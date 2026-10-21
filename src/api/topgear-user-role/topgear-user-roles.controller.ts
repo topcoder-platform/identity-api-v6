@@ -1,3 +1,4 @@
+import { hasServiceScopes } from '../../shared/auth/auth.helpers';
 import {
   Body,
   Controller,
@@ -184,42 +185,24 @@ export class TopgearUserRolesController {
     return result;
   }
 
-  private extractScopes(user: any): Set<string> {
-    const raw = user?.scopes ?? user?.scope;
-    if (Array.isArray(raw)) {
-      return new Set(raw as string[]);
-    }
-    if (typeof raw === 'string') {
-      return new Set(
-        raw
-          .split(/[ ,]/)
-          .map((scope) => scope.trim())
-          .filter(Boolean),
-      );
-    }
-    return new Set();
-  }
 
+  /** Allow a member admin or scoped service; throws ForbiddenException on denial. */
   private ensureAdminOrScope(user: any, requiredScopes: string[]): void {
-    if (user?.isAdmin) {
+    if (user?.kind === 'user' && user.isAdmin) {
       return;
     }
 
-    const scopes = this.extractScopes(user);
     const acceptedScopes = new Set(
       [
         ...requiredScopes,
         SCOPES.ALL_TOPGEAR_USER_ROLES,
-        SCOPES.ALL_USER_ROLES,
         SCOPES.ALL_USERS_ROLE,
         SCOPES.ALL_ROLES,
         SCOPES.ALL_USERS,
       ].filter(Boolean),
     );
 
-    const hasScope = Array.from(acceptedScopes).some((scope) =>
-      scopes.has(scope),
-    );
+    const hasScope = hasServiceScopes(user, Array.from(acceptedScopes));
 
     if (!hasScope) {
       this.logger.warn('Access denied: missing admin role or required scope.');

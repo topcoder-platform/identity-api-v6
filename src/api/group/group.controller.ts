@@ -1,3 +1,4 @@
+import { GroupServiceScopesGuard } from '../../auth/guards/group-service-scopes.guard';
 import {
   Controller,
   Get,
@@ -62,7 +63,7 @@ function checkParamExists(
 
 @ApiTags('groups')
 @Controller('groups')
-@UseGuards(AuthRequiredGuard)
+@UseGuards(AuthRequiredGuard, GroupServiceScopesGuard)
 @ApiBearerAuth()
 export class GroupController {
   private readonly logger = new Logger(GroupController.name);
@@ -179,7 +180,7 @@ export class GroupController {
       summary:
         'Fetch a specific membership record for the supplied group and member IDs.',
       jwt: 'Any authenticated user.',
-      m2m: 'No additional scope requirement beyond authentication.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
     }),
   })
   @ApiResponse({
@@ -236,7 +237,7 @@ export class GroupController {
       summary:
         'Returns a count of member-type memberships for the specified group, optionally including sub-groups.',
       jwt: 'Any authenticated user.',
-      m2m: 'No additional scope requirement beyond authentication.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
     }),
   })
   @ApiResponse({
@@ -617,7 +618,7 @@ export class GroupController {
       summary:
         'Returns the group tree for the requested group, optionally including nested levels.',
       jwt: 'Any authenticated user.',
-      m2m: 'No additional scope requirement beyond authentication.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
       notes:
         'Private group visibility currently mirrors legacy behaviour and does not enforce additional role checks for this endpoint.',
     }),
@@ -709,7 +710,7 @@ export class GroupController {
       summary:
         'Retrieves the direct parent group or the full ancestry chain for the supplied group.',
       jwt: 'Any authenticated user.',
-      m2m: 'No additional scope requirement beyond authentication.',
+      m2m: ['read:groups', 'write:groups', 'all:groups'],
     }),
   })
   @ApiParam({

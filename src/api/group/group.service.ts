@@ -1,3 +1,4 @@
+import { hasServiceScopes } from '../../shared/auth/auth.helpers';
 import {
   Injectable,
   Inject,
@@ -34,7 +35,7 @@ import {
   GroupMemberDto,
   GroupMembershipResponseDto,
 } from 'src/dto/group/group-membership.dto';
-import { AuthenticatedUser } from 'src/core/auth/jwt.strategy';
+import { AuthenticatedUser } from 'src/core/auth/auth.types';
 import { MembershipTypeHelper } from './membership-type.enum';
 import { Constants } from '../../core/constant/constants';
 
@@ -64,6 +65,7 @@ export class GroupService {
   ) {}
 
   // --- UTILITY METHODS ---
+  /** Check explicit service grants or member roles for an operation; throws 400/403 on denial. */
   private checkAccessPermissions(
     user: AuthenticatedUser,
     requiredScopes: string[] | null,
@@ -75,8 +77,7 @@ export class GroupService {
 
     if (user.isMachine) {
       if (
-        requiredScopes?.length &&
-        !requiredScopes.some((scope) => user.scopes?.includes(scope))
+        !hasServiceScopes(user, requiredScopes || [])
       ) {
         throw new ForbiddenException('Insufficient scopes');
       }
@@ -618,6 +619,10 @@ export class GroupService {
     return this.mapToGroupResponseDto(group);
   }
 
+  /** Authorize group visibility using service read grants or existing member rules.
+   * Inputs are the caller, group, membership type and accepted scopes/admin roles.
+   * Resolves void; throws ForbiddenException on denial or propagates storage errors.
+   */
   async validateAdminRoleOrPrivateGroupMembership(
     user: AuthenticatedUser,
     group: PrismaGroupFromDb,
@@ -629,20 +634,11 @@ export class GroupService {
       `Validating access for user ${user.userId} to group ${group.id}`,
     );
 
-    if (!group.privateGroup) {
-      this.logger.debug(`Access granted: Group ${group.id} is public.`);
+    if (user.isMachine) {
+      if (!hasServiceScopes(user, readScopes)) throw new ForbiddenException('Insufficient scopes');
       return;
     }
-
-    if (
-      user.isMachine &&
-      readScopes.some((scope) => user.scopes?.includes(scope))
-    ) {
-      this.logger.debug(
-        `Access granted for machine user to private group ${group.id} via scope.`,
-      );
-      return;
-    }
+    if (!group.privateGroup) return;
 
     if (
       !user.isMachine &&
@@ -679,6 +675,8 @@ export class GroupService {
     this.logger.debug(
       `Fetching group hierarchy for ID: ${groupId}, includeSubGroups: ${includeSubGroups}, oneLevel: ${oneLevel}`,
     );
+
+    if (requestingUser.isMachine) this.checkAccessPermissions(requestingUser, this.readScopes, null);
 
     // const group = await this.findGroupById(groupId);
     // if (!group) {

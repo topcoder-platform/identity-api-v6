@@ -37,7 +37,7 @@ import {
   UserSearchQueryDto,
   AchievementDto,
 } from '../../dto/user/user.dto';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID as uuidv4 } from 'node:crypto';

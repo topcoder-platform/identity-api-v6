@@ -17,7 +17,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 
 import { Constants } from '../../core/constant/constants';
-import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
+import { AuthenticatedUser } from '../../core/auth/auth.types';
 import { MemberStatus } from '../../dto/member';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { EventService } from '../../shared/event/event.service';
