@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  tc-core-library-js: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09
+  tc-core-library-js: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e
   '@babel/core@^7': 7.29.6
   '@isaacs/brace-expansion': 5.0.1
   '@xhmikosr/decompress@^10': 10.2.1
@@ -144,8 +144,8 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(express@5.2.1(supports-color@8.1.1))
       tc-core-library-js:
-        specifier: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09
-        version: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
+        specifier: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e
+        version: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
       trolleyhq:
         specifier: ^1.1.0
         version: 1.1.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
@@ -4137,9 +4137,9 @@ packages:
   tar-stream@3.1.7:
     resolution: {integrity: sha512-qJj60CXt7IU1Ffyc3NJMjh6EkuCFej46zUqJ4J7pqYlThyd9bO0XBTmcOIhSzZJVWfsLks0+nle/j538YAW9RQ==}
 
-  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09:
-    resolution: {tarball: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09}
-    version: 4.0.0-keycloak.1
+  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e:
+    resolution: {tarball: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e}
+    version: 4.0.0-keycloak.2
     engines: {node: '>=18.19'}
 
   teleport-javascript@1.0.0:
@@ -5672,7 +5672,7 @@ snapshots:
       joi: 18.2.1
       lodash: 4.18.1
       superagent: 10.2.3(supports-color@8.1.1)
-      tc-core-library-js: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
+      tc-core-library-js: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
     transitivePeerDependencies:
       - debug
       - supports-color
@@ -8929,7 +8929,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/e844764e1c2cadcc01fd5e05029590319802af09(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1):
+  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/112d54a3ed66423e7305e94e174937823e76124e(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1):
     dependencies:
       axios: 1.18.1(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
       bunyan: 1.8.15

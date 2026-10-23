@@ -226,8 +226,8 @@ Notes:
 
 ## Keycloak M2M branch
 
-`keycloak_m2M` pins shared core `4.0.0-keycloak.1` at
-`e844764e1c2cadcc01fd5e05029590319802af09`, including the Bus wrapper dependency.
+`keycloak_m2M` pins shared core `4.0.0-keycloak.2` at
+`112d54a3ed66423e7305e94e174937823e76124e`, including the Bus wrapper dependency.
 Auth0 member authorization code/refresh/revocation and verification workflows
 remain separate and unchanged; `AUTH0_DOMAIN`, `AUTH0_NEW_*` and the member-login
 use of `AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET` are not affected by the switch below.
