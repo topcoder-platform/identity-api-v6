@@ -52,8 +52,8 @@ user.
 ```bash
 cp .env.sample .env
 # update `AUTH_SECRET` to `ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP`
-# Set the member-login Auth0 setting from the authorized secret store.
-# Set the member-login Auth0 setting from the authorized secret store.
+# Set `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET` from the authorized secret store
+# (member login; also M2M when `USE_KEYCLOAK` is not `true`).
 # update `LEGACY_BLOWFISH_KEY` to `dGhpc2lzRGVmYXVmZlZhbHVl`
 ```
 2. Start the Docker containers for the databases and Redis:
@@ -226,15 +226,39 @@ Notes:
 
 ## Keycloak M2M branch
 
-`keycloak_m2M` pins shared core `4.0.0-keycloak.0` at
-`c262f4aca971904f308085bdeaaed35cdf3cfa7d`, including the Bus wrapper dependency.
-Configure `M2M_PROVIDER=keycloak`, `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE`,
-`KEYCLOAK_TOKEN_URL` (managed HTTPS endpoint), `KEYCLOAK_CLIENT_ID`,
-`KEYCLOAK_CLIENT_SECRET`, and `KEYCLOAK_SCOPE` before rollout. The Identity
-workload needs `read:user_profiles` and `write:bus_api` for its outbound operations.
-Bus wrapper options retain legacy AUTH0 field names solely for compatibility;
-their values come only from Keycloak configuration. Auth0 member authorization
-code/refresh/revocation and verification workflows remain separate and unchanged.
+`keycloak_m2M` pins shared core `4.0.0-keycloak.1` at
+`e844764e1c2cadcc01fd5e05029590319802af09`, including the Bus wrapper dependency.
+Auth0 member authorization code/refresh/revocation and verification workflows
+remain separate and unchanged; `AUTH0_DOMAIN`, `AUTH0_NEW_*` and the member-login
+use of `AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET` are not affected by the switch below.
+
+### Provider switch: `USE_KEYCLOAK`
+
+`USE_KEYCLOAK=true` makes this service get its M2M tokens (Member API lookups and the
+Bus client) from Keycloak, using `KEYCLOAK_TOKEN_URL` (managed HTTPS endpoint),
+`KEYCLOAK_AUDIENCE`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET` and
+`KEYCLOAK_SCOPE`; `KEYCLOAK_ISSUER` is also required. The Identity workload needs
+`read:user_profiles` and `write:bus_api` for its outbound operations. Unset or
+`false` restores the Auth0 behaviour from before the migration: both the Member API
+provider and the Bus client use `AUTH0_URL`, `AUTH0_AUDIENCE`,
+`AUTH0_PROXY_SERVER_URL` (optional), `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET`.
+
+`tc-core-library-js` reads the flag (`auth.useKeycloak`); the Bus client gets the
+wrapper's `AUTH0_*` options from `auth.wrapperSettings`, so the service and the core
+always agree. Any value other than `true`/`false` fails at startup. In DEV the flag
+is `/config/common/global-appvar/USE_KEYCLOAK`; the CircleCI deploy loads that path,
+so no deployment file change is needed.
+
+Incoming machine tokens: with `true`, Keycloak tokens are accepted, plus Auth0 tokens
+while `LEGACY_M2M_ISSUERS`/`LEGACY_M2M_AUDIENCE` are set. With `false`, Auth0 tokens
+are accepted through `LEGACY_M2M_*`, plus Keycloak tokens while `KEYCLOAK_ISSUER` and
+`KEYCLOAK_AUDIENCE` are set, so callers that have not switched yet keep working.
+
+**Rollback:** set `USE_KEYCLOAK=false` and force a new deployment so tasks re-read SSM.
+No code or dependency change is needed. Keep the Auth0 settings above in SSM until
+Keycloak has been accepted.
+
+### Authentication
 
 All supplied API bearer tokens and authorization-record token verification use
 shared core. Public routes allow absent credentials, but invalid supplied tokens
@@ -258,7 +282,9 @@ CI deployment filters exclude this branch; no Identity application is deployed.
 Validation: lint, SWC build, five signed-token/real-HTTP/provider checks and live
 DEV inbound/direct/nested-Bus validation pass. The unit suite reports 485 passing
 and 66 failing; all 66 failure titles also fail on unchanged `ccde1d31` with
-independent frozen dependencies (480 passing/66 failing). Standalone TypeScript
+independent frozen dependencies (480 passing/66 failing). With the `USE_KEYCLOAK`
+switch, `member-api.module.spec.ts` and `event.module.spec.ts` cover both providers
+and the same 66 baseline failures remain. Standalone TypeScript
 checking retains 30 baseline diagnostics in old tests; an existing invalid
 Topgear scope constant was removed, reducing the baseline count from 31.
 No database connection or member/role/event mutation is used by the auth checks.

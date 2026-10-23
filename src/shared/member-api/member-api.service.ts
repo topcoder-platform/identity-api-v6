@@ -8,6 +8,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { auth } from 'tc-core-library-js';
 import { MemberInfoDto } from '../../dto/member/member.dto';
 import { M2M_AUTH_CLIENT } from './member-api.constants'; // Import M2M client token from constants
 
@@ -15,7 +16,7 @@ const MEMBER_LOOKUP_FIELDS = ['userId', 'handle', 'email'] as const;
 const DEFAULT_MEMBER_API_TIMEOUT_MS = 10000;
 
 // Define the interface for the M2M Auth client provided by the module
-// Based on the declaration file src/types/tc-core-library-js.d.ts
+// (the shared-core provider returned by auth.m2m in member-api.module.ts)
 interface M2MAuthClient {
   getMachineToken(): Promise<string>;
 }
@@ -24,7 +25,17 @@ interface M2MAuthClient {
 export class MemberApiService {
   private readonly logger = new Logger(MemberApiService.name);
   private readonly MEMBER_API_URL: string;
+  /** Name of the M2M provider selected by USE_KEYCLOAK, used in failure logs. */
+  private readonly m2mProviderName: 'Keycloak' | 'Auth0';
 
+  /**
+   * Reads `MEMBER_API_URL` and the `USE_KEYCLOAK` provider choice.
+   * @param configService Nest configuration.
+   * @param httpService HTTP client for Member API calls.
+   * @param m2mAuthClient Shared-core M2M provider from `MemberApiModule`.
+   * @throws Error when `MEMBER_API_URL` is missing; TypeError when `USE_KEYCLOAK`
+   * is not `true`/`false`.
+   */
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
@@ -39,17 +50,25 @@ export class MemberApiService {
         'Required configuration missing for MemberApiService: MEMBER_API_URL.',
       );
     }
+    this.m2mProviderName = auth.useKeycloak({
+      USE_KEYCLOAK: this.configService.get<string>('USE_KEYCLOAK'),
+    })
+      ? 'Keycloak'
+      : 'Auth0';
   }
 
   /**
-   * Gets a verified cached Keycloak token using the injected persistent provider.
-   * Takes no parameters; returns a token or null on failure, never throws.
+   * Gets a cached or new M2M token from the injected persistent provider: a verified
+   * Keycloak token when `USE_KEYCLOAK=true`, otherwise an Auth0 token for
+   * `AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET`.
+   * Takes no parameters; returns a token or null on failure (logging which provider
+   * failed, without details), never throws.
    */
   private async getM2mToken(): Promise<string | null> {
     try {
       return await this.m2mAuthClient.getMachineToken();
     } catch {
-      this.logger.error('Keycloak service authentication failed');
+      this.logger.error(`${this.m2mProviderName} service authentication failed`);
       return null;
     }
   }

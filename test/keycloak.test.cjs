@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const { generateKeyPairSync, sign, createHmac } = require('node:crypto');
 const nock = require('nock');
 const issuer = 'https://identity-keycloak.test/realms/m2m';
-Object.assign(process.env, { M2M_PROVIDER:'keycloak', KEYCLOAK_ISSUER:issuer,
+Object.assign(process.env, { USE_KEYCLOAK:'true', KEYCLOAK_ISSUER:issuer,
  KEYCLOAK_AUDIENCE:'https://api.test', KEYCLOAK_TOKEN_URL:'https://identity-keycloak.test/m2m/token',
  KEYCLOAK_CLIENT_ID:'identity-test', KEYCLOAK_CLIENT_SECRET:'synthetic-secret', KEYCLOAK_SCOPE:'read:user_profiles write:bus_api',
  AUTH_SECRET:'synthetic-member-secret', VALID_ISSUERS:'["https://member.test"]', AUTH_USER_AUDIENCES:'["member-api"]',

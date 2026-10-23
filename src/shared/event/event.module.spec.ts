@@ -14,6 +14,7 @@ describe('EventModule', () => {
   let module: TestingModule;
 
   const mockConfig = {
+    USE_KEYCLOAK: 'true',
     KEYCLOAK_TOKEN_URL: 'https://keycloak.example.test/m2m/token',
     KEYCLOAK_AUDIENCE: 'test-audience',
     TOKEN_CACHE_TIME: '3600',
@@ -61,9 +62,66 @@ describe('EventModule', () => {
         TOKEN_CACHE_TIME: mockConfig.TOKEN_CACHE_TIME,
         AUTH0_CLIENT_ID: mockConfig.KEYCLOAK_CLIENT_ID,
         AUTH0_CLIENT_SECRET: mockConfig.KEYCLOAK_CLIENT_SECRET,
+        AUTH0_PROXY_SERVER_URL: mockConfig.KEYCLOAK_TOKEN_URL,
         BUSAPI_URL: mockConfig.BUSAPI_URL,
         KAFKA_ERROR_TOPIC: mockConfig.KAFKA_ERROR_TOPIC,
       });
+    });
+
+    it.each([['false'], [undefined]])(
+      'should use the pre-migration Auth0 settings when USE_KEYCLOAK is %s',
+      async (useKeycloak) => {
+        const auth0Config = {
+          ...mockConfig,
+          USE_KEYCLOAK: useKeycloak,
+          AUTH0_URL: 'https://auth0.example.com/oauth/token',
+          AUTH0_AUDIENCE: 'https://m2m.example.com/',
+          AUTH0_CLIENT_ID: 'auth0-client-id',
+          AUTH0_CLIENT_SECRET: 'auth0-client-secret',
+          AUTH0_PROXY_SERVER_URL: 'https://proxy.example.com',
+        };
+        const mockConfigService = {
+          get: jest.fn((key: string, defaultValue?: string | number) => {
+            return auth0Config[key] ?? defaultValue;
+          }),
+        };
+        mockBusApi.mockReturnValue({ publish: jest.fn() });
+
+        module = await Test.createTestingModule({
+          imports: [EventModule],
+        })
+          .overrideProvider(ConfigService)
+          .useValue(mockConfigService)
+          .compile();
+
+        expect(mockBusApi).toHaveBeenCalledWith({
+          AUTH0_URL: auth0Config.AUTH0_URL,
+          AUTH0_AUDIENCE: auth0Config.AUTH0_AUDIENCE,
+          TOKEN_CACHE_TIME: auth0Config.TOKEN_CACHE_TIME,
+          AUTH0_CLIENT_ID: auth0Config.AUTH0_CLIENT_ID,
+          AUTH0_CLIENT_SECRET: auth0Config.AUTH0_CLIENT_SECRET,
+          BUSAPI_URL: auth0Config.BUSAPI_URL,
+          KAFKA_ERROR_TOPIC: auth0Config.KAFKA_ERROR_TOPIC,
+          AUTH0_PROXY_SERVER_URL: auth0Config.AUTH0_PROXY_SERVER_URL,
+        });
+      },
+    );
+
+    it('should reject a USE_KEYCLOAK value other than true or false', async () => {
+      const mockConfigService = {
+        get: jest.fn((key: string, defaultValue?: string | number) => {
+          return { ...mockConfig, USE_KEYCLOAK: 'yes' }[key] ?? defaultValue;
+        }),
+      };
+
+      await expect(
+        Test.createTestingModule({
+          imports: [EventModule],
+        })
+          .overrideProvider(ConfigService)
+          .useValue(mockConfigService)
+          .compile(),
+      ).rejects.toThrow('USE_KEYCLOAK must be true or false');
     });
 
     it('should log warnings for missing required configuration', async () => {
