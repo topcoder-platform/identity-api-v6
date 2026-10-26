@@ -1,3 +1,4 @@
+import { verifySignedJwt } from 'tc-core-library-js';
 import { HttpService } from '@nestjs/axios';
 import * as jwt from 'jsonwebtoken';
 import {
@@ -73,8 +74,10 @@ export class Auth0Service {
     try {
       const secretBuffer = Buffer.from(this.clientSecret, 'base64');
 
-      const decoded = jwt.verify(auth0Token, secretBuffer, {
-        algorithms: [Constants.jwtHs256Algorithm],
+      const decoded = verifySignedJwt(auth0Token, secretBuffer, {
+        algorithms: ['HS256'],
+        audience: this.clientId,
+        issuer: `https://${this.domain}/`,
       });
       return Promise.resolve(decoded as Record<string, any>);
     } catch (error) {

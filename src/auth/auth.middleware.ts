@@ -12,7 +12,9 @@ export class AuthMiddleware implements NestMiddleware {
       process.env.VALID_ISSUERS ||
       '["https://testsachin.topcoder-dev.com/","https://test-sachin-rs256.auth0.com/","https://api.topcoder.com","https://api.topcoder-dev.com","https://topcoder-dev.auth0.com/", "https://auth.topcoder-dev.com/"]';
 
-    this.jwtAuthenticator = tcCore.middleware.jwtAuthenticator({
+    this.jwtAuthenticator = tcCore.createJwtAuthenticator({
+      AUTH0_AUDIENCE: process.env.AUTH0_AUDIENCE,
+      JWT_AUDIENCE: process.env.JWT_AUDIENCE,
       AUTH_SECRET: secret,
       VALID_ISSUERS: validIssuers,
     });

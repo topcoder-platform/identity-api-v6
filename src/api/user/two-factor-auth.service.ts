@@ -1,3 +1,4 @@
+import { verifySignedJwt } from 'tc-core-library-js';
 import {
   Injectable,
   Inject,
@@ -383,14 +384,13 @@ export class TwoFactorAuthService {
     const resendToken = jwt.sign(payload, this.resendTokenSecret, {
       expiresIn: `${expiryInSecods}s`,
     });
-    console.log(`Generated resend token is: ${resendToken}`);
     return resendToken;
   }
 
   private verifyResendToken(userId: string, aud: string, token: string) {
     let decodedJwtPayload: jwt.JwtPayload;
     try {
-      decodedJwtPayload = jwt.verify(token, this.resendTokenSecret, {
+      decodedJwtPayload = verifySignedJwt(token, this.resendTokenSecret, {
         audience: aud,
         userId: userId,
       }) as jwt.JwtPayload;

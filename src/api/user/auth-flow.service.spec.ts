@@ -1,3 +1,5 @@
+import { verifySignedJwt } from 'tc-core-library-js';
+jest.mock('tc-core-library-js', () => ({ ...jest.requireActual('tc-core-library-js'), verifySignedJwt: jest.fn() }));
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthFlowService } from './auth-flow.service';
 import { ConfigService } from '@nestjs/config';
@@ -310,7 +312,7 @@ describe('AuthFlowService', () => {
     }); // Unverified
 
     beforeEach(() => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: userId.toString(),
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       });
@@ -329,7 +331,7 @@ describe('AuthFlowService', () => {
 
     it('should activate a user successfully and send welcome email', async () => {
       const result = await service.activateUser(activateDto);
-      expect(jwt.verify).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
+      expect(verifySignedJwt).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
       });
       expect(cacheManager.get).toHaveBeenCalledWith(
@@ -376,7 +378,7 @@ describe('AuthFlowService', () => {
     });
 
     it('should throw ForbiddenException for invalid resend token (sub mismatch)', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: '2',
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       }); // Different user ID
@@ -385,7 +387,7 @@ describe('AuthFlowService', () => {
       );
     });
     it('should throw GoneException if resend token is expired', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new jwt.TokenExpiredError('expired');
       });
       await expect(service.activateUser(activateDto)).rejects.toThrow(
@@ -393,7 +395,7 @@ describe('AuthFlowService', () => {
       );
     });
     it('should throw ForbiddenException for other jwt errors', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new Error('jwt malformed');
       });
       await expect(service.activateUser(activateDto)).rejects.toThrow(
@@ -473,7 +475,7 @@ describe('AuthFlowService', () => {
     });
 
     beforeEach(() => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: userId.toString(),
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       });
@@ -485,7 +487,7 @@ describe('AuthFlowService', () => {
 
     it('should resend activation email successfully', async () => {
       const result = await service.requestResendActivation(resendDto);
-      expect(jwt.verify).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
+      expect(verifySignedJwt).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
       });
       expect(prismaOltp.user.findUnique).toHaveBeenCalledWith({
@@ -526,7 +528,7 @@ describe('AuthFlowService', () => {
       ).rejects.toThrow(BadRequestException);
     });
     it('should throw ForbiddenException for invalid resend token (sub mismatch)', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: '2',
         aud: OTP_ACTIVATION_JWT_AUDIENCE,
       });
@@ -535,7 +537,7 @@ describe('AuthFlowService', () => {
       );
     });
     it('should throw GoneException if resend token is expired', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new jwt.TokenExpiredError('expired');
       });
       await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
@@ -690,7 +692,7 @@ describe('AuthFlowService', () => {
     });
 
     beforeEach(() => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: userIdString,
         aud: ONE_TIME_TOKEN_JWT_AUDIENCE,
         jti,
@@ -732,7 +734,7 @@ describe('AuthFlowService', () => {
       ).rejects.toThrow(BadRequestException);
     });
     it('should throw GoneException if token is expired', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new jwt.TokenExpiredError('expired');
       });
       await expect(
@@ -744,7 +746,7 @@ describe('AuthFlowService', () => {
       ).rejects.toThrow(GoneException);
     });
     it('should throw ForbiddenException if token subject mismatch', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: '2',
         aud: ONE_TIME_TOKEN_JWT_AUDIENCE,
         jti,

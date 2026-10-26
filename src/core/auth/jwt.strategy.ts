@@ -6,8 +6,9 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager'; // Correct import
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy, StrategyOptions } from 'passport-jwt';
-import { passportJwtSecret } from 'jwks-rsa';
+import { Strategy } from 'passport-custom';
+import { Request } from 'express';
+import { createJwtVerifier, type JwtVerifier } from 'tc-core-library-js';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager'; // Re-add Cache type import
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
@@ -22,6 +23,8 @@ export interface JwtPayload {
   iat?: number;
   exp?: number;
   gty?: string;
+  isMachine?: boolean;
+  scopes?: string[];
   // From HS256 examples
   userId?: string;
   roles?: string[];
@@ -46,69 +49,12 @@ export interface AuthenticatedUser {
   payload: JwtPayload; // Original JWT payload
 }
 
-// Helper function to create Strategy Options based on config
-const createStrategyOptions = (
-  configService: ConfigService,
-): StrategyOptions => {
-  const validationMode = configService.get<string>(
-    'JWT_VALIDATION_MODE',
-    'RS256',
-  );
-  let options: StrategyOptions;
-  if (validationMode === 'HS256') {
-    const authSecret = configService.get<string>('AUTH_SECRET');
-    if (!authSecret) {
-      console.error('[JwtStrategy] AUTH_SECRET must be set for HS256 mode.');
-      throw new Error('AUTH_SECRET must be set.');
-    }
-    const issuerURL = configService.get<string>('JWT_ISSUER_URL');
-    const audience = configService.get<string>('JWT_AUDIENCE');
-    if (!issuerURL)
-      console.warn('[JwtStrategy] JWT_ISSUER_URL not set for HS256.');
-    if (!audience)
-      console.warn('[JwtStrategy] JWT_AUDIENCE not set for HS256.');
-
-    options = {
-      secretOrKey: authSecret,
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience: audience || undefined,
-      issuer: issuerURL || undefined,
-      algorithms: ['HS256'],
-    };
-  } else {
-    // Default to RS256
-    const issuerURL = configService.get<string>('JWT_ISSUER_URL');
-    const jwksUri = configService.get<string>('JWT_JWKS_URI');
-    const audience = configService.get<string>('JWT_AUDIENCE');
-
-    if (!issuerURL || !jwksUri || !audience) {
-      console.error(
-        '[JwtStrategy] JWT_ISSUER_URL, JWT_JWKS_URI, JWT_AUDIENCE must be set for RS256 mode.',
-      );
-      throw new Error(
-        'Required JWT environment variables missing for RS256 mode.',
-      );
-    }
-    options = {
-      secretOrKeyProvider: passportJwtSecret({
-        cache: true,
-        rateLimit: true,
-        jwksRequestsPerMinute: 5,
-        jwksUri: jwksUri,
-      }),
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience: audience,
-      issuer: issuerURL,
-      algorithms: ['RS256'],
-    };
-  }
-  return options;
-};
-
+/** Authenticates bearer tokens through tc-core and enriches human identities with database roles. */
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
+export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private readonly logger = new Logger(JwtStrategy.name);
   private readonly validationMode: string;
+  private readonly verifier: JwtVerifier;
   private readonly cacheTtlSeconds: number;
 
   constructor(
@@ -117,8 +63,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaClient,
     @Inject(CACHE_MANAGER) private cacheManager: Cache, // Re-add Inject Cache Manager
   ) {
-    const strategyOptions = createStrategyOptions(configService);
-    super(strategyOptions);
+    super();
+    const algorithm = configService.get<string>('JWT_VALIDATION_MODE', 'RS256');
+    if (algorithm !== 'HS256' && algorithm !== 'RS256') throw new Error('Invalid JWT validation mode');
+    const audience = configService.get<string>('JWT_AUDIENCE');
+    this.verifier = createJwtVerifier({ issuers: [{
+      issuer: configService.get<string>('JWT_ISSUER_URL') || '',
+      algorithm,
+      secret: configService.get<string>('AUTH_SECRET'),
+      jwksUri: configService.get<string>('JWT_JWKS_URI'),
+      audience,
+      allowMissingAudience: algorithm === 'HS256' && !audience,
+    }] });
     this.validationMode = configService.get<string>(
       'JWT_VALIDATION_MODE',
       'RS256',
@@ -134,139 +90,51 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     this.logger.log(`Auth cache TTL set to ${this.cacheTtlSeconds} seconds.`);
   }
 
+  /** Returns the v6 database-permission cache key for an issuer/member identity; never throws. */
   private getCacheKey(userId: string): string {
-    return `auth:user:${userId}`;
+    return `auth:v6:roles:${userId}`;
   }
 
-  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    this.logger.debug('[JwtStrategy] --- Entering validate method ---'); // Log entry
-    this.logger.debug(
-      `[JwtStrategy] Raw validated payload received from JWT: ${JSON.stringify(
-        payload,
-      )}`,
-    );
-
-    // !!Note!!
-    // machine tokens do not have userId, so we should not throw an error if it is missing
-
-    let dbRoles: string[] = [];
-    let isAdmin = false;
-    const userId = payload.userId;
-    const sub = payload.sub;
-    const ck = userId || sub;
-
-    const cacheKey = this.getCacheKey(ck);
+  /** Verifies the request bearer token through tc-core, then loads service roles; returns identity or throws UnauthorizedException. */
+  async validate(request: Request): Promise<AuthenticatedUser> {
+    const header = request.headers.authorization;
+    const match = typeof header === 'string' ? /^Bearer ([^\s]+)$/i.exec(header) : null;
+    if (!match) throw new UnauthorizedException('A bearer token is required');
     try {
-      // 1. Check cache first
-      const cachedUser =
-        await this.cacheManager.get<AuthenticatedUser>(cacheKey);
-      if (cachedUser) {
-        this.logger.debug(`Returning cached auth data for user/sub ${ck}`);
-        // Ensure the payload is attached if returning from cache
-        // (Payload isn't essential for authorization checks but good to have consistency)
-        return { ...cachedUser, payload: payload };
-      }
-    } catch (error) {
-      this.logger.error(
-        `Error reading auth cache for user/sub ${ck}: ${error.message}`,
-        error.stack,
-      );
-      // Proceed without cache if error occurs
-    }
+      const payload = await this.verifier.verify(match[1]);
+      return await this.buildUser({ ...payload, userId: payload.userId === undefined ? undefined : String(payload.userId) });
+    } catch { throw new UnauthorizedException('Invalid or expired access token'); }
+  }
 
-    this.logger.debug(`[JwtStrategy] Cache miss for user/sub ${ck}.`);
-
-    if (userId) {
-      // handling if userId is present
-      this.logger.debug(
-        `[JwtStrategy] Extracted userId: ${userId}. Fetching roles from DB.`,
-      ); // Log extracted userId
-
-      // 2. Fetch roles and determine admin status from DB (if not cached)
+  /** Enriches verified claims with cached database roles; token scopes and machine identity are always taken from the current token.
+   * @param payload Verified and normalized identity. @returns User with database authorization.
+   * @throws UnauthorizedException when a human identity is missing or database authorization cannot be loaded.
+   */
+  private async buildUser(payload: JwtPayload): Promise<AuthenticatedUser> {
+    const isMachine = payload.isMachine === true;
+    const userId = payload.userId;
+    let permissions = { roles: [] as string[], isAdmin: false };
+    if (!isMachine) {
+      if (!userId) throw new UnauthorizedException('A member ID is required');
+      const cacheKey = this.getCacheKey(`${payload.iss}:${userId}`);
       try {
-        const result = await this.fetchUserRolesAndAdminStatusFromDb(userId);
-        dbRoles = result.roles;
-        isAdmin = result.isAdmin;
-        this.logger.debug(
-          `[JwtStrategy] Roles for user ${userId} from DB: ${dbRoles.join(', ')}. isAdmin: ${isAdmin}`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `[JwtStrategy] Error fetching roles/admin status for user ${userId} from DB: ${error.message}`,
-          error.stack,
-        );
-        // If we cannot fetch roles, authentication fails
-        throw new UnauthorizedException(
-          `Failed to fetch authorization details for user ${userId}`,
-        );
+        const cached = await this.cacheManager.get<{ roles: string[]; isAdmin: boolean }>(cacheKey);
+        permissions = cached ?? await this.fetchUserRolesAndAdminStatusFromDb(userId);
+        if (!cached) await this.cacheManager.set(cacheKey, permissions, this.cacheTtlSeconds * 1000);
+      } catch {
+        permissions = await this.fetchUserRolesAndAdminStatusFromDb(userId);
       }
     }
-
-    if (this.validationMode === 'HS256' && payload.roles) {
-      this.logger.debug(
-        `[JwtStrategy] Roles from HS256 token payload for user ${userId}: ${JSON.stringify(payload.roles)}`,
-      );
-    }
-
-    // Extract scopes from token payload
-    let isMachine = false;
-    let scopes: string[] = [];
-    if (payload.scope && typeof payload.scope === 'string') {
-      scopes = payload.scope.split(' ');
-
-      // isMachine is only considered when there are scopes in the token
-      // Check if this is a machine token
-      isMachine =
-        (payload.gty === 'client-credentials' ||
-          payload.gty === 'client_credentials') &&
-        !userId &&
-        dbRoles.length === 0;
-
-      // logic to determine isMachine consistent with tc-core-library-js
-      // https://github.com/appirio-tech/tc-core-library-js/blob/1d5111da652289b3f03bbb1a30e145ce07bde957/lib/middleware/jwtAuthenticator.js#L78
-    }
-
-    // 3. Construct the AuthenticatedUser object
-    const authenticatedUser: AuthenticatedUser = {
-      userId: userId,
-      roles: dbRoles, // Use roles fetched from the database
-      scopes: scopes, // Use scopes from the token
-      isAdmin: isAdmin, // Use admin status derived from DB roles
-      isMachine: isMachine, // Use machine status derived from JWT payload
+    return {
+      userId: userId || payload.sub || '',
+      roles: permissions.roles,
+      isAdmin: permissions.isAdmin,
+      scopes: payload.scopes ?? [],
+      isMachine,
       handle: payload.handle,
       email: payload.email,
-      payload: payload,
+      payload,
     };
-
-    this.logger.debug(
-      `[JwtStrategy] Constructed AuthenticatedUser object: ${JSON.stringify(authenticatedUser)}`,
-    ); // Log the final object
-
-    // 4. Store the result in cache
-    try {
-      // Create a cacheable version without the potentially large payload
-      const { payload: _, ...cacheableUser } = authenticatedUser;
-      void _;
-      await this.cacheManager.set(
-        cacheKey,
-        cacheableUser,
-        this.cacheTtlSeconds * 1000,
-      ); // TTL in milliseconds
-      this.logger.debug(
-        `Stored auth data for user ${userId} in cache (excluding payload).`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error writing auth cache for user ${userId}: ${error.message}`,
-        error.stack,
-      );
-      // Continue even if caching fails
-    }
-
-    this.logger.debug(
-      '[JwtStrategy] --- Exiting validate method successfully ---',
-    ); // Log successful exit
-    return authenticatedUser; // Return the full object for the current request
   }
 
   /**

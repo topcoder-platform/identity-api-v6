@@ -78,15 +78,12 @@ export class CommonUtils {
     validIssuers: string[],
     secret: string,
   ): Promise<Record<string, any>> {
-    const validator = tokenValidator.auth.verifier(validIssuers);
-    return new Promise((resolve, reject) => {
-      validator.validateToken(token, secret, (err, decoded) => {
-        if (err) {
-          return reject(new Error(err));
-        }
-        resolve(decoded);
-      });
-    });
+    return tokenValidator.createJwtVerifier({
+      VALID_ISSUERS: validIssuers,
+      AUTH_SECRET: secret,
+      AUTH0_AUDIENCE: process.env.AUTH0_AUDIENCE,
+      JWT_AUDIENCE: process.env.JWT_AUDIENCE,
+    }).verify(token);
   }
 
   static pick<T>(obj: T, keys: string[]) {
