@@ -53,7 +53,6 @@ export interface AuthenticatedUser {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private readonly logger = new Logger(JwtStrategy.name);
-  private readonly validationMode: string;
   private readonly verifier: JwtVerifier;
   private readonly cacheTtlSeconds: number;
 
@@ -64,29 +63,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @Inject(CACHE_MANAGER) private cacheManager: Cache, // Re-add Inject Cache Manager
   ) {
     super();
-    const algorithm = configService.get<string>('JWT_VALIDATION_MODE', 'RS256');
-    if (algorithm !== 'HS256' && algorithm !== 'RS256') throw new Error('Invalid JWT validation mode');
-    const audience = configService.get<string>('JWT_AUDIENCE');
-    this.verifier = createJwtVerifier({ issuers: [{
-      issuer: configService.get<string>('JWT_ISSUER_URL') || '',
-      algorithm,
-      secret: configService.get<string>('AUTH_SECRET'),
-      jwksUri: configService.get<string>('JWT_JWKS_URI'),
-      audience,
-      allowMissingAudience: algorithm === 'HS256' && !audience,
-    }] });
-    this.validationMode = configService.get<string>(
-      'JWT_VALIDATION_MODE',
-      'RS256',
-    );
+    this.verifier = createJwtVerifier({
+      VALID_ISSUERS: configService.get<string>('VALID_ISSUERS'),
+      AUTH_SECRET: configService.get<string>('AUTH_SECRET'),
+      JWT_AUDIENCE: configService.get<string>('JWT_AUDIENCE'),
+      AUTH0_AUDIENCE: configService.get<string>('AUTH0_AUDIENCE'),
+    });
     // Default cache TTL to 1 hour (3600 seconds), allow override via env
     this.cacheTtlSeconds = parseInt(
       configService.get<string>('AUTH_CACHE_TTL_SECONDS', '3600'),
       10,
     );
-    this.logger.log(
-      `Initialized JWT Strategy with mode: ${this.validationMode}`,
-    );
+    this.logger.log('Initialized shared JWT issuer and audience policies');
     this.logger.log(`Auth cache TTL set to ${this.cacheTtlSeconds} seconds.`);
   }
 
