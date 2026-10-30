@@ -1,3 +1,5 @@
+import { verifySignedJwt } from 'tc-core-library-js';
+jest.mock('tc-core-library-js', () => ({ ...jest.requireActual('tc-core-library-js'), verifySignedJwt: jest.fn() }));
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   TwoFactorAuthService,
@@ -719,7 +721,7 @@ describe('TwoFactorAuthService', () => {
     });
 
     beforeEach(() => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: userIdStr,
         aud: OTP_2FA_AUDIENCE,
       });
@@ -731,7 +733,7 @@ describe('TwoFactorAuthService', () => {
     });
 
     it('should throw BadRequestException if TokenExpiredError occurs', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new jwt.TokenExpiredError('expired test');
       });
       await expect(service.resendOtpEmailFor2fa(token)).rejects.toThrow(
@@ -745,7 +747,7 @@ describe('TwoFactorAuthService', () => {
     });
 
     it('should throw BadRequestException for other jwt.verify errors', async () => {
-      (jwt.verify as jest.Mock).mockImplementation(() => {
+      (verifySignedJwt as jest.Mock).mockImplementation(() => {
         throw new Error('generic verify error');
       });
       await expect(service.resendOtpEmailFor2fa(token)).rejects.toThrow(
@@ -754,14 +756,14 @@ describe('TwoFactorAuthService', () => {
     });
 
     it('should throw BadRequestException if userId (sub) not in decoded payload', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({ aud: OTP_2FA_AUDIENCE }); // No 'sub'
+      (verifySignedJwt as jest.Mock).mockReturnValue({ aud: OTP_2FA_AUDIENCE }); // No 'sub'
       await expect(service.resendOtpEmailFor2fa(token)).rejects.toThrow(
         new BadRequestException('User ID not found in resend token payload.'),
       );
     });
 
     it('should throw BadRequestException if userId in token is NaN', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: 'abc',
         aud: OTP_2FA_AUDIENCE,
       });
@@ -793,7 +795,7 @@ describe('TwoFactorAuthService', () => {
 
     it('should throw NotFoundException if user not found for final response (after successful OTP ops)', async () => {
       // Setup for successful OTP operations
-      (jwt.verify as jest.Mock).mockReturnValue({
+      (verifySignedJwt as jest.Mock).mockReturnValue({
         sub: userIdStr,
         aud: OTP_2FA_AUDIENCE,
       });

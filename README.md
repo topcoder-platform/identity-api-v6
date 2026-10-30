@@ -51,7 +51,7 @@ user.
 1. Configure Environment
 ```bash
 cp .env.sample .env
-# update `AUTH_SECRET` to `ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP`
+# set AUTH_SECRET to the existing dev signing secret from Parameter Store
 # update `AUTH0_CLIENT_SECRET` to `ldzqVaVEbqhwjM5KtZ79sG8djZpAVK8Z7qieVcC3vRjI4NirgcinKSBpPwk6mYYP`
 # update `AUTH0_CLIENT_ID` to `jGIf2pd3f44B1jqvOai30BIKTZanYBfU`
 # update `LEGACY_BLOWFISH_KEY` to `dGhpc2lzRGVmYXVmZlZhbHVl`
@@ -118,11 +118,10 @@ The following table summarizes the environment variables used by the application
 | `REDIS_HOST`               | Hostname for the Redis cache instance                                       | `127.0.0.1`                   |
 | `REDIS_PORT`               | Port for the Redis cache instance                                           | `6380`                        |
 |                            | **JWT Validation**                                                          |                               |
-| `JWT_VALIDATION_MODE`      | Validation mode: `HS256` (local) or `RS256` (prod/staging)                  | `HS256`                       |
-| `AUTH_SECRET`              | Secret key for HS256 token generation/validation (local only). **CHANGE THIS!** | `<<<REPLACE WITH A REAL SECRET KEY>>>` |
-| `JWT_ISSUER_URL`           | Expected issuer URL in JWTs                                                 | `https://api.topcoder-dev.com` |
-| `JWT_AUDIENCE`             | Expected audience in JWTs                                                   | `www.example.com`             |
-| `JWT_JWKS_URI`             | JWKS endpoint URI for RS256 validation (prod/staging only)                  | *(commented out)*             |
+| `AUTH_SECRET` | Existing shared HS256 signing key, at least 32 UTF-8 bytes | Required for legacy human tokens |
+| `JWT_AUDIENCE` | Browser/application RSA audience | `BXWXUWnilVUPdN01t2Se29Tw2ZYNGZvH` in dev |
+| `AUTH0_AUDIENCE` | Machine/API RSA audience | `https://m2m.topcoder-dev.com/` in dev |
+| `VALID_ISSUERS` | Exact issuer allowlist, as JSON array or comma-separated string | Shared dev Parameter Store value |
 |                            | **Slack Integration**                                                       |                               |
 | `SLACK_BOT_KEY`            | Bot token for Slack API authentication.                                         | `xoxb-3858018789-...` (example)             |
 | `SLACK_CHANNEL_ID`         | Default Slack channel ID for sending notifications.                             | `C04ENKCU4TZ` (example)                     |
@@ -222,3 +221,60 @@ Swagger: when running locally, the Identity API docs are available at `http://lo
 Notes:
 - Endpoints above are intentionally callable by Auth0 without a bearer token and are documented in the code (`identity-api-v6/src/api/user/user.controller.ts`).  These endpoints are restricted to only Auth0 IP addresses
 - Roles added to JWTs are then consumed by apps like Work Manager and Community App to gate features, as well as all services, to validate user access to specific functionality.
+
+## Shared authentication and bus client (v6 refresh)
+
+This branch uses `tc-core-library-js` **4.0.0-rc.1**. Use its named
+`createJwtVerifier` / `createJwtAuthenticator`, `createM2MClient`, and
+`createBusApiClient` exports for shared authentication and bus API publishing.
+Service-specific roles, scopes, sessions and ownership checks remain in this service.
+The former bus wrapper dependency and local JWT cryptography must not be reintroduced.
+
+RSA verification requires an exact configured issuer and audience (`JWT_AUDIENCE`
+for client tokens, `AUTH0_AUDIENCE` for machine/API tokens, or this service's explicit
+issuer-policy settings). HMAC secrets must be at least 32 bytes; no default secret
+is supplied. Expiry is enforced. Machine identity comes from the shared verifier,
+not the presence of scopes. Supply real development credentials through the service's
+existing environment configuration before deployment.
+
+Bus publishers use `createBusApiClient(config).postEvent(event)` with the existing
+event envelope and optional key. Configure `BUSAPI_URL` for v6 and the existing
+OAuth credentials/token provider. The client uses bounded HTTPS requests and does
+not retry POSTs automatically. Application retry/outbox behavior remains local.
+
+See the [core migration guide](https://github.com/topcoder-platform/tc-core-library-js/blob/v4.0.0-rc.1/MIGRATION.md)
+for the API mapping, compatibility requirements, and rollout scope.
+
+## Alpine Node runtime packages
+
+Container stages that install Node through APK constrain `nodejs-current` to the
+major version in `NODE_VERSION`, rather than an exact Alpine package revision.
+Alpine replaces older patch packages in its repositories; the compatible pin
+allows current security patches while a build-time check rejects a different
+Node major. The runtime keeps Alpine's dynamically linked Node and system
+libraries. Existing non-root users and application entrypoints are preserved.
+Build stages using a versioned official Node image retain their configured
+version, and pnpm build arguments are explicitly declared in the consuming stage.
+
+## Shared JWT deployment configuration
+
+Development deployments load `/config/common/global-appvar` alongside the service's
+application parameters. JWT verification uses the same four settings as the other
+v6 services: `VALID_ISSUERS` (JSON array or comma-separated exact issuers),
+`AUTH_SECRET` (the existing shared HS256 signing key, at least 32 UTF-8 bytes),
+`JWT_AUDIENCE` (the browser application's audience), and `AUTH0_AUDIENCE` (the
+machine/API audience). RSA keys are fetched over HTTPS from the trusted issuer's
+`/.well-known/jwks.json`. Audience settings must reach the shared verifier; OAuth
+client IDs/secrets used for outbound requests are independent of JWT audiences.
+
+The development browser audience is `BXWXUWnilVUPdN01t2Se29Tw2ZYNGZvH`, and the
+machine audience is `https://m2m.topcoder-dev.com/`. Use the existing Parameter Store
+secret rather than creating a per-service key. Reconcile any service-specific
+overrides of these four keys with the global values before deployment. Parameters
+are consumed on deployment/task startup; changing Parameter Store alone does not
+replace running tasks. Existing role, scope, ownership and active-session checks
+continue after JWT verification.
+
+Passport and middleware both use these common settings. `JWT_VALIDATION_MODE`,
+`JWT_ISSUER_URL`, and `JWT_JWKS_URI` no longer select a separate access-token policy.
+Internal purpose-bound signing keys such as `JWT_SECRET` retain their existing use.

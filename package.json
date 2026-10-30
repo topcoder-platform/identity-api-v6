@@ -53,7 +53,6 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
     "@prisma/client": "^6.19.3",
-    "@topcoder-platform/topcoder-bus-api-wrapper": "github:topcoder-platform/tc-bus-api-wrapper",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.2",
     "cache-manager": "^6.4.3",
@@ -72,14 +71,14 @@
     "jwks-rsa": "^3.2.0",
     "lodash": "^4.18.1",
     "passport": "^0.7.0",
-    "passport-jwt": "^4.0.1",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
-    "tc-core-library-js": "github:topcoder-platform/tc-core-library-js#master",
+    "tc-core-library-js": "github:topcoder-platform/tc-core-library-js#v4.0.0-rc.1",
     "trolleyhq": "^1.1.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "passport-custom": "^1.1.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

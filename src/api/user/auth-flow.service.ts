@@ -1,3 +1,4 @@
+import { verifySignedJwt } from 'tc-core-library-js';
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { isBefore, addMinutes, addSeconds } from 'date-fns';
 import { format } from 'date-fns-tz';
@@ -95,6 +96,7 @@ export class AuthFlowService {
     return otp;
   }
 
+  /** Verifies the audience- and user-bound resend proof through tc-core, then activates the supplied user; throws on invalid proof/OTP. */
   async activateUser(activateDto: ActivateUserBodyDto): Promise<any> {
     const { userId, otp, resendToken } = activateDto.param;
     this.logger.log(`Attempting to activate user ID: ${userId} with OTP`);
@@ -107,7 +109,7 @@ export class AuthFlowService {
 
     let decodedJwtPayload: jwt.JwtPayload;
     try {
-      decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
+      decodedJwtPayload = verifySignedJwt(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
         userId: userId,
       }) as jwt.JwtPayload;
@@ -274,7 +276,7 @@ export class AuthFlowService {
 
     let decodedJwtPayload: jwt.JwtPayload;
     try {
-      decodedJwtPayload = jwt.verify(resendToken, this.jwtSecret, {
+      decodedJwtPayload = verifySignedJwt(resendToken, this.jwtSecret, {
         audience: OTP_ACTIVATION_JWT_AUDIENCE,
         userId: userId,
       }) as jwt.JwtPayload;
@@ -484,7 +486,7 @@ export class AuthFlowService {
     // 1. Validate JWT (signature, expiry, audience, subject)
     let decodedPayload: jwt.JwtPayload;
     try {
-      decodedPayload = jwt.verify(token, this.jwtSecret, {
+      decodedPayload = verifySignedJwt(token, this.jwtSecret, {
         audience: ONE_TIME_TOKEN_JWT_AUDIENCE,
       }) as jwt.JwtPayload;
       if (decodedPayload.sub !== userId.toString()) {
