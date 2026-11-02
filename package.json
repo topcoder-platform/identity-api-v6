@@ -40,7 +40,8 @@
     "test:postman:roles": "newman run 'doc/roles api.postman_collection.json' -e doc/postman_environment.json -r cli,json --reporter-json-export roles-report.json",
     "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json",
     "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json",
-    "test:postman:authorization": "newman run --ignore-redirects \"doc/authorizations.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export authorizations-report.json"
+    "test:postman:authorization": "newman run --ignore-redirects \"doc/authorizations.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export authorizations-report.json",
+    "test:dependency-compat": "node --test tools/minimatch-compat/index.test.cjs"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.0",
@@ -53,7 +54,7 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
     "@prisma/client": "^6.19.3",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "bcryptjs": "^3.0.2",
     "cache-manager": "^6.4.3",
     "cache-manager-ioredis": "^2.1.0",

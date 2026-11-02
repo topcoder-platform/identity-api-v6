@@ -1,0 +1,13 @@
+diff --git a/lib/run/options.js b/lib/run/options.js
+index 19c876ce2ae4c0bfb388f53e9839eae6b8cbd9b0..074f2e1b728970692942f4aa971d203197b00b1f 100644
+--- a/lib/run/options.js
++++ b/lib/run/options.js
+@@ -6,7 +6,7 @@ var _ = require('lodash'),
+     CookieJar = require('@postman/tough-cookie').CookieJar,
+     transformer = require('postman-collection-transformer'),
+     liquidJSON = require('liquid-json'),
+-    parseCsv = require('csv-parse'),
++    parseCsv = require('csv-parse').parse,
+     util = require('../util'),
+     config = require('../config'),
+ 

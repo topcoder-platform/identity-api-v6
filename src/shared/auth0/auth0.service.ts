@@ -1,6 +1,5 @@
 import { verifySignedJwt } from 'tc-core-library-js';
 import { HttpService } from '@nestjs/axios';
-import * as jwt from 'jsonwebtoken';
 import {
   HttpStatus,
   Injectable,
@@ -11,7 +10,6 @@ import { firstValueFrom } from 'rxjs';
 import { Auth0Credential } from 'src/dto/authorization/authorization.dto';
 import { CommonUtils } from '../util/common.utils';
 import { ConfigurationService } from '../../config/configuration.service';
-import { Constants } from '../../core/constant/constants';
 
 @Injectable()
 export class Auth0Service {
