@@ -162,8 +162,8 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(express@5.2.1(supports-color@8.1.1))
       tc-core-library-js:
-        specifier: github:topcoder-platform/tc-core-library-js#v4.0.0-rc.1
-        version: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/6c326fea0abfccb5ae29dff2ac5bce01aabc1fa4(supports-color@8.1.1)
+        specifier: github:topcoder-platform/tc-core-library-js#v4.0.0-rc.2
+        version: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/58de37670180e183e8378c3d203df0112a0414f6(supports-color@8.1.1)
       trolleyhq:
         specifier: ^1.1.0
         version: 1.1.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
@@ -4023,9 +4023,9 @@ packages:
   tar-stream@3.1.7:
     resolution: {integrity: sha512-qJj60CXt7IU1Ffyc3NJMjh6EkuCFej46zUqJ4J7pqYlThyd9bO0XBTmcOIhSzZJVWfsLks0+nle/j538YAW9RQ==}
 
-  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/6c326fea0abfccb5ae29dff2ac5bce01aabc1fa4:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/6c326fea0abfccb5ae29dff2ac5bce01aabc1fa4}
-    version: 4.0.0-rc.1
+  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/58de37670180e183e8378c3d203df0112a0414f6:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/58de37670180e183e8378c3d203df0112a0414f6}
+    version: 4.0.0-rc.2
     engines: {node: '>=22.13'}
 
   teleport-javascript@1.0.0:
@@ -8660,7 +8660,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/6c326fea0abfccb5ae29dff2ac5bce01aabc1fa4(supports-color@8.1.1):
+  tc-core-library-js@https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/58de37670180e183e8378c3d203df0112a0414f6(supports-color@8.1.1):
     dependencies:
       '@types/jsonwebtoken': 9.0.10
       jsonwebtoken: 9.0.3
