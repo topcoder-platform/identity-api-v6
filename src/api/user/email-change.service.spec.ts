@@ -18,13 +18,13 @@ describe('EmailChangeService', () => {
   let service: EmailChangeService;
   const cache = new Map<string, unknown>();
   const cacheManager = {
-    del: jest.fn(async (key: string) => {
+    del: jest.fn((key: string) => Promise.resolve().then(() => {
       cache.delete(key);
-    }),
-    get: jest.fn(async (key: string) => cache.get(key)),
-    set: jest.fn(async (key: string, value: unknown) => {
+    })),
+    get: jest.fn((key: string) => Promise.resolve().then(() => cache.get(key))),
+    set: jest.fn((key: string, value: unknown) => Promise.resolve().then(() => {
       cache.set(key, value);
-    }),
+    })),
   };
   const eventService = {
     postDirectBusMessage: jest.fn().mockResolvedValue(undefined),
