@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Isolated RSA key for Topcoder access tokens; private key stays in KMS.
+Parameters:
+  IdentityTaskRoleArn:
+    Type: String
+    Description: Dedicated Identity ECS task role; must not be shared with API verifiers.
+    AllowedPattern: 'arn:aws:iam::[0-9]{12}:role/.+'
+  KeyAdministratorArn:
+    Type: String
+    Description: Stable administration IAM role ARN (not an STS session ARN).
+    AllowedPattern: 'arn:aws:iam::[0-9]{12}:role/.+'
+Resources:
+  SigningKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Topcoder Identity access-token signing key
+      KeySpec: RSA_2048
+      KeyUsage: SIGN_VERIFY
+      PendingWindowInDays: 30
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AdministerKeyWithoutSigning
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref KeyAdministratorArn
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action:
+              - kms:DescribeKey
+              - kms:GetKeyPolicy
+              - kms:PutKeyPolicy
+              - kms:EnableKey
+              - kms:DisableKey
+              - kms:UpdateKeyDescription
+              - kms:ScheduleKeyDeletion
+              - kms:CancelKeyDeletion
+              - kms:ListResourceTags
+              - kms:TagResource
+              - kms:UntagResource
+            Resource: '*'
+          - Sid: IdentityReadsPublicKey
+            Effect: Allow
+            Principal:
+              AWS: !Ref IdentityTaskRoleArn
+            Action: kms:GetPublicKey
+            Resource: '*'
+          - Sid: IdentitySignsAccessTokens
+            Effect: Allow
+            Principal:
+              AWS: !Ref IdentityTaskRoleArn
+            Action: kms:Sign
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:SigningAlgorithm: RSASSA_PKCS1_V1_5_SHA_256
+          - Sid: NoOtherPrincipalCanSign
+            Effect: Deny
+            Principal: '*'
+            Action: kms:Sign
+            Resource: '*'
+            Condition:
+              ArnNotEquals:
+                aws:PrincipalArn: !Ref IdentityTaskRoleArn
+Outputs:
+  SigningKeyArn:
+    Description: Set ACCESS_TOKEN_KMS_KEY_ARN to this immutable key ARN.
+    Value: !GetAtt SigningKey.Arn

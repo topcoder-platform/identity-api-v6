@@ -31,6 +31,7 @@ import { PrismaClient } from '@prisma/client';
 import { UserProfileHelper } from './user-profile.helper';
 import { ProviderTypes } from '../../core/constant/provider-type.enum';
 import { ConfigurationService } from '../../config/configuration.service';
+import { AccessTokenSigner } from './access-token-signer.service';
 import { Constants } from '../../core/constant/constants';
 
 const tcRedirectDomains = [
@@ -69,6 +70,7 @@ export class AuthorizationService {
     @Inject(PRISMA_CLIENT)
     private readonly prismaClient: PrismaClient,
     private readonly userProfileHelper: UserProfileHelper,
+    private readonly accessTokenSigner: AccessTokenSigner,
   ) {
     this.cookieExpirySeconds =
       this.config.getAuthorizationService().cookieExpirySeconds;
@@ -694,14 +696,7 @@ export class AuthorizationService {
       exp: expSeconds,
       jti: uuidv4(),
     };
-    const options = {
-      algorithm: Constants.jwtHs256Algorithm,
-    };
-    const token = CommonUtils.generateJwt(
-      payload,
-      this.config.getCommon().authSecret,
-      options,
-    );
+    const token = await this.accessTokenSigner.sign(payload);
     auth.token = token;
     auth.target = Constants.defaultTargetId;
     return auth;
@@ -794,14 +789,7 @@ export class AuthorizationService {
       await this.storeAuthRefreshLogToCache(userId, user);
     }
 
-    const options = {
-      algorithm: Constants.jwtHs256Algorithm,
-    };
-    return CommonUtils.generateJwt(
-      payload,
-      this.config.getCommon().authSecret,
-      options,
-    );
+    return this.accessTokenSigner.sign(payload);
   }
 
   private async storeAuthRefreshLogToCache(userId: number, user) {
