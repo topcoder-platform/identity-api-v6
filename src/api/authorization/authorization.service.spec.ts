@@ -1,3 +1,4 @@
+import { AccessTokenSigner } from './access-token-signer.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -110,6 +111,17 @@ describe('AuthorizationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthorizationService,
+        {
+          provide: AccessTokenSigner,
+          useValue: {
+            sign: (payload: Record<string, unknown>) =>
+              CommonUtils.generateJwt(
+                payload,
+                mockConfigService.getCommon().authSecret,
+                { algorithm: 'HS256' },
+              ),
+          },
+        },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: Auth0Service, useValue: mockAuth0Service },
         { provide: UserService, useValue: mockUserService },
@@ -225,7 +237,7 @@ describe('AuthorizationService', () => {
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
       const authorizeUrl = new URL(mockRes.redirect.mock.calls[0][1]);
       const callbackUrl = new URL(
-        authorizeUrl.searchParams.get('redirect_uri')!,
+        authorizeUrl.searchParams.get('redirect_uri'),
       );
       expect(callbackUrl.searchParams.get('redirectUrl')).toBe(
         'https://www.topcoder.com/',
@@ -368,7 +380,7 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.cookie).toHaveBeenCalledTimes(2);
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        new URL(dto.redirectUrl!).toString(),
+        new URL(dto.redirectUrl).toString(),
       );
     });
   });
