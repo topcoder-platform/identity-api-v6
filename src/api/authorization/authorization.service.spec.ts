@@ -235,7 +235,7 @@ describe('AuthorizationService', () => {
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
       const authorizeUrl = new URL(mockRes.redirect.mock.calls[0][1]);
       const callbackUrl = new URL(
-        authorizeUrl.searchParams.get('redirect_uri')!,
+        authorizeUrl.searchParams.get('redirect_uri'),
       );
       expect(callbackUrl.searchParams.get('redirectUrl')).toBe(
         'https://www.topcoder.com/',
@@ -378,7 +378,7 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.cookie).toHaveBeenCalledTimes(2);
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        new URL(dto.redirectUrl!).toString(),
+        new URL(dto.redirectUrl).toString(),
       );
     });
   });
