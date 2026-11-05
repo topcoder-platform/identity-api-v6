@@ -8,6 +8,7 @@ import {
   forwardRef,
   BadRequestException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -2488,6 +2489,16 @@ export class UserService {
       // Match Java's approach - same exception type for both cases
       throw new BadRequestException("userId doesn't exist."); // Exact Java message
     }
+    if (
+      user.status !== 'A' ||
+      Number((user as any).primaryEmailStatusId) !==
+        Constants.verifiedEmailStatus
+    ) {
+      throw new ForbiddenException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Activate your account before logging in.',
+      });
+    }
     const securityUserRecord = await this.prismaClient.security_user.findUnique(
       {
         where: { user_id: user.handle },
@@ -2716,7 +2727,7 @@ export class UserService {
             from: { email: fromEmail },
             version: 'v3',
             sendgrid_template_id: welcomeTemplateId,
-            recipients: [emailAddress],           
+            recipients: [emailAddress],
           };
           await this.eventService.postDirectBusMessage(
             'external.action.email',

@@ -1,5 +1,8 @@
 import { verifySignedJwt } from 'tc-core-library-js';
-jest.mock('tc-core-library-js', () => ({ ...jest.requireActual('tc-core-library-js'), verifySignedJwt: jest.fn() }));
+jest.mock('tc-core-library-js', () => ({
+  ...jest.requireActual('tc-core-library-js'),
+  verifySignedJwt: jest.fn(),
+}));
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthFlowService } from './auth-flow.service';
 import { ConfigService } from '@nestjs/config';
@@ -331,9 +334,13 @@ describe('AuthFlowService', () => {
 
     it('should activate a user successfully and send welcome email', async () => {
       const result = await service.activateUser(activateDto);
-      expect(verifySignedJwt).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
-        audience: OTP_ACTIVATION_JWT_AUDIENCE,
-      });
+      expect(verifySignedJwt).toHaveBeenCalledWith(
+        resendToken,
+        'test-jwt-secret',
+        {
+          audience: OTP_ACTIVATION_JWT_AUDIENCE,
+        },
+      );
       expect(cacheManager.get).toHaveBeenCalledWith(
         `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`,
       );
@@ -487,9 +494,13 @@ describe('AuthFlowService', () => {
 
     it('should resend activation email successfully', async () => {
       const result = await service.requestResendActivation(resendDto);
-      expect(verifySignedJwt).toHaveBeenCalledWith(resendToken, 'test-jwt-secret', {
-        audience: OTP_ACTIVATION_JWT_AUDIENCE,
-      });
+      expect(verifySignedJwt).toHaveBeenCalledWith(
+        resendToken,
+        'test-jwt-secret',
+        {
+          audience: OTP_ACTIVATION_JWT_AUDIENCE,
+        },
+      );
       expect(prismaOltp.user.findUnique).toHaveBeenCalledWith({
         where: { user_id: userId },
       });
@@ -903,10 +914,60 @@ describe('AuthFlowService', () => {
       prismaOltp.user.findFirst.mockResolvedValue(mockUserRecord); // For handle lookup
       prismaOltp.user.findUnique.mockResolvedValue(mockUserRecord); // For email->userId->user lookup
       prismaOltp.email.findFirst
-        .mockResolvedValueOnce(mockPrimaryEmail) // For initial email lookup if identifier is email
-        .mockResolvedValueOnce(mockPrimaryEmail); // For attaching primary email
+        .mockReset()
+        .mockResolvedValue(mockPrimaryEmail);
       prismaOltp.security_user.findUnique.mockResolvedValue(mockSecurityUser);
       roleService.findAll.mockResolvedValue(mockRoles);
+    });
+
+    it.each(['handle', 'email'])(
+      'rejects unverified login by %s after checking the password',
+      async (identifier) => {
+        prismaOltp.user.findFirst.mockResolvedValue({
+          ...mockUserRecord,
+          status: 'U',
+        });
+        prismaOltp.user.findUnique.mockResolvedValue({
+          ...mockUserRecord,
+          status: 'U',
+        });
+        mockVerifyLegacyPassword.mockReturnValue(true);
+        await expect(
+          service.authenticateForAuth0(
+            identifier === 'email' ? email : handle,
+            passwordPlain,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'EMAIL_VERIFICATION_REQUIRED' },
+        });
+        expect(roleService.findAll).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([null, 0, 2])(
+      'rejects active accounts with unverified or missing primary email (%s)',
+      async (status) => {
+        prismaOltp.email.findFirst.mockReset().mockResolvedValue(
+          status === null
+            ? null
+            : {
+                ...mockPrimaryEmail,
+                status_id: new Decimal(status),
+              },
+        );
+        mockVerifyLegacyPassword.mockReturnValue(true);
+        await expect(
+          service.authenticateForAuth0(handle, passwordPlain),
+        ).rejects.toThrow(ForbiddenException);
+        expect(roleService.findAll).not.toHaveBeenCalled();
+      },
+    );
+
+    it('allows an active account with verified email', async () => {
+      mockVerifyLegacyPassword.mockReturnValue(true);
+      await expect(
+        service.authenticateForAuth0(handle, passwordPlain),
+      ).resolves.toMatchObject({ emailActive: true, active: true });
     });
 
     it('should throw UnauthorizedException for user not found (by handle)', async () => {
@@ -915,11 +976,11 @@ describe('AuthFlowService', () => {
         service.authenticateForAuth0('unknownHandle', passwordPlain),
       ).rejects.toThrow(UnauthorizedException);
     });
-    it('should throw UnauthorizedException for user not found (by email)', () => {
+    it('should throw UnauthorizedException for user not found (by email)', async () => {
       prismaOltp.email.findFirst.mockResolvedValueOnce(null); // Email not found
-      expect(
+      await expect(
         service.authenticateForAuth0('unknown@example.com', passwordPlain),
-      );
+      ).rejects.toThrow(UnauthorizedException);
     });
     it('should throw UnauthorizedException for deactivated account', async () => {
       prismaOltp.user.findFirst.mockResolvedValue({
@@ -976,8 +1037,15 @@ describe('AuthFlowService', () => {
       prismaOltp.user.findFirst.mockResolvedValue(mockUser); // For handle lookup
       prismaOltp.user.findUnique.mockResolvedValue(mockUser); // For email->userId->user lookup
       prismaOltp.email.findFirst
-        .mockResolvedValueOnce(mockPrimaryEmail) // For initial email lookup if identifier is email
-        .mockResolvedValueOnce(mockPrimaryEmail); // For attaching primary email
+        .mockReset()
+        .mockResolvedValue(mockPrimaryEmail);
+      (prismaOltp as any).user_otp_email = {
+        findFirst: jest.fn().mockResolvedValue({
+          fail_count: 0,
+          expire_at: new Date(Date.now() + 60000),
+          resend: false,
+        }),
+      };
       roleService.findAll.mockResolvedValue(mockRoles);
       userService.generateSSOToken.mockResolvedValue(mockTcssoToken);
       (jwt.sign as jest.Mock).mockReturnValue(mockResendActivationToken);
@@ -985,22 +1053,28 @@ describe('AuthFlowService', () => {
 
     it('should return user profile with tcsso for an active user', async () => {
       const profile = await service.getUserProfileForAuth0(handle);
-      expect(profile.userId).toBe(userId.toString());
+      expect(profile.id).toBe(userId.toString());
       expect(profile.handle).toBe(handle);
       expect(profile.email).toBe(email);
-      expect(profile.roles).toEqual(['User']);
-      expect(profile.tcsso).toBe(mockTcssoToken);
+      expect(profile.roles).toEqual(mockRoles);
+      expect(profile.regSource).toBe(mockTcssoToken);
       expect(profile.status).toBe('A');
-      expect(profile.resendToken).toBeUndefined();
+      expect(profile.credential.resendToken).toBeNull();
     });
     it('should return user profile with resendToken for an unverified user (U)', async () => {
       prismaOltp.user.findFirst.mockResolvedValue({ ...mockUser, status: 'U' });
       const profile = await service.getUserProfileForAuth0(handle);
       expect(profile.status).toBe('U');
-      expect(profile.resendToken).toBe(mockResendActivationToken);
-      expect(profile.canResendActivation).toBe(true);
+      expect(profile.regSource).toBeNull();
+      expect(userService.generateSSOToken).not.toHaveBeenCalled();
+      expect(profile.credential.resendToken).toBe(mockResendActivationToken);
+      expect(profile.credential.canResend).toBe(true);
       expect(jwt.sign).toHaveBeenCalledWith(
-        { sub: userId.toString(), aud: OTP_ACTIVATION_JWT_AUDIENCE },
+        {
+          sub: userId.toString(),
+          userId: userId.toString(),
+          aud: OTP_ACTIVATION_JWT_AUDIENCE,
+        },
         'test-jwt-secret',
         { expiresIn: `${(service as any).activationResendExpirySeconds}s` },
       );
