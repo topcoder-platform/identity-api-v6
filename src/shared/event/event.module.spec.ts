@@ -4,11 +4,11 @@ import { Logger } from '@nestjs/common';
 import { EventModule } from './event.module';
 import { EventService } from './event.service';
 import { BUS_API_CLIENT } from './event.constants';
-import busApi from '@topcoder-platform/topcoder-bus-api-wrapper';
+import { createBusApiClient as busApi } from 'tc-core-library-js';
 
 // Mock the external bus API
-jest.mock('@topcoder-platform/topcoder-bus-api-wrapper');
-const mockBusApi = busApi;
+jest.mock('tc-core-library-js', () => ({ createBusApiClient: jest.fn() }));
+const mockBusApi = busApi as jest.Mock;
 
 describe('EventModule', () => {
   let module: TestingModule;

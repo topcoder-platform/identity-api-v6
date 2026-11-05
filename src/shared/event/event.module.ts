@@ -2,7 +2,7 @@ import { Module, Global, Provider } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventService } from './event.service';
-import busApi from '@topcoder-platform/topcoder-bus-api-wrapper';
+import { createBusApiClient as busApi } from 'tc-core-library-js';
 import { Logger } from '@nestjs/common';
 import { BUS_API_CLIENT } from './event.constants';
 

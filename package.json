@@ -40,7 +40,8 @@
     "test:postman:roles": "newman run 'doc/roles api.postman_collection.json' -e doc/postman_environment.json -r cli,json --reporter-json-export roles-report.json",
     "test:postman:users": "newman run doc/users.postman_collection.json -e doc/postman_environment.json -r cli,json --reporter-json-export users-report.json",
     "test:postman:group": "newman run \"doc/User GroupResource - Topcoder.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export GroupResource-report.json",
-    "test:postman:authorization": "newman run --ignore-redirects \"doc/authorizations.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export authorizations-report.json"
+    "test:postman:authorization": "newman run --ignore-redirects \"doc/authorizations.postman_collection.json\" -e doc/postman_environment.json -r cli,json --reporter-json-export authorizations-report.json",
+    "test:dependency-compat": "node --test tools/minimatch-compat/index.test.cjs"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.0",
@@ -53,8 +54,7 @@
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
     "@prisma/client": "^6.19.3",
-    "@topcoder-platform/topcoder-bus-api-wrapper": "github:topcoder-platform/tc-bus-api-wrapper",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "bcryptjs": "^3.0.2",
     "cache-manager": "^6.4.3",
     "cache-manager-ioredis": "^2.1.0",
@@ -72,14 +72,14 @@
     "jwks-rsa": "^3.2.0",
     "lodash": "^4.18.1",
     "passport": "^0.7.0",
-    "passport-jwt": "^4.0.1",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
-    "tc-core-library-js": "github:topcoder-platform/tc-core-library-js#master",
+    "tc-core-library-js": "github:topcoder-platform/tc-core-library-js#v4.0.0-rc.2",
     "trolleyhq": "^1.1.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "passport-custom": "^1.1.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

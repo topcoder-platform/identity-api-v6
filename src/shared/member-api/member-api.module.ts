@@ -3,7 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { MemberApiService } from './member-api.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager'; // Import CacheModule
-import m2mAuth from 'tc-core-library-js/lib/auth/m2m'; // Use default import
+import { createM2MClient as m2mAuth } from 'tc-core-library-js';
 import { Logger } from '@nestjs/common';
 import { M2M_AUTH_CLIENT } from './member-api.constants'; // Import from constants file
 

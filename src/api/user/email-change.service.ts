@@ -1,3 +1,4 @@
+import { verifySignedJwt } from 'tc-core-library-js';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
@@ -542,7 +543,7 @@ export class EmailChangeService {
     expiredMessage: string,
   ): EmailChangeJwtPayload {
     try {
-      return jwt.verify(token, this.jwtSecret, {
+      return verifySignedJwt(token, this.jwtSecret, {
         audience,
       }) as EmailChangeJwtPayload;
     } catch (error) {
