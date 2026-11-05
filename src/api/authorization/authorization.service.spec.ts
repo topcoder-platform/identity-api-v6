@@ -87,6 +87,14 @@ describe('AuthorizationService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockCacheManager.get.mockResolvedValue('state123');
+    mockAuth0Service.verifyToken.mockResolvedValue({
+      userId: 123,
+      email_verified: true,
+    });
+    mockUserService.findUserById.mockResolvedValue({
+      status: 'A',
+      primaryEmailStatusId: 1,
+    });
 
     parseHeaderSpy = jest
       .spyOn(CommonUtils, 'parseJWTHeader')
@@ -98,6 +106,8 @@ describe('AuthorizationService', () => {
       .mockImplementation(() => {
         return {
           iss: 'https://api.test.com',
+          userId: 123,
+          email_verified: true,
         };
       });
     jest.spyOn(CommonUtils, 'verifyJwtToken').mockResolvedValue({});
@@ -225,7 +235,7 @@ describe('AuthorizationService', () => {
       expect(mockRes.redirect.mock.calls[0][0]).toEqual(302);
       const authorizeUrl = new URL(mockRes.redirect.mock.calls[0][1]);
       const callbackUrl = new URL(
-        authorizeUrl.searchParams.get('redirect_uri')!,
+        authorizeUrl.searchParams.get('redirect_uri'),
       );
       expect(callbackUrl.searchParams.get('redirectUrl')).toBe(
         'https://www.topcoder.com/',
@@ -368,7 +378,7 @@ describe('AuthorizationService', () => {
       expect(mockCacheManager.set).toHaveBeenCalled();
       expect(mockRes.cookie).toHaveBeenCalledTimes(2);
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        new URL(dto.redirectUrl!).toString(),
+        new URL(dto.redirectUrl).toString(),
       );
     });
   });
@@ -398,6 +408,7 @@ describe('AuthorizationService', () => {
       mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
+        primaryEmailStatusId: 1,
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
@@ -421,11 +432,12 @@ describe('AuthorizationService', () => {
       mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
+        primaryEmailStatusId: 1,
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
       mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
-      (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
+      (CommonUtils.parseJWTHeader as jest.Mock).mockReturnValue({
         alg: 'HS256',
       });
 
@@ -452,11 +464,12 @@ describe('AuthorizationService', () => {
       mockUserProfileHelper.getUserIdByProfile.mockReturnValue(123);
       mockUserService.findUserById.mockResolvedValue({
         status: 'A',
+        primaryEmailStatusId: 1,
         handle: 'testuser',
         primaryEmailAddress: 'test@test.com',
       });
       mockPrisma.roleAssignment.findMany.mockResolvedValue([]);
-      (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValue({
+      (CommonUtils.parseJWTHeader as jest.Mock).mockReturnValue({
         alg: 'RS256',
       });
 
@@ -465,6 +478,83 @@ describe('AuthorizationService', () => {
       expect(result).toBeDefined();
       expect(result.token).toBeDefined();
       expect(mockAuthDataStore.put).toHaveBeenCalled();
+    });
+  });
+
+  describe('verification restrictions', () => {
+    const request = { headers: {}, get: () => 'test.com' } as any;
+    const response = () => ({ cookie: jest.fn(), redirect: jest.fn() }) as any;
+
+    it.each([undefined, false, 'true', 1])(
+      'rejects callback tokens without boolean verification (%s) before cookies/cache',
+      async (email_verified) => {
+        parseClaimsSpy.mockReturnValue({ userId: 123, email_verified });
+        mockAuth0Service.getToken.mockResolvedValue({
+          id_token: 'id-token',
+          access_token: 'access-token',
+          refresh_token: 'refresh',
+        });
+        const res = response();
+        await expect(
+          service.getTokenByAuthorizationCode(request, res, {
+            code: 'code',
+            state: 'state123',
+            redirectUrl: 'https://test.com',
+          }),
+        ).rejects.toMatchObject({
+          response: { code: 'EMAIL_VERIFICATION_REQUIRED' },
+        });
+        expect(res.cookie).not.toHaveBeenCalled();
+        expect(mockCacheManager.set).not.toHaveBeenCalled();
+        expect(mockUserService.generateSSOToken).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      { status: 'U', primaryEmailStatusId: 1 },
+      { status: 'A', primaryEmailStatusId: 0 },
+      { status: 'A' },
+    ])(
+      'rejects callback and refresh when persisted verification is absent: %j',
+      async (user) => {
+        mockUserService.findUserById.mockResolvedValue(user);
+        mockAuth0Service.getToken.mockResolvedValue({
+          id_token: 'id-token',
+          access_token: 'access-token',
+        });
+        mockAuth0Service.refreshToken.mockResolvedValue({
+          access_token: 'access-token',
+        });
+        const res = response();
+        await expect(
+          service.getTokenByAuthorizationCode(request, res, {
+            code: 'code',
+            state: 'state123',
+            redirectUrl: 'https://test.com',
+          }),
+        ).rejects.toThrow('Activate your account');
+        parseHeaderSpy.mockReturnValue({ alg: 'RS256' });
+        await expect(
+          service.createObject(request, res, {
+            externalToken: 'external',
+            refreshToken: 'refresh',
+          }),
+        ).rejects.toThrow('Activate your account');
+        expect(res.cookie).not.toHaveBeenCalled();
+        expect(mockAuthDataStore.put).not.toHaveBeenCalled();
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects an external Auth0 token without verification before profile resolution', async () => {
+      mockAuth0Service.verifyToken.mockResolvedValue({ email_verified: false });
+      await expect(
+        service.createObject(request, response(), {
+          externalToken: 'external',
+        }),
+      ).rejects.toThrow('Activate your account');
+      expect(mockUserProfileHelper.createProfile).not.toHaveBeenCalled();
+      expect(generateJwtSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -837,7 +927,7 @@ describe('AuthorizationService', () => {
         externalToken: 'ext-token',
         refreshToken: 'refresh-token',
       });
-      (CommonUtils.parseJWTHeader as jest.Mock).mockResolvedValueOnce({
+      (CommonUtils.parseJWTHeader as jest.Mock).mockReturnValueOnce({
         iss: 'https://another-test.com',
       });
 

@@ -1,3 +1,4 @@
+import { getClaim, hasVerifiedEmail } from 'tc-core-library-js';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
@@ -192,6 +193,8 @@ export class AuthorizationService {
       redirectUrl,
     );
 
+    const userId = await this.requireVerifiedTokenUser(credential.id_token);
+
     await this.cacheManager.set(
       credential.access_token,
       credential.refresh_token,
@@ -201,7 +204,6 @@ export class AuthorizationService {
 
     const cookieOptions = { maxAge: this.cookieExpirySeconds };
     res.cookie(Constants.tcJwtCookieName, credential.id_token, cookieOptions);
-    const userId = this.extractUserIdFromToken(credential.access_token);
     const token = await this.userService.generateSSOToken(userId);
     res.cookie(Constants.tcSsoCookieName, token, cookieOptions);
 
@@ -337,6 +339,7 @@ export class AuthorizationService {
         isRs256Token = true;
         const refreshToken = dto.refreshToken;
         const cred = await this.auth0.refreshToken(refreshToken);
+        await this.requireVerifiedTokenUser(cred.access_token);
         await this.cacheManager.del(auth.externalToken);
         await this.cacheManager.set(cred.access_token, refreshToken);
         auth.token = cred.access_token;
@@ -685,9 +688,11 @@ export class AuthorizationService {
     const currentSeconds = Math.floor(Date.now() / 1000);
     const expSeconds =
       currentSeconds + this.config.getCommon().jwtExpirySeconds;
+    await this.requireVerifiedUser(Number(systemUserId));
     const roles = await this.getRoleNames(parseInt(systemUserId));
     const payload = {
       userId: systemUserId,
+      emailVerified: true,
       roles,
       iss: issuer,
       iat: currentSeconds,
@@ -769,6 +774,7 @@ export class AuthorizationService {
       currentSeconds + this.config.getCommon().jwtExpirySeconds;
     const payload = {
       userId: userId,
+      emailVerified: true,
       email: '',
       handle: '',
       roles: [],
@@ -779,13 +785,7 @@ export class AuthorizationService {
       jti: uuidv4(),
     };
     if (userId != null) {
-      const user = await this.userService.findUserById(userId);
-      if (user == null) {
-        throw new NotFoundException('User does not exist');
-      }
-      if (user.status !== 'A') {
-        throw new ForbiddenException('Account Inactive');
-      }
+      const user = await this.requireVerifiedUser(userId);
 
       payload.handle = user.handle;
       payload.email = (user as any).primaryEmailAddress;
@@ -802,6 +802,41 @@ export class AuthorizationService {
       this.config.getCommon().authSecret,
       options,
     );
+  }
+
+  /** Checks persisted activation and primary-email state before any session is issued. */
+  private async requireVerifiedUser(userId: number) {
+    if (!Number.isSafeInteger(userId) || userId <= 0)
+      throw new UnauthorizedException('Invalid member identity');
+    const user = await this.userService.findUserById(userId);
+    if (!user) throw new NotFoundException('User does not exist');
+    if (
+      user.status !== 'A' ||
+      Number((user as any).primaryEmailStatusId) !==
+        Constants.verifiedEmailStatus
+    ) {
+      throw new ForbiddenException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Activate your account before logging in.',
+      });
+    }
+    return user;
+  }
+
+  /** Only accepts tokens returned directly by the trusted Auth0 HTTPS exchange/refresh. */
+  private async requireVerifiedTokenUser(token: string): Promise<number> {
+    const decoded = CommonUtils.parseJWTClaims(token);
+    if (!hasVerifiedEmail(decoded)) {
+      throw new ForbiddenException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Activate your account before logging in.',
+      });
+    }
+    const memberId = getClaim(decoded, 'userId');
+    const userId =
+      memberId === undefined ? await this.getUserId(token) : Number(memberId);
+    await this.requireVerifiedUser(userId);
+    return userId;
   }
 
   private async storeAuthRefreshLogToCache(userId: number, user) {
@@ -837,6 +872,12 @@ export class AuthorizationService {
     }
     // verify token
     const decoded = await this.auth0.verifyToken(auth0Token);
+    if (!hasVerifiedEmail(decoded)) {
+      throw new ForbiddenException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Activate your account before logging in.',
+      });
+    }
     // create profile
     const profile = this.userProfileHelper.createProfile(decoded);
     // check provider type
