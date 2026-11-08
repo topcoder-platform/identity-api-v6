@@ -1125,6 +1125,7 @@ describe('UserService', () => {
       user_id: new Decimal(userId),
       password: 'encodedPasswordFromDB',
       status: 'A',
+      primaryEmailStatusId: new Decimal(1),
     });
 
     let mockFindUser;
@@ -1134,6 +1135,9 @@ describe('UserService', () => {
         .spyOn(service, 'findUserById')
         .mockResolvedValue(mockUserWithPassword);
 
+      prismaOltp.security_user.findUnique.mockResolvedValue({
+        password: mockUserWithPassword.password,
+      });
       // Mock generateSSOTokenWithCredentials since it's now a separate method
       jest
         .spyOn(service as any, 'generateSSOTokenWithCredentials')
@@ -1146,6 +1150,23 @@ describe('UserService', () => {
 
       mockDigest.mockReturnValue('sha256HashedValue');
     });
+
+    it.each([
+      { status: 'U', primaryEmailStatusId: new Decimal(1) },
+      { status: 'A', primaryEmailStatusId: new Decimal(0) },
+      { status: 'A', primaryEmailStatusId: undefined },
+    ])(
+      'rejects SSO issuance without persisted verification: %j',
+      async (fields) => {
+        mockFindUser.mockResolvedValue({ ...mockUserWithPassword, ...fields });
+        await expect(service.generateSSOToken(userId)).rejects.toMatchObject({
+          response: { code: 'EMAIL_VERIFICATION_REQUIRED' },
+        });
+        expect(
+          (service as any).generateSSOTokenWithCredentials,
+        ).not.toHaveBeenCalled();
+      },
+    );
 
     it('should generate an SSO token', async () => {
       const token = await service.generateSSOToken(userId);

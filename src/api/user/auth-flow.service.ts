@@ -1009,6 +1009,13 @@ export class AuthFlowService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
+    if (userRecord.status !== MemberStatus.ACTIVE || !emailVerified) {
+      throw new ForbiddenException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Activate your account before logging in.',
+      });
+    }
+
     // Password matches, proceed with profile generation
     this.logger.log(
       `Auth0 Custom DB: Password validated for ${userHandle} (ID: ${userId})`,
@@ -1164,7 +1171,10 @@ export class AuthFlowService {
     );
 
     // reg source, similar to java code, set directly with ssoToken
-    const token = await this.userService.generateSSOToken(userIdNumber);
+    const token =
+      user.status === MemberStatus.ACTIVE && emailVerified
+        ? await this.userService.generateSSOToken(userIdNumber)
+        : null;
 
     const response: any = {
       id: user.user_id.toString(),
