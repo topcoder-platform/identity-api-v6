@@ -1,3 +1,4 @@
+import { AccessTokenSigner } from './access-token-signer.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -120,6 +121,17 @@ describe('AuthorizationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthorizationService,
+        {
+          provide: AccessTokenSigner,
+          useValue: {
+            sign: (payload: Record<string, unknown>) =>
+              CommonUtils.generateJwt(
+                payload,
+                mockConfigService.getCommon().authSecret,
+                { algorithm: 'HS256' },
+              ),
+          },
+        },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: Auth0Service, useValue: mockAuth0Service },
         { provide: UserService, useValue: mockUserService },
