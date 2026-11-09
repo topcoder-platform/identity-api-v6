@@ -31,6 +31,15 @@ jest.mock('../../shared/util/common.utils', () => ({
 }));
 
 describe('AuthDataStore', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
   let service: AuthDataStore;
   let mockConfigService: Partial<ConfigurationService>;
 
@@ -97,6 +106,9 @@ describe('AuthDataStore', () => {
 
     beforeEach(async () => {
       mockRedisClient = {
+        on: jest.fn().mockReturnThis(),
+        disconnect: jest.fn(),
+        quit: jest.fn().mockResolvedValue('OK'),
         ping: jest.fn().mockResolvedValue('PONG'),
         setex: jest.fn().mockResolvedValue('OK'),
         get: jest.fn().mockResolvedValue(JSON.stringify(mockAuthResponse)),
@@ -127,6 +139,39 @@ describe('AuthDataStore', () => {
 
     it('should initialize with RedisDataStore', () => {
       expect(service['store']).toBeInstanceOf(RedisDataStore);
+    });
+
+    it('uses the TLS URL with certificate verification and the existing auth TTL', async () => {
+      const store = new RedisDataStore({
+        spec: {
+          url: 'rediss://cache.example.com:6379',
+          host: 'old.example.com',
+          port: 6379,
+          expirySeconds: 7776000,
+        },
+      });
+      await store.put(mockAuthResponse);
+      expect(Redis).toHaveBeenCalledWith(
+        'rediss://cache.example.com:6379',
+        expect.objectContaining({
+          tls: {
+            servername: 'cache.example.com',
+            rejectUnauthorized: true,
+            minVersion: 'TLSv1.2',
+          },
+        }),
+      );
+      expect(mockRedisClient.setex).toHaveBeenCalledWith(
+        'ap:identity:authorization:123456:test-target',
+        7776000,
+        JSON.stringify(mockAuthResponse),
+      );
+    });
+
+    it('closes the authorization client when its Nest provider is destroyed', async () => {
+      await service.get('token', 'target');
+      await service.onModuleDestroy();
+      expect(mockRedisClient.quit).toHaveBeenCalledTimes(1);
     });
 
     it('should store and retrieve authorization data', async () => {
@@ -176,6 +221,7 @@ describe('AuthDataStore', () => {
       await expect(failingService.put(mockAuthResponse)).rejects.toThrow();
       await expect(failingService.get('token', 'target')).rejects.toThrow();
       await expect(failingService.delete('token', 'target')).rejects.toThrow();
+      expect(mockRedisClient.disconnect).toHaveBeenCalledTimes(3);
     });
 
     it('should handle null auth data in put', async () => {

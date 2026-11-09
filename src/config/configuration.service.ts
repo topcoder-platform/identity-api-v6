@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getRedisConnectionConfig } from './redis.config';
 
 @Injectable()
 export class ConfigurationService {
@@ -45,8 +46,7 @@ export class ConfigurationService {
     return {
       type: 'redis',
       spec: {
-        host: this.configService.get<string>('REDIS_HOST'),
-        port: this.configService.get<number>('REDIS_PORT'),
+        ...getRedisConnectionConfig(this.configService),
         expirySeconds: 7776000,
       },
     };

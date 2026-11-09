@@ -3,9 +3,10 @@ import Redis, { RedisOptions } from 'ioredis';
 import { ConfigurationService } from '../../config/configuration.service';
 import { AuthorizationResponse } from '../../dto/authorization/authorization.dto';
 import { CommonUtils } from '../../shared/util/common.utils';
+import { getRedisTlsOptions, getRedisUrl } from '../../config/redis.config';
 
 @Injectable()
-export class AuthDataStore {
+export class AuthDataStore implements OnModuleDestroy {
   private readonly storeConfig;
 
   private readonly store: DataStoreService;
@@ -29,6 +30,12 @@ export class AuthDataStore {
 
   async delete(token: string, target: string): Promise<void> {
     await this.store.delete(token, target);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.store instanceof RedisDataStore) {
+      await this.store.onModuleDestroy();
+    }
   }
 }
 
@@ -127,25 +134,33 @@ export class RedisDataStore
   private readonly expirySeconds: number;
   private readonly redisOptions: RedisOptions;
 
+  private readonly redisUrl: string;
+
   constructor(config) {
     super();
-    // create redis connection
+    this.redisUrl = getRedisUrl(config.spec);
     this.redisOptions = {
-      host: config.spec.host || 'localhost',
-      port: parseInt(config.spec.port) || 6379,
+      tls: getRedisTlsOptions(this.redisUrl),
+      connectTimeout: 5000,
+      commandTimeout: 5000,
+      maxRetriesPerRequest: 1,
     };
     this.expirySeconds = config.spec.expirySeconds;
   }
 
   private async getRedisClient() {
     if (!this.redisClient) {
-      this.redisClient = new Redis(this.redisOptions);
+      this.redisClient = new Redis(this.redisUrl, this.redisOptions);
+      this.redisClient.on('error', () =>
+        this.logger.error('Authorization Redis connection failed'),
+      );
       // check connection
       try {
         await this.redisClient.ping();
-      } catch (error) {
+      } catch {
+        this.redisClient.disconnect();
         this.redisClient = null;
-        this.logger.error('Cannot connect to redis.', error);
+        this.logger.error('Cannot connect to authorization Redis');
         throw new Error("authDataStore can't connect to redis");
       }
     }
