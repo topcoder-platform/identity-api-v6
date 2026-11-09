@@ -115,6 +115,7 @@ The following table summarizes the environment variables used by the application
 |                            | **Database (PostgreSQL - Group)**                                   |                               |
 | `GROUP_DB_URL`    | URL of the group PostgreSQL database                             | `postgresql://postgres:identitypassword@localhost:5431/group`            |
 |                            | **Redis Cache**                                                             |                               |
+| `REDIS_URL`                | Preferred connection URL for both authorization storage and the Nest cache. Use `rediss://` with the AWS endpoint for TLS; overrides `REDIS_HOST`/`REDIS_PORT`. | Unset |
 | `REDIS_HOST`               | Hostname for the Redis cache instance                                       | `127.0.0.1`                   |
 | `REDIS_PORT`               | Port for the Redis cache instance                                           | `6380`                        |
 |                            | **JWT Validation**                                                          |                               |
