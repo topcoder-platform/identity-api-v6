@@ -15,7 +15,7 @@ overrides:
   'handlebars': 4.7.10
   'csv-parse': 7.0.2
   '@faker-js/faker': 10.6.0
-  'node-forge': 1.4.1
+  'node-forge': 1.4.3
   '@xhmikosr/decompress': 10.2.2
   'piscina': 4.9.4
   'joi': 18.3.1
