@@ -4,7 +4,7 @@
   "accountId": "811668436784",
   "region": "us-east-1",
   "deployRoleArn": "arn:aws:iam::811668436784:role/identity-api-v6-dev-deploy",
-  "taskRoleArn": null,
+  "taskRoleArn": "arn:aws:iam::811668436784:role/identity-api-v6-dev-signing-task",
   "executionRoleArn": "arn:aws:iam::811668436784:role/ecsTaskExecutionRole",
   "cluster": "identity-service-serverless",
   "service": "identity-api-v6",

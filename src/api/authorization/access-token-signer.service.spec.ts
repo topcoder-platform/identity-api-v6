@@ -67,6 +67,23 @@ function setup(values: Record<string, string> = settings) {
 }
 
 describe('isolated access-token signing', () => {
+  it('preserves the default legacy login without a KMS key or credentials', async () => {
+    const { signer, send } = setup({});
+    await signer.onModuleInit();
+    const token = await signer.sign({
+      userId: '42',
+      emailVerified: true,
+      exp: Math.floor(Date.now() / 1000) + 300,
+    });
+    expect(
+      jwt.verify(token, common.getCommon().authSecret, {
+        algorithms: ['HS256'],
+      }),
+    ).toMatchObject({ userId: '42', emailVerified: true });
+    expect(signer.getJwks()).toEqual({ keys: [] });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('signs server-bound claims with RS256 and publishes only the matching public key', async () => {
     const { signer, send } = setup();
     await signer.onModuleInit();

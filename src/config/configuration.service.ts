@@ -8,7 +8,18 @@ export class ConfigurationService {
 
   getCommon() {
     const issuerValue = this.configService.get<string>('VALID_ISSUERS', '[]');
-    const issuers = issuerValue.split(',').map((t) => t.trim());
+    const issuers: string[] = issuerValue.trim().startsWith('[')
+      ? JSON.parse(issuerValue)
+      : issuerValue
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+    if (
+      !Array.isArray(issuers) ||
+      issuers.some((issuer) => typeof issuer !== 'string' || !issuer.trim())
+    ) {
+      throw new Error('VALID_ISSUERS must contain issuer strings');
+    }
     return {
       authSecret: this.configService.get<string>('AUTH_SECRET'),
       authDomain: this.configService.get<string>('AUTH_DOMAIN'),
