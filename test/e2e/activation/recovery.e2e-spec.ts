@@ -22,10 +22,10 @@ describe('Activation recovery', () => {
   };
   const userService = new UserService(
     prisma,
-    { $queryRaw: async () => [] } as any,
+    { $queryRaw: jest.fn().mockResolvedValue([]) } as any,
     {
       validateUser: jest.fn(),
-      validateHandle: async () => ({ valid: true }),
+      validateHandle: jest.fn().mockResolvedValue({ valid: true }),
       validateEmailViaDB: jest.fn(),
     } as any,
     { assignRoleByName: jest.fn() } as any,
@@ -44,7 +44,7 @@ describe('Activation recovery', () => {
       config,
       userService as any,
       events as any,
-      { findAll: async () => [] } as any,
+      { findAll: jest.fn().mockResolvedValue([]) } as any,
       null,
       { member: { update: jest.fn() } } as any,
     );
