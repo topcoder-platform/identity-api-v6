@@ -920,7 +920,7 @@ describe('UserController', () => {
       mockAuthFlowService.requestResendActivation.mockResolvedValue({
         message: 'Activation email resent',
       });
-      const result = await controller.resendActivationEmail(resendDto);
+      const result = await controller.resendActivationEmail({ param: resendDto });
       expect(mockAuthFlowService.requestResendActivation).toHaveBeenCalledWith(
         resendDto,
       );

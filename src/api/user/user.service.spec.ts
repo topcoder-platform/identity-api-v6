@@ -1892,11 +1892,6 @@ describe('UserService', () => {
         .spyOn(service, 'checkEmailAvailabilityForUser')
         .mockResolvedValue(undefined);
 
-      // Mock generateNumericOtp
-      jest
-        .spyOn(service as any, 'generateNumericOtp')
-        .mockReturnValue('123456');
-
       // Mock toCamelCase
       jest
         .spyOn(service, 'toCamelCase')

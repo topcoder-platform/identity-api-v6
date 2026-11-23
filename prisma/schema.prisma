@@ -265,8 +265,13 @@ model user_otp_email {
   expire_at  DateTime @db.Timestamp(6)
   resend     Boolean  @default(false)
   fail_count Int      @default(0) @db.SmallInt
+  activation_sends    DateTime[] @default([]) @db.Timestamp(3)
+  activation_failures DateTime[] @default([]) @db.Timestamp(3)
+  delivery_due_at     DateTime?  @db.Timestamp(3)
+  delivery_recipient  String?    @db.VarChar(100)
   user       user     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([delivery_due_at], map: "activation_delivery_due_idx")
   @@unique([user_id, mode])
   
   @@schema("identity")

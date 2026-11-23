@@ -1,6 +1,6 @@
 import { verifySignedJwt } from 'tc-core-library-js';
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { isBefore, addMinutes, addSeconds } from 'date-fns';
+import { addSeconds } from 'date-fns';
 import { format } from 'date-fns-tz';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { Prisma, PrismaClient, user as UserModel } from '@prisma/client';
@@ -24,13 +24,19 @@ import {
   NotFoundException,
   UnauthorizedException,
   ConflictException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import {
-  // ACTIVATION_OTP_CACHE_PREFIX_KEY,
-  // ACTIVATION_OTP_EXPIRY_SECONDS,
-  ACTIVATION_OTP_LENGTH,
-} from './user.service';
-import { randomInt, randomUUID as uuidv4 } from 'node:crypto';
+  ACTIVATION_MODE,
+  ACTIVATION_LIFETIME_MS,
+  MAX_CODE_ATTEMPTS,
+  newActivationCode,
+  recentActivationEvents,
+  nextActivationSend,
+  activationAttemptRetry,
+} from './activation-code';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { Constants } from '../../core/constant/constants';
 import { MemberStatus } from '../../dto/member/member.status.enum';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
@@ -43,7 +49,6 @@ const ONE_TIME_TOKEN_JWT_AUDIENCE = 'onetime_email_update';
 const ONE_TIME_TOKEN_CACHE_PREFIX_JTI = 'USED_JTI_OTT';
 const PASSWORD_RESET_TOKEN_CACHE_PREFIX = 'ap:identity:reset-tokens:'; // same as v3 java
 const PASSWORD_RESET_TOKEN_LENGTH = 6; // Or longer for more security, Java used 6 alphanumeric
-const OTP_ACTIVATION_MODE = 1;
 
 @Injectable()
 export class AuthFlowService {
@@ -51,7 +56,6 @@ export class AuthFlowService {
   private readonly jwtSecret: string;
   private readonly resetTokenExpirySeconds: number;
   private readonly activationResendExpirySeconds: number;
-  private readonly activationCodeExpirationMinutes: number;
   private readonly oneTimeTokenExpirySeconds: number;
   private readonly legacyBlowfishKey: string; // For legacy password decryption
   private readonly authDomain: string;
@@ -73,7 +77,6 @@ export class AuthFlowService {
     this.resetTokenExpirySeconds = 30 * 60; // Example: 30 mins
     this.activationResendExpirySeconds = 1 * 60 * 60; // Example: 1 hour
     this.oneTimeTokenExpirySeconds = 10 * 60; // Example: 10 mins
-    this.activationCodeExpirationMinutes = 24 * 60; // 1 day
     this.legacyBlowfishKey = this.configService.get<string>(
       'LEGACY_BLOWFISH_KEY',
     )!;
@@ -87,13 +90,64 @@ export class AuthFlowService {
     }
   }
 
-  private generateNumericOtp(length: number): string {
-    let otp = '';
-    const otpChars = '0123456789';
-    for (let i = 0; i < length; i++) {
-      otp += otpChars.charAt(randomInt(otpChars.length));
+  private verifyActivationProof(userId: number, token: string) {
+    try {
+      verifySignedJwt(token, this.jwtSecret, {
+        audience: OTP_ACTIVATION_JWT_AUDIENCE,
+        userId,
+      });
+    } catch (error) {
+      if (
+        error instanceof jwt.TokenExpiredError ||
+        error.name === 'TokenExpiredError'
+      ) {
+        throw new GoneException(
+          'Your activation session expired. Sign in again.',
+        );
+      }
+      throw new ForbiddenException('Invalid or expired resend token.');
     }
-    return otp;
+  }
+
+  // Lock the account even when its activation row is missing. Resend, wrong
+  // attempts and successful activation must all observe the same generation.
+  private async lockUnverifiedUser(
+    tx: Prisma.TransactionClient,
+    userId: number,
+  ) {
+    const [user] = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status FROM identity."user" WHERE user_id = ${userId} FOR UPDATE`;
+    if (!user) throw new NotFoundException('User does not exist');
+    if (user.status === MemberStatus.ACTIVE)
+      throw new BadRequestException('User has been activated');
+    if (user.status !== MemberStatus.UNVERIFIED)
+      throw new ForbiddenException('Account is deactivated');
+  }
+
+  private async activationEmail(tx: Prisma.TransactionClient, userId: number) {
+    const email = await tx.email.findFirst({
+      where: {
+        user_id: userId,
+        primary_ind: Constants.primaryEmailFlag,
+        email_type_id: Constants.standardEmailType,
+      },
+      select: { email_id: true, address: true },
+    });
+    if (!email?.address)
+      throw new InternalServerErrorException(
+        'Primary email not found for the user.',
+      );
+    return email;
+  }
+
+  private rateLimit(until: Date) {
+    return new HttpException(
+      {
+        message: `Please try again after ${until.toISOString()}.`,
+        retryAt: until.toISOString(),
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   /** Verifies the audience- and user-bound resend proof through tc-core, then activates the supplied user; throws on invalid proof/OTP. */
@@ -107,99 +161,71 @@ export class AuthFlowService {
       );
     }
 
-    let decodedJwtPayload: jwt.JwtPayload;
+    this.verifyActivationProof(userId, resendToken);
+
+    let primaryEmailAddress: string;
     try {
-      decodedJwtPayload = verifySignedJwt(resendToken, this.jwtSecret, {
-        audience: OTP_ACTIVATION_JWT_AUDIENCE,
-        userId: userId,
-      }) as jwt.JwtPayload;
-      this.logger.log('Decoded JWT: ' + JSON.stringify(decodedJwtPayload));
-    } catch (error) {
-      this.logger.warn(
-        `Resend token validation failed for user ID ${userId}: ${error.message}`,
-      );
-      if (error instanceof jwt.TokenExpiredError) {
-        throw new GoneException('Resend token has expired.');
-      }
-      throw new ForbiddenException('Invalid or expired resend token.');
-    }
-
-    this.logger.debug(`Resend token validated for user ID ${userId}`);
-
-    const userActivation = await this.findUserOtpByUserId(
-      userId,
-      OTP_ACTIVATION_MODE,
-    );
-    if (!userActivation) {
-      throw new NotFoundException('User does not exist'); // just like in UserResource.java line 1111
-    }
-    if (userActivation.status == MemberStatus.ACTIVE) {
-      throw new BadRequestException('User has been activated');
-    }
-    if (userActivation.status != MemberStatus.UNVERIFIED) {
-      throw new ForbiddenException(`Account is deactivated`);
-    }
-    if (!userActivation.id) {
-      throw new NotFoundException('No activation code found');
-    }
-    if (userActivation.failCount >= 3) {
-      throw new BadRequestException('Too many attempts');
-    } else if (isBefore(userActivation.expireAt, new Date())) {
-      throw new BadRequestException('Activation code expired');
-    } else if (userActivation.otp != otp) {
-      console.log(`${userActivation.otp} != ${otp}`);
-      // update user otp attempt
-      await this.updateUserOtpAttempt(
-        userActivation.id,
-        userActivation.failCount + 1,
-      );
-      if (userActivation.failCount >= 2) {
-        throw new BadRequestException('Too many attempts');
-      }
-      throw new BadRequestException('Wrong activation code');
-    }
-
-    let primaryEmailAddress: string | undefined;
-    try {
-      // this point starts user activation similar to UserDAO.java line 701
-      await this.prismaClient.$transaction(async (prisma) => {
-        await prisma.user.update({
-          where: {
-            user_id: userId,
-            status: { not: MemberStatus.INACTIVE_IRREGULAR_ACCOUNT },
-          },
-          data: { status: 'A', modify_date: new Date() },
+      const outcome = await this.prismaClient.$transaction(async (tx) => {
+        await this.lockUnverifiedUser(tx, userId);
+        const code = await tx.user_otp_email.findUnique({
+          where: { user_id_mode: { user_id: userId, mode: ACTIVATION_MODE } },
         });
-        this.logger.log(`User status updated to 'A' for ID ${userId}`);
-
-        // Find the standard email record for this user directly from the email table
-        const stdEmailRecord = await prisma.email.findFirst({
-          where: {
-            user_id: userId,
-            email_type_id: Constants.standardEmailType,
-          },
-        });
-        if (stdEmailRecord) {
-          primaryEmailAddress = stdEmailRecord.address;
-          // Update the status of the primary email to Verified (assuming status_id 1)
-          await prisma.email.update({
-            where: {
-              email_id: stdEmailRecord.email_id,
-            },
+        if (!code) throw new NotFoundException('No activation code found');
+        const now = new Date();
+        const retryAt = activationAttemptRetry(code.activation_failures, now);
+        if (retryAt) throw this.rateLimit(retryAt);
+        if (code.expire_at <= now)
+          throw new BadRequestException('Activation code expired');
+        if (code.fail_count >= MAX_CODE_ATTEMPTS)
+          throw new BadRequestException('Too many attempts');
+        if (code.otp !== otp) {
+          const failures = [
+            ...recentActivationEvents(code.activation_failures, now),
+            now,
+          ];
+          await tx.user_otp_email.update({
+            where: { id: code.id },
             data: {
-              status_id: Constants.verifiedEmailStatus,
-              modify_date: new Date(),
-            }, // Prisma handles number to Decimal for DTOs
+              fail_count: { increment: 1 },
+              activation_failures: failures,
+            },
           });
-          this.logger.log(
-            `Standard email (ID: ${stdEmailRecord.email_id.toNumber()}, Address: ${stdEmailRecord.address}) status_id updated to verified for user ${userId}.`,
-          );
-        } else {
-          this.logger.warn(
-            `No primary email record (email_type_id = 1) found for user ${userId} during activation to mark as verified.`,
-          );
+          // Return the error so the transaction commits the failed attempt.
+          const retry = activationAttemptRetry(failures, now);
+          return {
+            error: retry
+              ? this.rateLimit(retry)
+              : new BadRequestException(
+                  code.fail_count + 1 >= MAX_CODE_ATTEMPTS
+                    ? 'Too many attempts'
+                    : 'Wrong activation code',
+                ),
+          };
         }
+        const email = await this.activationEmail(tx, userId);
+        if (
+          code.delivery_recipient &&
+          code.delivery_recipient !== email.address
+        ) {
+          throw new BadRequestException('Request a new activation code');
+        }
+        await tx.email.update({
+          where: {
+            email_id: email.email_id,
+            address: email.address,
+            primary_ind: Constants.primaryEmailFlag,
+          },
+          data: { status_id: Constants.verifiedEmailStatus, modify_date: now },
+        });
+        await tx.user.update({
+          where: { user_id: userId },
+          data: { status: MemberStatus.ACTIVE, modify_date: now },
+        });
+        await tx.user_otp_email.delete({ where: { id: code.id } });
+        return { address: email.address };
       });
+      if (outcome.error) throw outcome.error;
+      primaryEmailAddress = outcome.address;
 
       // Update members.member status to ACTIVE
       try {
@@ -220,6 +246,7 @@ export class AuthFlowService {
         // Intentionally not throwing to avoid failing the main identity update
       }
     } catch (dbError) {
+      if (dbError instanceof HttpException) throw dbError;
       this.logger.error(
         `Database error during activation for user ID ${userId}: ${dbError.message}`,
         dbError.stack,
@@ -264,124 +291,49 @@ export class AuthFlowService {
    * @param resendDto Resend DTO request
    * @returns resulting message
    */
-  async requestResendActivation(
-    resendDto: UserOtpDto,
-  ): Promise<{ message: string }> {
-    const { userId, resendToken } = resendDto;
-    this.logger.log(`Attempting to resend activation for user ID: ${userId}`);
-
-    if (!userId || !resendToken) {
+  async requestResendActivation({
+    userId,
+    resendToken,
+  }: UserOtpDto): Promise<{ message: string; nextResendAt: string }> {
+    if (!userId || !resendToken)
       throw new BadRequestException('User ID and resend token are required.');
-    }
-
-    let decodedJwtPayload: jwt.JwtPayload;
-    try {
-      decodedJwtPayload = verifySignedJwt(resendToken, this.jwtSecret, {
-        audience: OTP_ACTIVATION_JWT_AUDIENCE,
-        userId: userId,
-      }) as jwt.JwtPayload;
-      this.logger.log('Decoded JWT:' + JSON.stringify(decodedJwtPayload));
-    } catch (error) {
-      this.logger.warn(
-        `Resend activation token validation failed for user ID ${userId}: ${error.message}`,
+    this.verifyActivationProof(userId, resendToken);
+    return this.prismaClient.$transaction(async (tx) => {
+      await this.lockUnverifiedUser(tx, userId);
+      const where = {
+        user_id_mode: { user_id: userId, mode: ACTIVATION_MODE },
+      };
+      const code = await tx.user_otp_email.findUnique({ where });
+      const now = new Date();
+      const sends = recentActivationEvents(code?.activation_sends || [], now);
+      const failures = recentActivationEvents(
+        code?.activation_failures || [],
+        now,
       );
-      if (error instanceof jwt.TokenExpiredError) {
-        throw new GoneException('Resend token has expired.');
-      }
-      throw new ForbiddenException('Invalid or expired resend token.');
-    }
-
-    const userOtp = await this.findUserOtpByUserId(userId, OTP_ACTIVATION_MODE);
-
-    if (!userOtp) {
-      throw new NotFoundException('User does not exist'); // just like in UserResource.java line 1057
-    }
-    if (userOtp.status == MemberStatus.ACTIVE) {
-      throw new BadRequestException('User has been activated');
-    }
-    if (userOtp.status != MemberStatus.UNVERIFIED) {
-      throw new ForbiddenException(`Account is deactivated`);
-    }
-    if (!userOtp.id) {
-      throw new NotFoundException('No activation code found');
-    }
-    if (userOtp.resend) {
-      throw new BadRequestException('Activation email already resent');
-    }
-    if (isBefore(userOtp.expireAt, new Date())) {
-      throw new BadRequestException('Activation code expired');
-    }
-    if (userOtp.failCount >= 3) {
-      throw new BadRequestException('Too many attempts');
-    }
-
-    // update user OTP resend
-    await this.updateUserOtpResend(
-      userOtp.id,
-      addMinutes(new Date(), this.activationCodeExpirationMinutes),
-      true,
-    );
-
-    // send activation email event
-    const primaryEmailRecord = await this.prismaClient.email.findFirst({
-      where: {
-        user_id: userId,
-        primary_ind: Constants.primaryEmailFlag,
-        email_type_id: Constants.standardEmailType,
-      },
+      const retryAt = nextActivationSend(sends, failures, now);
+      if (retryAt) throw this.rateLimit(retryAt);
+      const email = await this.activationEmail(tx, userId);
+      sends.push(now);
+      const replacement = {
+        otp: newActivationCode(code?.otp),
+        expire_at: new Date(now.getTime() + ACTIVATION_LIFETIME_MS),
+        fail_count: 0,
+        resend: true,
+        activation_sends: sends,
+        activation_failures: failures,
+        delivery_due_at: now,
+        delivery_recipient: email.address,
+      };
+      await tx.user_otp_email.upsert({
+        where,
+        create: { ...where.user_id_mode, ...replacement },
+        update: replacement,
+      });
+      return {
+        message: 'SUCCESS',
+        nextResendAt: nextActivationSend(sends, failures, now).toISOString(),
+      };
     });
-    if (!primaryEmailRecord) {
-      throw new InternalServerErrorException(
-        'Primary email not found for the user.', // Updated error message for clarity
-      );
-    }
-    await this.resendActivationEmailEvent(userOtp, primaryEmailRecord.address);
-
-    return { message: 'SUCCESS' }; // same as UserResource.java line 1080
-  }
-
-  /**
-   * Resend activation email event.
-   * @param userOtp User OTP details
-   * @param primaryEmail Primary email address
-   */
-  async resendActivationEmailEvent(userOtp: UserOtpDto, primaryEmail: string) {
-    try {
-      // For activation email (resend), use postDirectBusMessage to match legacy Java structure
-      const domain =
-        this.configService.get<string>('APP_DOMAIN') || 'topcoder-dev.com';
-      const fromEmail = `Topcoder <noreply@${domain}>`;
-      // Use the specific template ID for resending activation emails
-      const sendgridTemplateId = this.configService.get<string>(
-        'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
-      );
-
-      if (!sendgridTemplateId) {
-        this.logger.error(
-          `SendGrid template ID not configured (SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID). Cannot send activation email resend.`,
-        );
-      } else {
-        const activationEmailPayload = {
-          data: { handle: userOtp.handle, code: userOtp.otp },
-          from: { email: fromEmail },
-          version: 'v3',
-          sendgrid_template_id: sendgridTemplateId,
-          recipients: [primaryEmail], // The user's primary email
-        };
-        await this.eventService.postDirectBusMessage(
-          'external.action.email',
-          activationEmailPayload,
-        );
-        this.logger.log(
-          `Published 'external.action.email' (activation resend) for ${userOtp.userId} with new OTP. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
-        );
-      }
-    } catch (eventError) {
-      this.logger.error(
-        `Failed to publish resend activation event for user ${userOtp.userId}: ${eventError.message}`,
-        eventError.stack,
-      );
-    }
   }
 
   async generateOneTimeToken(
@@ -1159,7 +1111,7 @@ export class AuthFlowService {
     });
     const primaryEmail = primaryEmailRecord?.address;
     const emailVerified =
-      primaryEmailRecord?.status_id.toNumber() ===
+      primaryEmailRecord?.status_id?.toNumber() ===
       Constants.verifiedEmailStatus;
 
     // check credentials
@@ -1210,48 +1162,37 @@ export class AuthFlowService {
     };
 
     if (user.status == MemberStatus.UNVERIFIED) {
-      // activation logic
-      const activation = await this.prismaClient.user_otp_email.findFirst({
-        where: { user_id: user.user_id, mode: OTP_ACTIVATION_MODE },
+      const activation = await this.prismaClient.user_otp_email.findUnique({
+        where: {
+          user_id_mode: { user_id: user.user_id, mode: ACTIVATION_MODE },
+        },
         select: {
-          id: true,
-          mode: true,
-          otp: true,
           fail_count: true,
           expire_at: true,
-          resend: true,
+          delivery_recipient: true,
+          activation_sends: true,
+          activation_failures: true,
         },
       });
-
-      if (activation) {
-        if (
-          activation.fail_count >= 3 ||
-          isBefore(activation.expire_at, new Date())
-        ) {
-          response.credential.activationBlocked = true;
-          return response; // return response here like in java
-        } else if (!activation.resend) {
-          response.credential.canResend = true;
-        }
-      } else {
-        response.credential.canResend = true;
-
-        const newOtp = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
-        const expiresAt = addMinutes(
-          new Date(),
-          this.activationCodeExpirationMinutes,
-        );
-        this.logger.debug(`New OTP for activation: ${newOtp}`);
-        // if activation is not found, then need to insert one
-        await this.insertUserOtp(
-          userIdNumber,
-          OTP_ACTIVATION_MODE,
-          newOtp,
-          false,
-          0,
-          expiresAt,
-        );
+      const now = new Date();
+      let state = 'valid';
+      if (
+        !activation ||
+        activation.fail_count >= MAX_CODE_ATTEMPTS ||
+        (activation.delivery_recipient &&
+          activation.delivery_recipient !== primaryEmail)
+      ) {
+        state = 'replacement_required';
+      } else if (activation.expire_at <= now) {
+        state = 'expired';
       }
+      response.credential.activationCodeState = state;
+      response.credential.canResend = true;
+      response.credential.nextResendAt = nextActivationSend(
+        activation?.activation_sends || [],
+        activation?.activation_failures || [],
+        now,
+      )?.toISOString();
       // set resend token. similar to java code, line 874 of UserResource.java
       const payload = {
         sub: user.user_id.toString(),

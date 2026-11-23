@@ -1659,10 +1659,14 @@ export class UserController {
       m2m: 'Not applicable.',
     }),
   })
-  @ApiBody({ type: DTOs.UserOtpDto }) // UserOtpDto contains userId and resendToken for this flow
+  @ApiBody({ type: DTOs.ActivateUserBodyDto })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Activation email resent successfully',
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'retryAt specifies when another code can be requested.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Replacement email queued. nextResendAt specifies when another can be requested.',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -1680,7 +1684,7 @@ export class UserController {
   })
   async resendActivationEmail(
     @Body() resendActivationDto: DTOs.ActivateUserBodyDto,
-  ): Promise<{ message: string }> {
+  ): Promise<{ message: string; nextResendAt: string }> {
     this.checkParam(resendActivationDto);
     this.logger.log(
       `Attempting to resend activation email for user: ${resendActivationDto.param.userId}`,
