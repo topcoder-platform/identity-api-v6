@@ -79,6 +79,11 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message: message,
+      ...(status === HttpStatus.TOO_MANY_REQUESTS &&
+      typeof exceptionResponse === 'object' &&
+      'retryAt' in exceptionResponse
+        ? { retryAt: exceptionResponse.retryAt }
+        : {}),
       errors: errors, // Include formatted validation errors if present
       timestamp: new Date().toISOString(),
       path: request.url,
