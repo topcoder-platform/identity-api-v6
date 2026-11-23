@@ -217,7 +217,6 @@ describe('AuthFlowService', () => {
   let eventService: jest.Mocked<EventService>;
   let roleService: jest.Mocked<RoleService>;
   let loggerErrorSpy: jest.SpyInstance;
-  let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -225,9 +224,7 @@ describe('AuthFlowService', () => {
     loggerErrorSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => {});
-    loggerWarnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
