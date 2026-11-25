@@ -31,7 +31,6 @@ import {
   CredentialDto,
   UserParamBaseDto,
   ValidationResponseDto,
-  UserOtpDto,
 } from '../../dto/user/user.dto';
 import { ValidationService } from './validation.service';
 import { randomUUID as uuidv4 } from 'node:crypto';
@@ -48,7 +47,12 @@ import { MemberStatus } from '../../dto/member';
 import { MemberStatus as MemberDbStatus } from '../../../prisma/member/generated/member';
 import { CommonUtils } from '../../shared/util/common.utils';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
-import { addMinutes } from 'date-fns';
+import {
+  ACTIVATION_MODE,
+  MAX_CODE_ATTEMPTS,
+  ACTIVATION_LIFETIME_MS,
+  newActivationCode,
+} from './activation-code';
 type GroupIdRow = { id: string };
 type UserIdRow = { user_id: bigint | Decimal | number | string };
 type UserSearchFilters = {
@@ -81,9 +85,6 @@ export interface Auth0UserProfile {
 
 export const ACTIVATION_OTP_CACHE_PREFIX_KEY = 'USER_ACTIVATION_OTP';
 export const ACTIVATION_OTP_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
-export const ACTIVATION_OTP_LENGTH = 6;
-const OTP_ACTIVATION_MODE = 1;
-const ACTIVATION_OTP_EXPIRY_MINUTES = 24 * 60;
 const WIPRO_SSO_PROVIDER = 'wipro-adfs';
 const WIPRO_ALL_GROUP_NAME = 'Wipro - All';
 
@@ -1069,15 +1070,6 @@ export class UserService {
     return userWithEmail;
   }
 
-  private generateNumericOtp(length: number): string {
-    let otp = '';
-    const otpChars = '0123456789';
-    for (let i = 0; i < length; i++) {
-      otp += otpChars.charAt(crypto.randomInt(otpChars.length));
-    }
-    return otp;
-  }
-
   // Generates a cryptographically-strong random password consisting of
   // alphanumeric characters of the requested length.
   private generateRandomPassword(length: number): string {
@@ -1233,7 +1225,7 @@ export class UserService {
     // -----------------------------------
 
     // Generate OTP first, as it will be stored as the activation_code
-    const otpForActivation = this.generateNumericOtp(ACTIVATION_OTP_LENGTH);
+    const otpForActivation = newActivationCode();
 
     // Step 1: Get the next user ID from the sequence (mimicking Java DAO)
     const nextUserId: number = await this.getNextUserId();
@@ -1322,6 +1314,20 @@ export class UserService {
           );
         }
 
+        if (createdUser.status !== MemberStatus.ACTIVE) {
+          const now = new Date();
+          await prisma.user_otp_email.create({
+            data: {
+              user_id: createdUser.user_id,
+              mode: ACTIVATION_MODE,
+              otp: otpForActivation,
+              expire_at: new Date(now.getTime() + ACTIVATION_LIFETIME_MS),
+              activation_sends: [now],
+              delivery_due_at: now,
+              delivery_recipient: userParams.email,
+            },
+          });
+        }
         return createdUser;
       });
     } catch (error) {
@@ -1358,32 +1364,7 @@ export class UserService {
     // ==============
     await this.createMemberData(nextUserId, userParams);
 
-    // =============
-    // insert otp
-    // =============
-    // when not active yet
-    if (newUser.status != MemberStatus.ACTIVE) {
-      const expiresAt = addMinutes(new Date(), ACTIVATION_OTP_EXPIRY_MINUTES);
-      // we insert a new one
-      await this.prismaClient.user_otp_email.create({
-        data: {
-          user_id: newUser.user_id,
-          mode: OTP_ACTIVATION_MODE,
-          otp: otpForActivation,
-          resend: false,
-          fail_count: 0,
-          expire_at: expiresAt,
-        },
-      });
-      await this.resendActivationEmailEvent(
-        {
-          handle: newUser.handle,
-          otp: otpForActivation,
-          userId: Number(newUser.user_id),
-        },
-        userParams.email,
-      );
-    } else {
+    if (newUser.status === MemberStatus.ACTIVE) {
       // add Topcoder User role if the user was auto-activated
       await this.assignDefaultUserRole(Number(newUser.user_id));
     }
@@ -2781,6 +2762,23 @@ export class UserService {
       throw new BadRequestException('User has been activated');
     }
 
+    // This older form can only mail the original registration code. Route
+    // recovery through the password-verified flow once that code is unusable.
+    const activation = await this.prismaClient.user_otp_email.findUnique({
+      where: { user_id_mode: { user_id: user.user_id, mode: ACTIVATION_MODE } },
+      select: { otp: true, expire_at: true, fail_count: true },
+    });
+    if (
+      (activation &&
+        (activation.otp !== user.activation_code ||
+          activation.expire_at <= new Date() ||
+          activation.fail_count >= MAX_CODE_ATTEMPTS)) ||
+      (!activation && /^\d{6}$/.test(user.activation_code || ''))
+    ) {
+      throw new BadRequestException(
+        'Sign in to request a new activation code.',
+      );
+    }
     // make sure we get primary email
     const emailRecord = await this.prismaClient.email.findFirst({
       where: {
@@ -2863,49 +2861,6 @@ export class UserService {
     } catch (eventError) {
       this.logger.error(
         `Failed to publish resend email event for user ${handle}: ${eventError.message}`,
-        eventError.stack,
-      );
-    }
-  }
-
-  /**
-   * Resend activation email event.
-   * @param userOtp User OTP details
-   * @param primaryEmail Primary email address
-   */
-  async resendActivationEmailEvent(userOtp: UserOtpDto, primaryEmail: string) {
-    try {
-      // For activation email (resend), use postDirectBusMessage to match legacy Java structure
-      const domain = CommonUtils.getAppDomain(this.configService);
-      const fromEmail = `Topcoder <noreply@${domain}>`;
-      // Use the specific template ID for resending activation emails
-      const sendgridTemplateId = this.configService.get<string>(
-        'SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID',
-      );
-
-      if (!sendgridTemplateId) {
-        this.logger.error(
-          `SendGrid template ID not configured (SENDGRID_RESEND_ACTIVATION_EMAIL_TEMPLATE_ID). Cannot send activation email resend.`,
-        );
-      } else {
-        const activationEmailPayload = {
-          data: { handle: userOtp.handle, code: userOtp.otp },
-          from: { email: fromEmail },
-          version: 'v3',
-          sendgrid_template_id: sendgridTemplateId,
-          recipients: [primaryEmail], // The user's primary email
-        };
-        await this.eventService.postDirectBusMessage(
-          'external.action.email',
-          activationEmailPayload,
-        );
-        this.logger.log(
-          `Published 'external.action.email' (activation resend) for ${userOtp.userId} with new OTP. Payload: ${JSON.stringify(activationEmailPayload, null, 2)}`,
-        );
-      }
-    } catch (eventError) {
-      this.logger.error(
-        `Failed to publish resend activation event for user ${userOtp.userId}: ${eventError.message}`,
         eventError.stack,
       );
     }

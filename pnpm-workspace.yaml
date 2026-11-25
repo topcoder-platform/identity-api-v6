@@ -37,7 +37,7 @@ overrides:
   'ajv@^8.0.0': 8.18.0
   defu: 6.1.7
   'diff@^4': 4.0.4
-  'effect@^3.0.0': 3.22.0
+  'effect@^3.0.0': 3.22.1
   deepmerge-ts: 8.0.0
   'file-type@>=13.0.0 <21.3.2': 21.3.2
   flatted: 3.4.2

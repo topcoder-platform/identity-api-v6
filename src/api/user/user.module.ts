@@ -5,6 +5,7 @@ import { PrismaModule } from '../../shared/prisma/prisma.module';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { UserProfileService } from './user-profile.service';
+import { ActivationEmailWorker } from './activation-email.worker';
 import { AuthFlowService } from './auth-flow.service';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { ValidationService } from './validation.service';
@@ -36,6 +37,7 @@ import { EmailChangeService } from './email-change.service';
     UserService,
     UserProfileService,
     AuthFlowService,
+    ActivationEmailWorker,
     TwoFactorAuthService,
     EmailChangeService,
     ValidationService,

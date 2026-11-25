@@ -516,6 +516,8 @@ export class UserCredentialDto {
   resendToken?: string;
   activationBlocked?: boolean;
   canResend?: boolean;
+  activationCodeState?: 'valid' | 'expired' | 'replacement_required';
+  nextResendAt?: string;
   hasPassword?: boolean;
 }
 

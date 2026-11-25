@@ -24012,6 +24012,8 @@ export namespace Prisma {
     expire_at: Date | null
     resend: boolean | null
     fail_count: number | null
+    delivery_due_at: Date | null
+    delivery_recipient: string | null
   }
 
   export type User_otp_emailMaxAggregateOutputType = {
@@ -24022,6 +24024,8 @@ export namespace Prisma {
     expire_at: Date | null
     resend: boolean | null
     fail_count: number | null
+    delivery_due_at: Date | null
+    delivery_recipient: string | null
   }
 
   export type User_otp_emailCountAggregateOutputType = {
@@ -24032,6 +24036,10 @@ export namespace Prisma {
     expire_at: number
     resend: number
     fail_count: number
+    activation_sends: number
+    activation_failures: number
+    delivery_due_at: number
+    delivery_recipient: number
     _all: number
   }
 
@@ -24058,6 +24066,8 @@ export namespace Prisma {
     expire_at?: true
     resend?: true
     fail_count?: true
+    delivery_due_at?: true
+    delivery_recipient?: true
   }
 
   export type User_otp_emailMaxAggregateInputType = {
@@ -24068,6 +24078,8 @@ export namespace Prisma {
     expire_at?: true
     resend?: true
     fail_count?: true
+    delivery_due_at?: true
+    delivery_recipient?: true
   }
 
   export type User_otp_emailCountAggregateInputType = {
@@ -24078,6 +24090,10 @@ export namespace Prisma {
     expire_at?: true
     resend?: true
     fail_count?: true
+    activation_sends?: true
+    activation_failures?: true
+    delivery_due_at?: true
+    delivery_recipient?: true
     _all?: true
   }
 
@@ -24175,6 +24191,10 @@ export namespace Prisma {
     expire_at: Date
     resend: boolean
     fail_count: number
+    activation_sends: Date[]
+    activation_failures: Date[]
+    delivery_due_at: Date | null
+    delivery_recipient: string | null
     _count: User_otp_emailCountAggregateOutputType | null
     _avg: User_otp_emailAvgAggregateOutputType | null
     _sum: User_otp_emailSumAggregateOutputType | null
@@ -24204,6 +24224,10 @@ export namespace Prisma {
     expire_at?: boolean
     resend?: boolean
     fail_count?: boolean
+    activation_sends?: boolean
+    activation_failures?: boolean
+    delivery_due_at?: boolean
+    delivery_recipient?: boolean
     user?: boolean | userDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user_otp_email"]>
 
@@ -24215,6 +24239,10 @@ export namespace Prisma {
     expire_at?: boolean
     resend?: boolean
     fail_count?: boolean
+    activation_sends?: boolean
+    activation_failures?: boolean
+    delivery_due_at?: boolean
+    delivery_recipient?: boolean
     user?: boolean | userDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user_otp_email"]>
 
@@ -24226,6 +24254,10 @@ export namespace Prisma {
     expire_at?: boolean
     resend?: boolean
     fail_count?: boolean
+    activation_sends?: boolean
+    activation_failures?: boolean
+    delivery_due_at?: boolean
+    delivery_recipient?: boolean
     user?: boolean | userDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user_otp_email"]>
 
@@ -24237,9 +24269,13 @@ export namespace Prisma {
     expire_at?: boolean
     resend?: boolean
     fail_count?: boolean
+    activation_sends?: boolean
+    activation_failures?: boolean
+    delivery_due_at?: boolean
+    delivery_recipient?: boolean
   }
 
-  export type user_otp_emailOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "user_id" | "mode" | "otp" | "expire_at" | "resend" | "fail_count", ExtArgs["result"]["user_otp_email"]>
+  export type user_otp_emailOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "user_id" | "mode" | "otp" | "expire_at" | "resend" | "fail_count" | "activation_sends" | "activation_failures" | "delivery_due_at" | "delivery_recipient", ExtArgs["result"]["user_otp_email"]>
   export type user_otp_emailInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | userDefaultArgs<ExtArgs>
   }
@@ -24263,6 +24299,10 @@ export namespace Prisma {
       expire_at: Date
       resend: boolean
       fail_count: number
+      activation_sends: Date[]
+      activation_failures: Date[]
+      delivery_due_at: Date | null
+      delivery_recipient: string | null
     }, ExtArgs["result"]["user_otp_email"]>
     composites: {}
   }
@@ -24694,6 +24734,10 @@ export namespace Prisma {
     readonly expire_at: FieldRef<"user_otp_email", 'DateTime'>
     readonly resend: FieldRef<"user_otp_email", 'Boolean'>
     readonly fail_count: FieldRef<"user_otp_email", 'Int'>
+    readonly activation_sends: FieldRef<"user_otp_email", 'DateTime[]'>
+    readonly activation_failures: FieldRef<"user_otp_email", 'DateTime[]'>
+    readonly delivery_due_at: FieldRef<"user_otp_email", 'DateTime'>
+    readonly delivery_recipient: FieldRef<"user_otp_email", 'String'>
   }
     
 
@@ -35339,7 +35383,11 @@ export namespace Prisma {
     otp: 'otp',
     expire_at: 'expire_at',
     resend: 'resend',
-    fail_count: 'fail_count'
+    fail_count: 'fail_count',
+    activation_sends: 'activation_sends',
+    activation_failures: 'activation_failures',
+    delivery_due_at: 'delivery_due_at',
+    delivery_recipient: 'delivery_recipient'
   };
 
   export type User_otp_emailScalarFieldEnum = (typeof User_otp_emailScalarFieldEnum)[keyof typeof User_otp_emailScalarFieldEnum]
@@ -36694,6 +36742,10 @@ export namespace Prisma {
     expire_at?: DateTimeFilter<"user_otp_email"> | Date | string
     resend?: BoolFilter<"user_otp_email"> | boolean
     fail_count?: IntFilter<"user_otp_email"> | number
+    activation_sends?: DateTimeNullableListFilter<"user_otp_email">
+    activation_failures?: DateTimeNullableListFilter<"user_otp_email">
+    delivery_due_at?: DateTimeNullableFilter<"user_otp_email"> | Date | string | null
+    delivery_recipient?: StringNullableFilter<"user_otp_email"> | string | null
     user?: XOR<UserScalarRelationFilter, userWhereInput>
   }
 
@@ -36705,6 +36757,10 @@ export namespace Prisma {
     expire_at?: SortOrder
     resend?: SortOrder
     fail_count?: SortOrder
+    activation_sends?: SortOrder
+    activation_failures?: SortOrder
+    delivery_due_at?: SortOrderInput | SortOrder
+    delivery_recipient?: SortOrderInput | SortOrder
     user?: userOrderByWithRelationInput
   }
 
@@ -36720,6 +36776,10 @@ export namespace Prisma {
     expire_at?: DateTimeFilter<"user_otp_email"> | Date | string
     resend?: BoolFilter<"user_otp_email"> | boolean
     fail_count?: IntFilter<"user_otp_email"> | number
+    activation_sends?: DateTimeNullableListFilter<"user_otp_email">
+    activation_failures?: DateTimeNullableListFilter<"user_otp_email">
+    delivery_due_at?: DateTimeNullableFilter<"user_otp_email"> | Date | string | null
+    delivery_recipient?: StringNullableFilter<"user_otp_email"> | string | null
     user?: XOR<UserScalarRelationFilter, userWhereInput>
   }, "id" | "user_id_mode">
 
@@ -36731,6 +36791,10 @@ export namespace Prisma {
     expire_at?: SortOrder
     resend?: SortOrder
     fail_count?: SortOrder
+    activation_sends?: SortOrder
+    activation_failures?: SortOrder
+    delivery_due_at?: SortOrderInput | SortOrder
+    delivery_recipient?: SortOrderInput | SortOrder
     _count?: user_otp_emailCountOrderByAggregateInput
     _avg?: user_otp_emailAvgOrderByAggregateInput
     _max?: user_otp_emailMaxOrderByAggregateInput
@@ -36749,6 +36813,10 @@ export namespace Prisma {
     expire_at?: DateTimeWithAggregatesFilter<"user_otp_email"> | Date | string
     resend?: BoolWithAggregatesFilter<"user_otp_email"> | boolean
     fail_count?: IntWithAggregatesFilter<"user_otp_email"> | number
+    activation_sends?: DateTimeNullableListFilter<"user_otp_email">
+    activation_failures?: DateTimeNullableListFilter<"user_otp_email">
+    delivery_due_at?: DateTimeNullableWithAggregatesFilter<"user_otp_email"> | Date | string | null
+    delivery_recipient?: StringNullableWithAggregatesFilter<"user_otp_email"> | string | null
   }
 
   export type user_social_loginWhereInput = {
@@ -38466,6 +38534,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
     user: userCreateNestedOneWithoutUser_otp_emailInput
   }
 
@@ -38477,6 +38549,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
   }
 
   export type user_otp_emailUpdateInput = {
@@ -38485,6 +38561,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
     user?: userUpdateOneRequiredWithoutUser_otp_emailNestedInput
   }
 
@@ -38496,6 +38576,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_otp_emailCreateManyInput = {
@@ -38506,6 +38590,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
   }
 
   export type user_otp_emailUpdateManyMutationInput = {
@@ -38514,6 +38602,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_otp_emailUncheckedUpdateManyInput = {
@@ -38524,6 +38616,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_social_loginCreateInput = {
@@ -40065,6 +40161,14 @@ export namespace Prisma {
     security_status_id?: SortOrder
   }
 
+  export type DateTimeNullableListFilter<$PrismaModel = never> = {
+    equals?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    has?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    hasEvery?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    hasSome?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    isEmpty?: boolean
+  }
+
   export type user_otp_emailUser_idModeCompoundUniqueInput = {
     user_id: Decimal | DecimalJsLike | number | string
     mode: number
@@ -40078,6 +40182,10 @@ export namespace Prisma {
     expire_at?: SortOrder
     resend?: SortOrder
     fail_count?: SortOrder
+    activation_sends?: SortOrder
+    activation_failures?: SortOrder
+    delivery_due_at?: SortOrder
+    delivery_recipient?: SortOrder
   }
 
   export type user_otp_emailAvgOrderByAggregateInput = {
@@ -40095,6 +40203,8 @@ export namespace Prisma {
     expire_at?: SortOrder
     resend?: SortOrder
     fail_count?: SortOrder
+    delivery_due_at?: SortOrder
+    delivery_recipient?: SortOrder
   }
 
   export type user_otp_emailMinOrderByAggregateInput = {
@@ -40105,6 +40215,8 @@ export namespace Prisma {
     expire_at?: SortOrder
     resend?: SortOrder
     fail_count?: SortOrder
+    delivery_due_at?: SortOrder
+    delivery_recipient?: SortOrder
   }
 
   export type user_otp_emailSumOrderByAggregateInput = {
@@ -41524,10 +41636,28 @@ export namespace Prisma {
     update?: XOR<XOR<security_status_luUpdateToOneWithWhereWithoutUser_group_xrefInput, security_status_luUpdateWithoutUser_group_xrefInput>, security_status_luUncheckedUpdateWithoutUser_group_xrefInput>
   }
 
+  export type user_otp_emailCreateactivation_sendsInput = {
+    set: Date[] | string[]
+  }
+
+  export type user_otp_emailCreateactivation_failuresInput = {
+    set: Date[] | string[]
+  }
+
   export type userCreateNestedOneWithoutUser_otp_emailInput = {
     create?: XOR<userCreateWithoutUser_otp_emailInput, userUncheckedCreateWithoutUser_otp_emailInput>
     connectOrCreate?: userCreateOrConnectWithoutUser_otp_emailInput
     connect?: userWhereUniqueInput
+  }
+
+  export type user_otp_emailUpdateactivation_sendsInput = {
+    set?: Date[] | string[]
+    push?: Date | string | Date[] | string[]
+  }
+
+  export type user_otp_emailUpdateactivation_failuresInput = {
+    set?: Date[] | string[]
+    push?: Date | string | Date[] | string[]
   }
 
   export type userUpdateOneRequiredWithoutUser_otp_emailNestedInput = {
@@ -43056,6 +43186,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
   }
 
   export type user_otp_emailUncheckedCreateWithoutUserInput = {
@@ -43065,6 +43199,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
   }
 
   export type user_otp_emailCreateOrConnectWithoutUserInput = {
@@ -43310,6 +43448,10 @@ export namespace Prisma {
     expire_at?: DateTimeFilter<"user_otp_email"> | Date | string
     resend?: BoolFilter<"user_otp_email"> | boolean
     fail_count?: IntFilter<"user_otp_email"> | number
+    activation_sends?: DateTimeNullableListFilter<"user_otp_email">
+    activation_failures?: DateTimeNullableListFilter<"user_otp_email">
+    delivery_due_at?: DateTimeNullableFilter<"user_otp_email"> | Date | string | null
+    delivery_recipient?: StringNullableFilter<"user_otp_email"> | string | null
   }
 
   export type user_social_loginUpsertWithWhereUniqueWithoutUserInput = {
@@ -45344,6 +45486,10 @@ export namespace Prisma {
     expire_at: Date | string
     resend?: boolean
     fail_count?: number
+    activation_sends?: user_otp_emailCreateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailCreateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: Date | string | null
+    delivery_recipient?: string | null
   }
 
   export type user_social_loginCreateManyUserInput = {
@@ -45413,6 +45559,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_otp_emailUncheckedUpdateWithoutUserInput = {
@@ -45422,6 +45572,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_otp_emailUncheckedUpdateManyWithoutUserInput = {
@@ -45431,6 +45585,10 @@ export namespace Prisma {
     expire_at?: DateTimeFieldUpdateOperationsInput | Date | string
     resend?: BoolFieldUpdateOperationsInput | boolean
     fail_count?: IntFieldUpdateOperationsInput | number
+    activation_sends?: user_otp_emailUpdateactivation_sendsInput | Date[] | string[]
+    activation_failures?: user_otp_emailUpdateactivation_failuresInput | Date[] | string[]
+    delivery_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    delivery_recipient?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type user_social_loginUpdateWithoutUserInput = {

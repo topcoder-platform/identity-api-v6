@@ -157,10 +157,6 @@ export class EventService {
       this.logger.log(
         `Attempting to post DIRECT message to bus topic: ${topic}`,
       );
-      this.logger.log(
-        `[DEBUG] Full direct message being sent to bus client: ${JSON.stringify(message, null, 2)}`,
-      );
-
       await this.busClient.postEvent(message); // Assuming busClient.postEvent is generic enough
       this.logger.log(
         `Successfully posted DIRECT message to bus topic: ${topic}${options.key ? ' with key ' + options.key : ''}`,

@@ -285,7 +285,11 @@ exports.Prisma.User_otp_emailScalarFieldEnum = {
   otp: 'otp',
   expire_at: 'expire_at',
   resend: 'resend',
-  fail_count: 'fail_count'
+  fail_count: 'fail_count',
+  activation_sends: 'activation_sends',
+  activation_failures: 'activation_failures',
+  delivery_due_at: 'delivery_due_at',
+  delivery_recipient: 'delivery_recipient'
 };
 
 exports.Prisma.User_social_loginScalarFieldEnum = {

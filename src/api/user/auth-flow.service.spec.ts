@@ -26,12 +26,8 @@ import {
   email as EmailModel,
   security_user as SecurityUserModel,
 } from '@prisma/client';
-import { ActivateUserBodyDto, UserOtpDto } from '../../dto/user/user.dto';
 import { RoleResponseDto } from 'src/dto/role/role.dto';
-import {
-  ACTIVATION_OTP_CACHE_PREFIX_KEY,
-  ACTIVATION_OTP_EXPIRY_SECONDS,
-} from './user.service'; // Constants from UserService
+import { ACTIVATION_OTP_EXPIRY_SECONDS } from './user.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID as uuidv4 } from 'node:crypto';
@@ -70,6 +66,12 @@ const mockPrismaOltp = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  user_otp_email: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
   $transaction: jest
     .fn()
     .mockImplementation(async (callback) =>
@@ -102,6 +104,9 @@ const mockConfigService = {
 
 const mockVerifyLegacyPassword = jest.fn();
 const mockUserService = {
+  findUserById: jest.fn(),
+  notifyWelcome: jest.fn(),
+  assignDefaultUserRole: jest.fn(),
   findUserByEmailOrHandle: jest.fn(),
   encodePasswordLegacy: jest.fn(),
   generateSSOToken: jest.fn(),
@@ -212,7 +217,6 @@ describe('AuthFlowService', () => {
   let eventService: jest.Mocked<EventService>;
   let roleService: jest.Mocked<RoleService>;
   let loggerErrorSpy: jest.SpyInstance;
-  let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -220,9 +224,7 @@ describe('AuthFlowService', () => {
     loggerErrorSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => {});
-    loggerWarnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -296,296 +298,128 @@ describe('AuthFlowService', () => {
     });
   });
 
-  describe('activateUser', () => {
+  describe('activation and resend', () => {
     const userId = 1;
-    const otp = '123456';
+    const otp = '012345';
     const resendToken = 'valid.resend.token';
-    const activateDto: ActivateUserBodyDto = {
-      param: { userId, otp, resendToken },
+    const email = { email_id: 2, address: 'pending@example.com' };
+    const activate = () =>
+      service.activateUser({ param: { userId, otp, resendToken } });
+    const resend = () =>
+      service.requestResendActivation({ userId, resendToken });
+    const code = {
+      id: 3,
+      otp,
+      expire_at: new Date(Date.now() + 60000),
+      fail_count: 0,
+      activation_sends: [],
+      activation_failures: [],
     };
-    const mockUser = createMockUserModel({
-      user_id: new Decimal(userId),
-      status: 'U',
-      handle: 'unverifiedUser',
-    });
-    const mockPrimaryEmail = createMockEmailModel({
-      user_id: new Decimal(userId),
-      address: 'unverified@example.com',
-      status_id: new Decimal(2),
-    }); // Unverified
 
     beforeEach(() => {
-      (verifySignedJwt as jest.Mock).mockReturnValue({
-        sub: userId.toString(),
-        aud: OTP_ACTIVATION_JWT_AUDIENCE,
-      });
-      cacheManager.get.mockResolvedValue(otp); // Correct OTP
-      cacheManager.del.mockResolvedValue(undefined);
-      prismaOltp.user.findUnique.mockResolvedValue(mockUser);
-      prismaOltp.email.findFirst.mockResolvedValue(mockPrimaryEmail); // For finding primary email to verify
-      prismaOltp.user.update.mockResolvedValue({ ...mockUser, status: 'A' }); // User status update
-      prismaOltp.email.update.mockResolvedValue({
-        ...mockPrimaryEmail,
-        status_id: new Decimal(1),
-      }); // Email status update
-      eventService.postEnvelopedNotification.mockResolvedValue(undefined);
-      eventService.postDirectBusMessage.mockResolvedValue(undefined);
+      (verifySignedJwt as jest.Mock).mockReset();
+      prismaOltp.$queryRaw.mockResolvedValue([{ status: 'U' }]);
+      prismaOltp.user_otp_email.findUnique.mockResolvedValue(code);
+      prismaOltp.email.findFirst.mockResolvedValue(email);
     });
 
-    it('should activate a user successfully and send welcome email', async () => {
-      const result = await service.activateUser(activateDto);
-      expect(verifySignedJwt).toHaveBeenCalledWith(
-        resendToken,
-        'test-jwt-secret',
-        {
-          audience: OTP_ACTIVATION_JWT_AUDIENCE,
-        },
-      );
-      expect(cacheManager.get).toHaveBeenCalledWith(
-        `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`,
-      );
-      expect(cacheManager.del).toHaveBeenCalledWith(
-        `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`,
-      );
-      expect(prismaOltp.user.update).toHaveBeenCalledWith({
-        where: { user_id: userId },
-        data: { status: 'A', modify_date: expect.any(Date) },
-      });
+    it('consumes the code, verifies the primary address and sends the welcome email', async () => {
+      prismaOltp.user.findUnique.mockResolvedValue({ status: 'A' });
+      await expect(activate()).resolves.toEqual({ status: 'A' });
       expect(prismaOltp.email.update).toHaveBeenCalledWith({
-        where: { email_id: mockPrimaryEmail.email_id },
+        where: { ...email, primary_ind: 1 },
         data: { status_id: 1, modify_date: expect.any(Date) },
       });
-      expect(mockEventService.postEnvelopedNotification).toHaveBeenCalledWith(
-        'user.activated',
-        { userId: userId.toString() },
-      );
-      expect(mockEventService.postDirectBusMessage).toHaveBeenCalledWith(
-        'external.action.email',
-        expect.objectContaining({ sendgrid_template_id: 'd-welcome' }),
-      );
-      expect(result?.status).toBe('U');
-    });
-
-    it('should throw BadRequestException if userId, otp, or resendToken is missing', async () => {
-      await expect(
-        service.activateUser({
-          param: { userId: undefined, otp, resendToken },
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.activateUser({
-          param: { userId, otp: undefined, resendToken },
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.activateUser({
-          param: { userId, otp, resendToken: undefined },
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw ForbiddenException for invalid resend token (sub mismatch)', async () => {
-      (verifySignedJwt as jest.Mock).mockReturnValue({
-        sub: '2',
-        aud: OTP_ACTIVATION_JWT_AUDIENCE,
-      }); // Different user ID
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        new ForbiddenException('Invalid or expired resend token.'),
-      );
-    });
-    it('should throw GoneException if resend token is expired', async () => {
-      (verifySignedJwt as jest.Mock).mockImplementation(() => {
-        throw new jwt.TokenExpiredError('expired');
+      expect(prismaOltp.user_otp_email.delete).toHaveBeenCalledWith({
+        where: { id: code.id },
       });
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        GoneException,
-      );
-    });
-    it('should throw ForbiddenException for other jwt errors', async () => {
-      (verifySignedJwt as jest.Mock).mockImplementation(() => {
-        throw new Error('jwt malformed');
-      });
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        ForbiddenException,
+      expect(mockUserService.notifyWelcome).toHaveBeenCalledWith(
+        userId,
+        email.address,
       );
     });
 
-    it('should throw GoneException if OTP not found in cache', async () => {
-      cacheManager.get.mockResolvedValue(null);
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        GoneException,
-      );
+    it('persists the replacement and email job in the same write', async () => {
+      await expect(resend()).resolves.toMatchObject({ message: 'SUCCESS' });
+      const { create, update } =
+        prismaOltp.user_otp_email.upsert.mock.calls[0][0];
+      expect(create).toEqual({ ...update, user_id: userId, mode: 1 });
+      expect(update.otp).toMatch(/^\d{6}$/);
+      expect(update.otp).not.toBe(otp);
+      expect(update.delivery_due_at).toEqual(expect.any(Date));
+      expect(update.delivery_recipient).toBe(email.address);
+      expect(eventService.postDirectBusMessage).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException for invalid OTP', async () => {
-      cacheManager.get.mockResolvedValue('wrong-otp');
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        BadRequestException,
-      );
+    it('rejects missing input before reading the database', async () => {
+      for (const field of ['userId', 'otp', 'resendToken']) {
+        await expect(
+          service.activateUser({
+            param: { userId, otp, resendToken, [field]: undefined },
+          }),
+        ).rejects.toThrow(BadRequestException);
+      }
+      for (const field of ['userId', 'resendToken']) {
+        await expect(
+          service.requestResendActivation({
+            userId,
+            resendToken,
+            [field]: undefined,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(prismaOltp.$transaction).not.toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if user not found in DB', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue(null);
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
+    for (const operation of [activate, resend]) {
+      describe(operation.name, () => {
+        it.each([
+          [new Error('Token user mismatch'), ForbiddenException],
+          [new Error('jwt malformed'), ForbiddenException],
+          [new jwt.TokenExpiredError('expired', new Date()), GoneException],
+        ])(
+          'requires a valid account-bound activation proof',
+          async (error, exception) => {
+            (verifySignedJwt as jest.Mock).mockImplementation(() => {
+              throw error;
+            });
+            await expect(operation()).rejects.toThrow(exception);
+            expect(verifySignedJwt).toHaveBeenCalledWith(
+              resendToken,
+              'test-jwt-secret',
+              { audience: OTP_ACTIVATION_JWT_AUDIENCE, userId },
+            );
+            expect(prismaOltp.$transaction).not.toHaveBeenCalled();
+          },
+        );
+        it.each([
+          [[], NotFoundException],
+          [[{ status: 'A' }], BadRequestException],
+          [[{ status: 'I' }], ForbiddenException],
+        ])(
+          'requires an existing unverified account',
+          async (rows, exception) => {
+            prismaOltp.$queryRaw.mockResolvedValue(rows);
+            await expect(operation()).rejects.toThrow(exception);
+          },
+        );
+        it('requires a registered primary email', async () => {
+          prismaOltp.email.findFirst.mockResolvedValue(null);
+          await expect(operation()).rejects.toThrow(
+            InternalServerErrorException,
+          );
+        });
+      });
+    }
 
-    it('should return "User is already active" if user status is A', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue({
-        ...mockUser,
-        status: 'A',
+    it('rejects a missing or expired code on activation', async () => {
+      prismaOltp.user_otp_email.findUnique.mockResolvedValueOnce(null);
+      await expect(activate()).rejects.toThrow(NotFoundException);
+      prismaOltp.user_otp_email.findUnique.mockResolvedValueOnce({
+        ...code,
+        expire_at: new Date(0),
       });
-      const result = await service.activateUser(activateDto);
-      expect(result.message).toBe('User is already active.');
-      expect(prismaOltp.user.update).not.toHaveBeenCalled(); // No update if already active
-    });
-    it('should throw ForbiddenException if user status is not U or A', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue({
-        ...mockUser,
-        status: 'I',
-      }); // Inactive
-      await expect(service.activateUser(activateDto)).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
-    it('should handle case where primary email is not found during transaction', async () => {
-      prismaOltp.email.findFirst.mockResolvedValue(null); // No primary email
-      await service.activateUser(activateDto);
-      expect(prismaOltp.email.update).not.toHaveBeenCalled(); // Email update should not be called
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `No primary email record (primary_ind = 1) found for user ${userId}`,
-        ),
-      );
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `Could not send welcome email for user ${userId} due to missing primary email address or handle.`,
-        ),
-      );
-    });
-  });
-
-  describe('requestResendActivation', () => {
-    const userId = 1;
-    const resendToken = 'valid.resend.token';
-    const resendDto: UserOtpDto = { userId, resendToken };
-    const mockUser = createMockUserModel({
-      user_id: new Decimal(userId),
-      status: 'U',
-      handle: 'unverifiedUser',
-    });
-    const mockPrimaryUnverifiedEmail = createMockEmailModel({
-      user_id: new Decimal(userId),
-      address: 'unverified@example.com',
-      status_id: new Decimal(2),
-    });
-
-    beforeEach(() => {
-      (verifySignedJwt as jest.Mock).mockReturnValue({
-        sub: userId.toString(),
-        aud: OTP_ACTIVATION_JWT_AUDIENCE,
-      });
-      prismaOltp.user.findUnique.mockResolvedValue(mockUser);
-      prismaOltp.email.findFirst.mockResolvedValue(mockPrimaryUnverifiedEmail);
-      cacheManager.set.mockResolvedValue(undefined);
-      eventService.postDirectBusMessage.mockResolvedValue(undefined);
-    });
-
-    it('should resend activation email successfully', async () => {
-      const result = await service.requestResendActivation(resendDto);
-      expect(verifySignedJwt).toHaveBeenCalledWith(
-        resendToken,
-        'test-jwt-secret',
-        {
-          audience: OTP_ACTIVATION_JWT_AUDIENCE,
-        },
-      );
-      expect(prismaOltp.user.findUnique).toHaveBeenCalledWith({
-        where: { user_id: userId },
-      });
-      expect(prismaOltp.email.findFirst).toHaveBeenCalledWith({
-        where: { user_id: userId, primary_ind: 1, status_id: 2 },
-      });
-      expect(cacheManager.set).toHaveBeenCalledWith(
-        `${ACTIVATION_OTP_CACHE_PREFIX_KEY}:${userId}`,
-        expect.any(String),
-        expect.any(Number),
-      );
-      expect(mockEventService.postDirectBusMessage).toHaveBeenCalledWith(
-        'external.action.email',
-        expect.objectContaining({
-          sendgrid_template_id: 'd-resend-activation',
-          recipients: [mockPrimaryUnverifiedEmail.address],
-        }),
-      );
-      expect(result.message).toBe(
-        'Activation email has been resent successfully.',
-      );
-    });
-
-    it('should throw BadRequestException if userId or resendToken is missing', async () => {
-      await expect(
-        service.requestResendActivation({
-          userId: undefined,
-          resendToken,
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.requestResendActivation({
-          userId,
-          resendToken: undefined,
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-    it('should throw ForbiddenException for invalid resend token (sub mismatch)', async () => {
-      (verifySignedJwt as jest.Mock).mockReturnValue({
-        sub: '2',
-        aud: OTP_ACTIVATION_JWT_AUDIENCE,
-      });
-      await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
-        new ForbiddenException('Invalid or expired resend token.'),
-      );
-    });
-    it('should throw GoneException if resend token is expired', async () => {
-      (verifySignedJwt as jest.Mock).mockImplementation(() => {
-        throw new jwt.TokenExpiredError('expired');
-      });
-      await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
-        GoneException,
-      );
-    });
-    it('should throw NotFoundException if user not found', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue(null);
-      await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-    it('should throw InternalServerErrorException if primary unverified email not found', async () => {
-      prismaOltp.email.findFirst.mockResolvedValue(null);
-      await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
-        new InternalServerErrorException(
-          'Primary unverified email not found for the user.',
-        ),
-      );
-    });
-    it('should return "Account is already activated" if user status is A', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue({
-        ...mockUser,
-        status: 'A',
-      });
-      const result = await service.requestResendActivation(resendDto);
-      expect(result.message).toBe('Account is already activated.');
-      expect(cacheManager.set).not.toHaveBeenCalled(); // No OTP generation if already active
-    });
-    it('should throw ForbiddenException if user status is not U or A', async () => {
-      prismaOltp.user.findUnique.mockResolvedValue({
-        ...mockUser,
-        status: 'I',
-      });
-      await expect(service.requestResendActivation(resendDto)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(activate()).rejects.toThrow('Activation code expired');
     });
   });
 
@@ -1039,13 +873,12 @@ describe('AuthFlowService', () => {
       prismaOltp.email.findFirst
         .mockReset()
         .mockResolvedValue(mockPrimaryEmail);
-      (prismaOltp as any).user_otp_email = {
-        findFirst: jest.fn().mockResolvedValue({
-          fail_count: 0,
-          expire_at: new Date(Date.now() + 60000),
-          resend: false,
-        }),
-      };
+      prismaOltp.user_otp_email.findUnique.mockResolvedValue({
+        fail_count: 0,
+        expire_at: new Date(Date.now() + 60000),
+        activation_sends: [],
+        activation_failures: [],
+      });
       roleService.findAll.mockResolvedValue(mockRoles);
       userService.generateSSOToken.mockResolvedValue(mockTcssoToken);
       (jwt.sign as jest.Mock).mockReturnValue(mockResendActivationToken);
