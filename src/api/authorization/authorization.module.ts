@@ -8,8 +8,7 @@ import {
 import { Module } from '@nestjs/common';
 import { AuthorizationController } from './authorization.controller';
 import { AuthorizationService } from './authorization.service';
-import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaModule } from '../../shared/prisma/prisma.module';
 import { Auth0Module } from '../../shared/auth0/auth0.module';
 import { UserModule } from '../user/user.module';
 import { AuthDataStore } from './auth-data-store.service';
@@ -19,7 +18,13 @@ import { ConfigurationModule } from '../../config/configuration.module';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 
 @Module({
-  imports: [Auth0Module, ConfigurationModule, ConfigModule, UserModule],
+  imports: [
+    Auth0Module,
+    ConfigurationModule,
+    ConfigModule,
+    PrismaModule,
+    UserModule,
+  ],
   controllers: [AccessTokenJwksController, AuthorizationController],
   providers: [
     AuthorizationService,
@@ -31,10 +36,6 @@ import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
           maxAttempts: 2,
           requestHandler: { connectionTimeout: 2000, requestTimeout: 5000 },
         }),
-    },
-    {
-      provide: PRISMA_CLIENT,
-      useClass: PrismaClient,
     },
     AuthDataStore,
     ZendeskAuthPlugin,
