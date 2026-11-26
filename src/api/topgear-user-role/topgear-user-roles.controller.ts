@@ -210,7 +210,6 @@ export class TopgearUserRolesController {
       [
         ...requiredScopes,
         SCOPES.ALL_TOPGEAR_USER_ROLES,
-        SCOPES.ALL_USER_ROLES,
         SCOPES.ALL_USERS_ROLE,
         SCOPES.ALL_ROLES,
         SCOPES.ALL_USERS,

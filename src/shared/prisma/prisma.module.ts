@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../../prisma-adapter';
 import { Module, Global, Provider } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaClient as PrismaClientGroup } from '@prisma/client-group';
@@ -10,7 +11,7 @@ export const PRISMA_CLIENT_GROUP = 'PRISMA_CLIENT_GROUP';
 const prismaProvider: Provider = {
   provide: PRISMA_CLIENT,
   useFactory: () => {
-    const client = new PrismaClient();
+    const client = new PrismaClient({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
     // Connect eagerly or handle connection errors if needed
     client
       .$connect()
@@ -23,7 +24,7 @@ const prismaProvider: Provider = {
 const groupProvider: Provider = {
   provide: PRISMA_CLIENT_GROUP,
   useFactory: () => {
-    const client = new PrismaClientGroup();
+    const client = new PrismaClientGroup({ adapter: createPostgresAdapter(process.env.GROUP_DB_URL) });
     // Connect eagerly or handle connection errors if needed
     client
       .$connect()

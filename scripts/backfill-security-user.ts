@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../src/prisma-adapter';
 /* eslint-disable no-console */
 import { createReadStream, existsSync, readFileSync } from 'fs';
 import { resolve, extname } from 'path';
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
 
     console.log(`[load] Loaded ${records.length} candidate records from export.`);
 
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
 
     try {
       const missingRecords = await findMissingRecords(prisma, records);

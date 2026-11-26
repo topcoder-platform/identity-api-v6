@@ -40,7 +40,7 @@ import { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import * as crypto from 'crypto';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import { Constants, DefaultGroups } from '../../core/constant/constants';
 import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { MemberStatus } from '../../dto/member';

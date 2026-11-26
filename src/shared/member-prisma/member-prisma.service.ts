@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../../prisma-adapter';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient as MemberPrismaClient } from '../../../prisma/member/generated/member';
 
@@ -8,6 +9,7 @@ export class MemberPrismaService
 {
   constructor() {
     super({
+      adapter: createPostgresAdapter(process.env.MEMBER_DB_URL),
       transactionOptions: {
         timeout: process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT
           ? parseInt(process.env.IDENTITY_SERVICE_PRISMA_TIMEOUT, 10)

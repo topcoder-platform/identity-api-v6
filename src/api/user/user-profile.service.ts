@@ -22,7 +22,7 @@ import { ConfigService } from '@nestjs/config';
 import { Constants } from '../../core/constant/constants';
 import { getProviderDetails } from '../../core/constant/provider-type.enum';
 import { UserService } from './user.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 // Import other needed services
 
 @Injectable()

@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("GROUP_DB_URL")
 }
 
 // GROUP SCHEMA MODELS

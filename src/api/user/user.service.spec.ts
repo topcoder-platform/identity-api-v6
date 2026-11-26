@@ -38,12 +38,12 @@ import {
   AchievementDto,
 } from '../../dto/user/user.dto';
 import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import * as crypto from 'crypto';
 import { Cache } from 'cache-manager';
-import { MemberPrismaService } from 'src/shared/member-prisma/member-prisma.service';
+import { MemberPrismaService } from '../../shared/member-prisma/member-prisma.service';
 import { Constants } from '../../core/constant/constants';
 
 // Null logger to suppress NestJS application logs during tests
@@ -193,13 +193,6 @@ jest.mock('jsonwebtoken', () => ({
   verify: jest.fn(), // If you ever use verify
 }));
 
-// Mock UUID generation while retaining the other native crypto functions.
-jest.mock('node:crypto', () => ({
-  ...jest.requireActual('node:crypto'),
-  randomUUID: jest.fn(),
-}));
-
-// Mock crypto (Node.js built-ino
 let createCipherivError = false;
 const mockUpdate = jest.fn().mockReturnThis();
 const mockDigest = jest.fn();
@@ -207,6 +200,7 @@ jest.mock('crypto', () => {
   const realCrypto = jest.requireActual('crypto');
   return {
     ...realCrypto,
+    randomUUID: jest.fn(),
     createCipheriv: jest.fn((algorithm, key, iv) => {
       if (createCipherivError) {
         throw new Error('Crypto Error');
@@ -1825,7 +1819,7 @@ describe('UserService', () => {
         });
         // Simulate security_user.update fails with P2002
         prismaOltp.security_user.update.mockRejectedValueOnce(
-          new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          new Prisma.PrismaClientKnownRequestError('Unique constraint failed on security_user.user_id', {
             code: 'P2002',
             clientVersion: 'test',
             meta: { modelName: 'security_user', target: ['user_id'] }, // user_id in security_user is the handle
@@ -1839,7 +1833,7 @@ describe('UserService', () => {
         service.updateHandle(userIdString, newHandle, mockUser),
       ).rejects.toThrow(
         new ConflictException(
-          'Failed to update user handle due to a database error.',
+          `The handle '${newHandle}' is already in use in the security system.`,
         ),
       );
     });

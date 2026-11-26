@@ -13,7 +13,7 @@ import {
   ProviderId,
   ProviderTypes,
 } from '../../core/constant/provider-type.enum';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 
 // Corrected Constants
 const MSG_PROFILE_MANDATORY = 'Profile data must be specified.';
@@ -740,7 +740,7 @@ describe('ValidationService', () => {
       expect(socialProfile.providerType).toBe('social');
     });
 
-    it('should throw ConflictException if social profile already linked to this user', async () => {
+    it('should throw BadRequestException if social profile already linked to this user', async () => {
       prismaOltp.user_social_login.findUnique.mockResolvedValue(
         createMockUserSocialLoginModel({
           user_id: new Decimal(internalUserId),
@@ -750,11 +750,11 @@ describe('ValidationService', () => {
       await expect(
         service.validateProfile(socialProfile, internalUserId),
       ).rejects.toThrow(
-        new ConflictException(MSG_USER_ALREADY_BOUND_WITH_PROVIDER),
+        new BadRequestException(MSG_USER_ALREADY_BOUND_WITH_PROVIDER),
       );
     });
 
-    it('should throw ConflictException if social profile in use by another user', async () => {
+    it('should throw BadRequestException if social profile in use by another user', async () => {
       prismaOltp.user_social_login.findUnique.mockResolvedValue(null);
       prismaOltp.user_social_login.findFirst.mockResolvedValue(
         createMockUserSocialLoginModel({
@@ -765,7 +765,7 @@ describe('ValidationService', () => {
       );
       await expect(
         service.validateProfile(socialProfile, internalUserId),
-      ).rejects.toThrow(new ConflictException(MSG_SOCIAL_PROFILE_IN_USE));
+      ).rejects.toThrow(new BadRequestException(MSG_SOCIAL_PROFILE_IN_USE));
     });
     it('should throw BadRequestException if social profile userId is missing', async () => {
       const profileWithoutUserId = {

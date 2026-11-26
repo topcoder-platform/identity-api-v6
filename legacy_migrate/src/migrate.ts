@@ -1,5 +1,7 @@
 /* eslint-disable no-console */
 import 'dotenv/config';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+const { createPostgresAdapter } = require('./postgres-adapter');
 
 const fs = require('fs');
 const path = require('path');
@@ -15,9 +17,11 @@ type Rows<T extends (...args: any) => any> = Awaited<ReturnType<T>>;
 type Row<T extends (...args: any) => any> = Rows<T>[number];
 
 // ---- Instantiate clients
-const target = new TargetPrisma();
-const sourceAuth = new SourceAuthPrisma();
-const sourceIdentity = new SourceIdentityPrisma();
+const target = new TargetPrisma({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
+const authUrl = process.env.SOURCE_AUTH_MYSQL_URL;
+if (!authUrl) throw new Error('SOURCE_AUTH_MYSQL_URL is required');
+const sourceAuth = new SourceAuthPrisma({ adapter: new PrismaMariaDb(authUrl) });
+const sourceIdentity = new SourceIdentityPrisma({ adapter: createPostgresAdapter(process.env.SOURCE_IDENTITY_PG_URL) });
 
 // ---- Tunables
 const BATCH_SIZE = 1000;

@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("SOURCE_AUTH_MYSQL_URL")
 }
 
 model Client {

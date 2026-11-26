@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "types": ["node", "jest"],
+    "strict": false,
+    "module": "NodeNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -10,7 +12,7 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
@@ -19,8 +21,8 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@prisma/client-common-oltp": ["node_modules/@prisma/client-common-oltp"],
-      "@prisma/client-authorization": ["node_modules/@prisma/client-authorization"]
+      "@prisma/client-common-oltp": ["./node_modules/@prisma/client-common-oltp"],
+      "@prisma/client-authorization": ["./node_modules/@prisma/client-authorization"]
     }
   }
 }
