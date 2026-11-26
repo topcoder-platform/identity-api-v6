@@ -1,22 +1,15 @@
+import { createPostgresAdapter } from '../src/prisma-adapter';
 import { PrismaClient as IdentityClient } from '@prisma/client';
 import mysql from 'mysql2/promise';
 
 // Database clients
 const identityDb = new IdentityClient({
-  datasources: {
-    db: {
-      url: 'postgresql://postgres:identitypassword@localhost:5432/identity'
-    }
-  }
+  adapter: createPostgresAdapter('postgresql://postgres:identitypassword@localhost:5432/identity')
 });
 
 // Create a separate Prisma client for common_oltp database using raw connection
 const createCommonOltpClient = () => new IdentityClient({
-  datasources: { 
-    db: { 
-      url: 'postgresql://postgres:identitypassword@localhost:5433/common_oltp_db'
-    } 
-  }
+  adapter: createPostgresAdapter('postgresql://postgres:identitypassword@localhost:5433/common_oltp_db')
 });
 
 // MySQL connection for authorization data

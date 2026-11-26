@@ -26,9 +26,9 @@ import {
   email as EmailModel,
   security_user as SecurityUserModel,
 } from '@prisma/client';
-import { RoleResponseDto } from 'src/dto/role/role.dto';
+import { RoleResponseDto } from '../../dto/role/role.dto';
 import { ACTIVATION_OTP_EXPIRY_SECONDS } from './user.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import { ValidationService } from './validation.service';

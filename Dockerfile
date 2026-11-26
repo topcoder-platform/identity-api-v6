@@ -13,6 +13,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tools ./tools
 COPY patches ./patches
+COPY prisma.config.ts ./
 COPY prisma ./prisma
 RUN npm install --global pnpm@${PNPM_VERSION}
 RUN pnpm install --frozen-lockfile
@@ -28,11 +29,9 @@ RUN node node_modules/prisma/build/index.js generate --schema=prisma/schema.pris
 FROM alpine:3.24 AS runtime
 
 ARG NODE_VERSION
-# Alpine replaces old APK patch versions. Keep the configured Node major while
-# accepting maintained patch releases and verify the selected runtime below.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache 'libcrypto3>=3.5.9-r1' 'libssl3>=3.5.9-r1' bash "nodejs-current~${NODE_VERSION%%.*}" "nodejs-current>=26.13.1-r0" "zlib>=1.4-r0" \
-    && test "$(node -p 'process.versions.node.split(".")[0]')" = "${NODE_VERSION%%.*}" \
+    && apk add --no-cache 'libcrypto3>=3.5.9-r1' 'libssl3>=3.5.9-r1' bash 'nodejs-current~26.13.1' "zlib>=1.4-r0" \
+    && test "$(node -p 'process.versions.node')" = "${NODE_VERSION}" \
     && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app
 
@@ -45,6 +44,7 @@ WORKDIR /app
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/prisma ./prisma
+COPY --from=build --chown=app:app /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/appStartUp.sh ./appStartUp.sh
 RUN chmod +x appStartUp.sh

@@ -5,7 +5,6 @@ generator memberClient {
 
 datasource memberdb {
   provider = "postgresql"
-  url      = env("MEMBER_DB_URL")
 }
 
 enum MemberStatus {

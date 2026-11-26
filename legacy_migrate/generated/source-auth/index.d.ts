@@ -3,7 +3,7 @@
  * Client
 **/
 
-import * as runtime from './runtime/library.js';
+import * as runtime from './runtime/client.js';
 import $Types = runtime.Types // general types
 import $Public = runtime.Types.Public
 import $Utils = runtime.Types.Utils
@@ -35,13 +35,15 @@ export type RoleAssignment = $Result.DefaultSelection<Prisma.$RoleAssignmentPayl
  * Type-safe database client for TypeScript & Node.js
  * @example
  * ```
- * const prisma = new PrismaClient()
+ * const prisma = new PrismaClient({
+ *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+ * })
  * // Fetch zero or more Clients
  * const clients = await prisma.client.findMany()
  * ```
  *
  *
- * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+ * Read more in our [docs](https://pris.ly/d/client).
  */
 export class PrismaClient<
   ClientOptions extends Prisma.PrismaClientOptions = Prisma.PrismaClientOptions,
@@ -56,16 +58,18 @@ export class PrismaClient<
    * Type-safe database client for TypeScript & Node.js
    * @example
    * ```
-   * const prisma = new PrismaClient()
+   * const prisma = new PrismaClient({
+   *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+   * })
    * // Fetch zero or more Clients
    * const clients = await prisma.client.findMany()
    * ```
    *
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+   * Read more in our [docs](https://pris.ly/d/client).
    */
 
-  constructor(optionsArg ?: Prisma.Subset<ClientOptions, Prisma.PrismaClientOptions>);
+  constructor(optionsArg ?: Prisma.PrismaClientConstructorArgs<ClientOptions>);
   $on<V extends U>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
 
   /**
@@ -85,7 +89,7 @@ export class PrismaClient<
    * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -97,7 +101,7 @@ export class PrismaClient<
    * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -108,7 +112,7 @@ export class PrismaClient<
    * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -120,7 +124,7 @@ export class PrismaClient<
    * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -136,12 +140,11 @@ export class PrismaClient<
    * ])
    * ```
    * 
-   * Read more in our [docs](https://www.prisma.io/docs/concepts/components/prisma-client/transactions).
+   * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
    */
-  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
+  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
 
   $transaction<R>(fn: (prisma: Omit<PrismaClient, runtime.ITXClientDenyList>) => $Utils.JsPromise<R>, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<R>
-
 
   $extends: $Extensions.ExtendsHook<"extends", Prisma.TypeMapCb<ClientOptions>, ExtArgs, $Utils.Call<Prisma.TypeMapCb<ClientOptions>, {
     extArgs: ExtArgs
@@ -216,14 +219,6 @@ export namespace Prisma {
   export type DecimalJsLike = runtime.DecimalJsLike
 
   /**
-   * Metrics
-   */
-  export type Metrics = runtime.Metrics
-  export type Metric<T> = runtime.Metric<T>
-  export type MetricHistogram = runtime.MetricHistogram
-  export type MetricHistogramBucket = runtime.MetricHistogramBucket
-
-  /**
   * Extensions
   */
   export import Extension = $Extensions.UserArgs
@@ -234,11 +229,12 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 6.14.0
-   * Query Engine version: 717184b7b35ea05dfa71a3236b7af656013e1e49
+   * Prisma Client JS version: 7.10.1
+   * Query Engine version: d1b3f377ca835d73fd50954a5e22128b9ebdd6b8
    */
   export type PrismaVersion = {
     client: string
+    engine: string
   }
 
   export const prismaVersion: PrismaVersion
@@ -248,6 +244,7 @@ export namespace Prisma {
    */
 
 
+  export import Bytes = runtime.Bytes
   export import JsonObject = runtime.JsonObject
   export import JsonArray = runtime.JsonArray
   export import JsonValue = runtime.JsonValue
@@ -368,6 +365,19 @@ export namespace Prisma {
   };
 
   /**
+   * Resolved type of the argument passed to the `PrismaClient` constructor.
+   *
+   * When called without a narrower options type (the common case), this resolves
+   * to `PrismaClientOptions` directly, which produces a clear TypeScript error
+   * message (`not assignable to parameter of type 'PrismaClientOptions'`) when
+   * the argument is missing or incomplete. When the user supplies a narrower
+   * options type (e.g. via a literal), it falls back to `Subset` to keep
+   * filtering out unknown properties.
+   */
+  export type PrismaClientConstructorArgs<Options extends PrismaClientOptions> =
+    [PrismaClientOptions] extends [Options] ? PrismaClientOptions : Subset<Options, PrismaClientOptions>;
+
+  /**
    * SelectSubset
    * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
    * Additionally, it validates, if both select and include are present. If the case, it errors.
@@ -399,7 +409,7 @@ export namespace Prisma {
   type XOR<T, U> =
     T extends object ?
     U extends object ?
-      (Without<T, U> & U) | (Without<U, T> & T)
+      ((Without<T, U> & U) | (Without<U, T> & T)) & object
     : U : T
 
 
@@ -624,9 +634,6 @@ export namespace Prisma {
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
 
 
-  export type Datasources = {
-    db?: Datasource
-  }
 
   interface TypeMapCb<ClientOptions = {}> extends $Utils.Fn<{extArgs: $Extensions.InternalArgs }, $Utils.Record<string, any>> {
     returns: Prisma.TypeMap<this['params']['extArgs'], ClientOptions extends { omit: infer OmitOptions } ? OmitOptions : {}>
@@ -868,14 +875,6 @@ export namespace Prisma {
   export type ErrorFormat = 'pretty' | 'colorless' | 'minimal'
   export interface PrismaClientOptions {
     /**
-     * Overwrites the datasource url from your schema.prisma file
-     */
-    datasources?: Datasources
-    /**
-     * Overwrites the datasource url from your schema.prisma file
-     */
-    datasourceUrl?: string
-    /**
      * @default "colorless"
      */
     errorFormat?: ErrorFormat
@@ -901,7 +900,7 @@ export namespace Prisma {
      *  { emit: 'stdout', level: 'error' }
      * 
      * ```
-     * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/logging#the-log-option).
+     * Read more in our [docs](https://pris.ly/d/logging).
      */
     log?: (LogLevel | LogDefinition)[]
     /**
@@ -914,6 +913,29 @@ export namespace Prisma {
       timeout?: number
       isolationLevel?: Prisma.TransactionIsolationLevel
     }
+    /**
+     * A driver adapter that PrismaClient uses to connect to your database, such as the ones provided by `@prisma/adapter-pg`, `@prisma/adapter-libsql`, `@prisma/adapter-planetscale`, etc.
+     * 
+     * A driver adapter is **required** unless you connect to your database through Prisma Accelerate (in which case use `accelerateUrl` instead).
+     * 
+     * Learn more: https://pris.ly/d/driver-adapters
+     * 
+     * @example
+     * ```ts
+     * import { PrismaPg } from '@prisma/adapter-pg'
+     * import { PrismaClient } from './generated/prisma/client'
+     * 
+     * const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+     * const prisma = new PrismaClient({ adapter })
+     * ```
+     */
+    adapter?: runtime.SqlDriverAdapterFactory
+    /**
+     * The Prisma Accelerate connection URL. Use this option to connect to your database through Prisma Accelerate instead of using a driver adapter to connect directly.
+     * 
+     * Learn more: https://pris.ly/d/accelerate
+     */
+    accelerateUrl?: string
     /**
      * Global configuration for omitting model fields by default.
      * 
@@ -929,6 +951,22 @@ export namespace Prisma {
      * ```
      */
     omit?: Prisma.GlobalOmitConfig
+    /**
+     * SQL commenter plugins that add metadata to SQL queries as comments.
+     * Comments follow the sqlcommenter format: https://google.github.io/sqlcommenter/
+     * 
+     * @example
+     * ```
+     * const prisma = new PrismaClient({
+     *   adapter,
+     *   comments: [
+     *     traceContext(),
+     *     queryInsights(),
+     *   ],
+     * })
+     * ```
+     */
+    comments?: runtime.SqlCommenterPlugin[]
   }
   export type GlobalOmitConfig = {
     client?: ClientOmit
@@ -1837,6 +1875,11 @@ export namespace Prisma {
      * Skip the first `n` Clients.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Clients.
+     */
     distinct?: ClientScalarFieldEnum | ClientScalarFieldEnum[]
   }
 
@@ -2772,6 +2815,11 @@ export namespace Prisma {
      * Skip the first `n` Roles.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Roles.
+     */
     distinct?: RoleScalarFieldEnum | RoleScalarFieldEnum[]
   }
 
@@ -2935,7 +2983,6 @@ export namespace Prisma {
     subjectId: number | null
     createdBy: number | null
     modifiedBy: number | null
-    subjectType: number | null
   }
 
   export type RoleAssignmentSumAggregateOutputType = {
@@ -2944,7 +2991,6 @@ export namespace Prisma {
     subjectId: number | null
     createdBy: number | null
     modifiedBy: number | null
-    subjectType: number | null
   }
 
   export type RoleAssignmentMinAggregateOutputType = {
@@ -2955,7 +3001,6 @@ export namespace Prisma {
     createdAt: Date | null
     modifiedBy: number | null
     modifiedAt: Date | null
-    subjectType: number | null
   }
 
   export type RoleAssignmentMaxAggregateOutputType = {
@@ -2966,7 +3011,6 @@ export namespace Prisma {
     createdAt: Date | null
     modifiedBy: number | null
     modifiedAt: Date | null
-    subjectType: number | null
   }
 
   export type RoleAssignmentCountAggregateOutputType = {
@@ -2977,7 +3021,6 @@ export namespace Prisma {
     createdAt: number
     modifiedBy: number
     modifiedAt: number
-    subjectType: number
     _all: number
   }
 
@@ -2988,7 +3031,6 @@ export namespace Prisma {
     subjectId?: true
     createdBy?: true
     modifiedBy?: true
-    subjectType?: true
   }
 
   export type RoleAssignmentSumAggregateInputType = {
@@ -2997,7 +3039,6 @@ export namespace Prisma {
     subjectId?: true
     createdBy?: true
     modifiedBy?: true
-    subjectType?: true
   }
 
   export type RoleAssignmentMinAggregateInputType = {
@@ -3008,7 +3049,6 @@ export namespace Prisma {
     createdAt?: true
     modifiedBy?: true
     modifiedAt?: true
-    subjectType?: true
   }
 
   export type RoleAssignmentMaxAggregateInputType = {
@@ -3019,7 +3059,6 @@ export namespace Prisma {
     createdAt?: true
     modifiedBy?: true
     modifiedAt?: true
-    subjectType?: true
   }
 
   export type RoleAssignmentCountAggregateInputType = {
@@ -3030,7 +3069,6 @@ export namespace Prisma {
     createdAt?: true
     modifiedBy?: true
     modifiedAt?: true
-    subjectType?: true
     _all?: true
   }
 
@@ -3128,7 +3166,6 @@ export namespace Prisma {
     createdAt: Date | null
     modifiedBy: number | null
     modifiedAt: Date | null
-    subjectType: number
     _count: RoleAssignmentCountAggregateOutputType | null
     _avg: RoleAssignmentAvgAggregateOutputType | null
     _sum: RoleAssignmentSumAggregateOutputType | null
@@ -3158,7 +3195,6 @@ export namespace Prisma {
     createdAt?: boolean
     modifiedBy?: boolean
     modifiedAt?: boolean
-    subjectType?: boolean
   }, ExtArgs["result"]["roleAssignment"]>
 
 
@@ -3171,10 +3207,9 @@ export namespace Prisma {
     createdAt?: boolean
     modifiedBy?: boolean
     modifiedAt?: boolean
-    subjectType?: boolean
   }
 
-  export type RoleAssignmentOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "roleId" | "subjectId" | "createdBy" | "createdAt" | "modifiedBy" | "modifiedAt" | "subjectType", ExtArgs["result"]["roleAssignment"]>
+  export type RoleAssignmentOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "roleId" | "subjectId" | "createdBy" | "createdAt" | "modifiedBy" | "modifiedAt", ExtArgs["result"]["roleAssignment"]>
 
   export type $RoleAssignmentPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "RoleAssignment"
@@ -3187,7 +3222,6 @@ export namespace Prisma {
       createdAt: Date | null
       modifiedBy: number | null
       modifiedAt: Date | null
-      subjectType: number
     }, ExtArgs["result"]["roleAssignment"]>
     composites: {}
   }
@@ -3564,7 +3598,6 @@ export namespace Prisma {
     readonly createdAt: FieldRef<"RoleAssignment", 'DateTime'>
     readonly modifiedBy: FieldRef<"RoleAssignment", 'Int'>
     readonly modifiedAt: FieldRef<"RoleAssignment", 'DateTime'>
-    readonly subjectType: FieldRef<"RoleAssignment", 'Int'>
   }
     
 
@@ -3741,6 +3774,11 @@ export namespace Prisma {
      * Skip the first `n` RoleAssignments.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RoleAssignments.
+     */
     distinct?: RoleAssignmentScalarFieldEnum | RoleAssignmentScalarFieldEnum[]
   }
 
@@ -3934,8 +3972,7 @@ export namespace Prisma {
     createdBy: 'createdBy',
     createdAt: 'createdAt',
     modifiedBy: 'modifiedBy',
-    modifiedAt: 'modifiedAt',
-    subjectType: 'subjectType'
+    modifiedAt: 'modifiedAt'
   };
 
   export type RoleAssignmentScalarFieldEnum = (typeof RoleAssignmentScalarFieldEnum)[keyof typeof RoleAssignmentScalarFieldEnum]
@@ -4156,7 +4193,6 @@ export namespace Prisma {
     createdAt?: DateTimeNullableFilter<"RoleAssignment"> | Date | string | null
     modifiedBy?: IntNullableFilter<"RoleAssignment"> | number | null
     modifiedAt?: DateTimeNullableFilter<"RoleAssignment"> | Date | string | null
-    subjectType?: IntFilter<"RoleAssignment"> | number
   }
 
   export type RoleAssignmentOrderByWithRelationInput = {
@@ -4167,12 +4203,10 @@ export namespace Prisma {
     createdAt?: SortOrderInput | SortOrder
     modifiedBy?: SortOrderInput | SortOrder
     modifiedAt?: SortOrderInput | SortOrder
-    subjectType?: SortOrder
   }
 
   export type RoleAssignmentWhereUniqueInput = Prisma.AtLeast<{
     id?: number
-    roleId_subjectId_subjectType?: RoleAssignmentRoleIdSubjectIdSubjectTypeCompoundUniqueInput
     AND?: RoleAssignmentWhereInput | RoleAssignmentWhereInput[]
     OR?: RoleAssignmentWhereInput[]
     NOT?: RoleAssignmentWhereInput | RoleAssignmentWhereInput[]
@@ -4182,8 +4216,7 @@ export namespace Prisma {
     createdAt?: DateTimeNullableFilter<"RoleAssignment"> | Date | string | null
     modifiedBy?: IntNullableFilter<"RoleAssignment"> | number | null
     modifiedAt?: DateTimeNullableFilter<"RoleAssignment"> | Date | string | null
-    subjectType?: IntFilter<"RoleAssignment"> | number
-  }, "id" | "roleId_subjectId_subjectType">
+  }, "id">
 
   export type RoleAssignmentOrderByWithAggregationInput = {
     id?: SortOrder
@@ -4193,7 +4226,6 @@ export namespace Prisma {
     createdAt?: SortOrderInput | SortOrder
     modifiedBy?: SortOrderInput | SortOrder
     modifiedAt?: SortOrderInput | SortOrder
-    subjectType?: SortOrder
     _count?: RoleAssignmentCountOrderByAggregateInput
     _avg?: RoleAssignmentAvgOrderByAggregateInput
     _max?: RoleAssignmentMaxOrderByAggregateInput
@@ -4212,7 +4244,6 @@ export namespace Prisma {
     createdAt?: DateTimeNullableWithAggregatesFilter<"RoleAssignment"> | Date | string | null
     modifiedBy?: IntNullableWithAggregatesFilter<"RoleAssignment"> | number | null
     modifiedAt?: DateTimeNullableWithAggregatesFilter<"RoleAssignment"> | Date | string | null
-    subjectType?: IntWithAggregatesFilter<"RoleAssignment"> | number
   }
 
   export type ClientCreateInput = {
@@ -4363,7 +4394,6 @@ export namespace Prisma {
     createdAt?: Date | string | null
     modifiedBy?: number | null
     modifiedAt?: Date | string | null
-    subjectType?: number
   }
 
   export type RoleAssignmentUncheckedCreateInput = {
@@ -4374,7 +4404,6 @@ export namespace Prisma {
     createdAt?: Date | string | null
     modifiedBy?: number | null
     modifiedAt?: Date | string | null
-    subjectType?: number
   }
 
   export type RoleAssignmentUpdateInput = {
@@ -4384,7 +4413,6 @@ export namespace Prisma {
     createdAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     modifiedBy?: NullableIntFieldUpdateOperationsInput | number | null
     modifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    subjectType?: IntFieldUpdateOperationsInput | number
   }
 
   export type RoleAssignmentUncheckedUpdateInput = {
@@ -4395,7 +4423,6 @@ export namespace Prisma {
     createdAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     modifiedBy?: NullableIntFieldUpdateOperationsInput | number | null
     modifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    subjectType?: IntFieldUpdateOperationsInput | number
   }
 
   export type RoleAssignmentCreateManyInput = {
@@ -4406,7 +4433,6 @@ export namespace Prisma {
     createdAt?: Date | string | null
     modifiedBy?: number | null
     modifiedAt?: Date | string | null
-    subjectType?: number
   }
 
   export type RoleAssignmentUpdateManyMutationInput = {
@@ -4416,7 +4442,6 @@ export namespace Prisma {
     createdAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     modifiedBy?: NullableIntFieldUpdateOperationsInput | number | null
     modifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    subjectType?: IntFieldUpdateOperationsInput | number
   }
 
   export type RoleAssignmentUncheckedUpdateManyInput = {
@@ -4427,7 +4452,6 @@ export namespace Prisma {
     createdAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     modifiedBy?: NullableIntFieldUpdateOperationsInput | number | null
     modifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    subjectType?: IntFieldUpdateOperationsInput | number
   }
 
   export type IntFilter<$PrismaModel = never> = {
@@ -4679,12 +4703,6 @@ export namespace Prisma {
     modifiedBy?: SortOrder
   }
 
-  export type RoleAssignmentRoleIdSubjectIdSubjectTypeCompoundUniqueInput = {
-    roleId: number
-    subjectId: number
-    subjectType: number
-  }
-
   export type RoleAssignmentCountOrderByAggregateInput = {
     id?: SortOrder
     roleId?: SortOrder
@@ -4693,7 +4711,6 @@ export namespace Prisma {
     createdAt?: SortOrder
     modifiedBy?: SortOrder
     modifiedAt?: SortOrder
-    subjectType?: SortOrder
   }
 
   export type RoleAssignmentAvgOrderByAggregateInput = {
@@ -4702,7 +4719,6 @@ export namespace Prisma {
     subjectId?: SortOrder
     createdBy?: SortOrder
     modifiedBy?: SortOrder
-    subjectType?: SortOrder
   }
 
   export type RoleAssignmentMaxOrderByAggregateInput = {
@@ -4713,7 +4729,6 @@ export namespace Prisma {
     createdAt?: SortOrder
     modifiedBy?: SortOrder
     modifiedAt?: SortOrder
-    subjectType?: SortOrder
   }
 
   export type RoleAssignmentMinOrderByAggregateInput = {
@@ -4724,7 +4739,6 @@ export namespace Prisma {
     createdAt?: SortOrder
     modifiedBy?: SortOrder
     modifiedAt?: SortOrder
-    subjectType?: SortOrder
   }
 
   export type RoleAssignmentSumOrderByAggregateInput = {
@@ -4733,7 +4747,6 @@ export namespace Prisma {
     subjectId?: SortOrder
     createdBy?: SortOrder
     modifiedBy?: SortOrder
-    subjectType?: SortOrder
   }
 
   export type StringFieldUpdateOperationsInput = {

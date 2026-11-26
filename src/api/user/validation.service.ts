@@ -15,7 +15,7 @@ import {
   ProviderId,
 } from '../../core/constant/provider-type.enum';
 import { Constants } from '../../core/constant/constants';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import { CommonUtils } from '../../shared/util/common.utils';
 
 // Basic email regex, can be refined

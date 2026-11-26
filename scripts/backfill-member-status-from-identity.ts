@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../src/prisma-adapter';
 /* eslint-disable no-console */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -128,8 +129,8 @@ function mapIdentityToMemberStatus(
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const identityPrisma = new PrismaClient();
-  const memberPrisma = new MemberPrismaClient();
+  const identityPrisma = new PrismaClient({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
+  const memberPrisma = new MemberPrismaClient({ adapter: createPostgresAdapter(process.env.MEMBER_DB_URL) });
 
   let scanned = 0;
   let candidates = 0;

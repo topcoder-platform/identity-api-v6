@@ -17,7 +17,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { UserProfileDto } from '../../dto/user/user.dto';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 
 // Null logger
 const nullLogger = {

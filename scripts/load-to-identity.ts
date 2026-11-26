@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../src/prisma-adapter';
 import { PrismaClient as IdentityClient } from '@prisma/client';
 
 export interface UserTestData {
@@ -160,11 +161,7 @@ export const ROLES: Record<string, RoleData> = {
 
 // Database clients
 const identityDb = new IdentityClient({
-  datasources: {
-    db: {
-      url: 'postgresql://postgres:identitypassword@localhost:5432/identity',
-    },
-  },
+  adapter: createPostgresAdapter('postgresql://postgres:identitypassword@localhost:5432/identity'),
 });
 
 async function loadData() {

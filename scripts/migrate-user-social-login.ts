@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../src/prisma-adapter';
 import { PrismaClient as TargetIdentityClient } from '@prisma/client';
 import { PrismaClient as SourceIdentityClient } from '../legacy_migrate/generated/source-identity';
 
@@ -31,15 +32,11 @@ async function migrateUserSocialLogin() {
   const targetDbUrl = requiredEnv('IDENTITY_DB_URL');
 
   const sourceDb = new SourceIdentityClient({
-    datasources: {
-      db: { url: sourceDbUrl },
-    },
+    adapter: createPostgresAdapter(sourceDbUrl),
   });
 
   const targetDb = new TargetIdentityClient({
-    datasources: {
-      db: { url: targetDbUrl },
-    },
+    adapter: createPostgresAdapter(targetDbUrl),
   });
 
   console.log(

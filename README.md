@@ -42,7 +42,7 @@ The production Docker image uses pnpm only in its build stage. At startup, the
 container runs Prisma migrations with the bundled Prisma CLI and then directly
 executes the compiled Node.js application, so npm and pnpm are not required in
 the runtime image. The final Alpine 3.24 image installs the distribution's
-dynamically linked Node.js 26.5.1 package and runs as the unprivileged `app`
+dynamically linked Node.js 26.13.1 package and runs as the unprivileged `app`
 user.
 
 **Deploying Locally**

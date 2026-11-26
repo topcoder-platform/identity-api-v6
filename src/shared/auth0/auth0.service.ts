@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
-import { Auth0Credential } from 'src/dto/authorization/authorization.dto';
+import { Auth0Credential } from '../../dto/authorization/authorization.dto';
 import { CommonUtils } from '../util/common.utils';
 import { ConfigurationService } from '../../config/configuration.service';
 

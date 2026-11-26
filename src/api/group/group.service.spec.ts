@@ -17,12 +17,12 @@ import {
   GroupResponseDto,
   GroupDto,
   SecurityGroups,
-} from 'src/dto/group/group.dto';
+} from '../../dto/group/group.dto';
 import {
   GroupMemberDto,
   GroupMembershipResponseDto,
-} from 'src/dto/group/group-membership.dto';
-import { AuthenticatedUser } from 'src/core/auth/jwt.strategy';
+} from '../../dto/group/group-membership.dto';
+import { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { MembershipType, MembershipTypeHelper } from './membership-type.enum';
 import { Constants } from '../../core/constant/constants';
 

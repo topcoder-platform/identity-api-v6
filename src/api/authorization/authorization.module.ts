@@ -10,12 +10,12 @@ import { AuthorizationController } from './authorization.controller';
 import { AuthorizationService } from './authorization.service';
 import { PRISMA_CLIENT } from '../../shared/prisma/prisma.module';
 import { PrismaClient } from '@prisma/client';
-import { Auth0Module } from 'src/shared/auth0/auth0.module';
+import { Auth0Module } from '../../shared/auth0/auth0.module';
 import { UserModule } from '../user/user.module';
 import { AuthDataStore } from './auth-data-store.service';
 import { ZendeskAuthPlugin } from './zendesk.service';
 import { UserProfileHelper } from './user-profile.helper';
-import { ConfigurationModule } from 'src/config/configuration.module';
+import { ConfigurationModule } from '../../config/configuration.module';
 import { AuthRequiredGuard } from '../../auth/guards/auth-required.guard';
 
 @Module({

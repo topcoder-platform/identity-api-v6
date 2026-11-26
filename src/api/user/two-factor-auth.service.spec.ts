@@ -29,7 +29,7 @@ import {
 import * as DTOs from '../../dto/user/user.dto'; // Using your DTO import
 import { RoleResponseDto } from '../../dto/role/role.dto';
 import { AuthenticatedUser, JwtPayload } from '../../core/auth/jwt.strategy';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import * as jwt from 'jsonwebtoken';
 // import { format } from 'date-fns'; // Not directly used in this spec, but service uses it
 

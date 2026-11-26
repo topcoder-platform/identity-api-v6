@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '../../../src/prisma-adapter';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
@@ -10,7 +11,7 @@ import { ACTIVATION_LIFETIME_MS } from '../../../src/api/user/activation-code';
 // Run on a freshly migrated identity_test2 database. Authentication proofs and
 // Identity writes are real. Member, role and mail-bus calls are test doubles.
 describe('Activation recovery', () => {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
   const config = new ConfigService({
     JWT_SECRET: randomUUID(),
     LEGACY_BLOWFISH_KEY: 'fixture',

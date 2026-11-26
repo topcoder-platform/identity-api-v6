@@ -4,15 +4,14 @@ generator client {
 }
 
 generator externalClient {
-  provider      = "prisma-client-js"
-  output        = "../packages/identity-prisma-client"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider = "prisma-client-js"
+  output   = "../packages/identity-prisma-client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("IDENTITY_DB_URL")
-  schemas  = ["identity"]
+
+  schemas = ["identity"]
 }
 
 // IDENTITY SCHEMA MODELS
