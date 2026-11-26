@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import 'dotenv/config';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { createAuthSource, isAuthTable, type AuthTable } from './source-auth';
 const { createPostgresAdapter } = require('./postgres-adapter');
 
 const fs = require('fs');
@@ -9,7 +9,6 @@ const { URL } = require('url');
 
 // === CommonJS-friendly requires for generated Prisma clients
 const { PrismaClient: TargetPrisma } = require('../generated/target');
-const { PrismaClient: SourceAuthPrisma } = require('../generated/source-auth');
 const { PrismaClient: SourceIdentityPrisma } = require('../generated/source-identity');
 
 // ---- Helpers to keep TS happy (avoid TS7022)
@@ -20,7 +19,7 @@ type Row<T extends (...args: any) => any> = Rows<T>[number];
 const target = new TargetPrisma({ adapter: createPostgresAdapter(process.env.IDENTITY_DB_URL) });
 const authUrl = process.env.SOURCE_AUTH_MYSQL_URL;
 if (!authUrl) throw new Error('SOURCE_AUTH_MYSQL_URL is required');
-const sourceAuth = new SourceAuthPrisma({ adapter: new PrismaMariaDb(authUrl) });
+const sourceAuth = createAuthSource(authUrl);
 const sourceIdentity = new SourceIdentityPrisma({ adapter: createPostgresAdapter(process.env.SOURCE_IDENTITY_PG_URL) });
 
 // ---- Tunables
@@ -81,17 +80,20 @@ if (cliOptions.mode === 'delta') {
 const PARALLEL_LIMIT = resolveParallelLimit();
 console.log(`[config] Parallel worker limit: ${PARALLEL_LIMIT}`);
 
-function applyChangeWindow<T extends Record<string, any>>(
-  args: T,
-  fields: string[],
-  label: string
-): T {
+function registerDeltaFields(label: string, fields: string[]) {
   if (!deltaTableStats.has(label)) {
     deltaTableStats.set(label, { fields, fetches: 0, matched: 0 });
   } else if (fields.length && deltaTableStats.get(label)!.fields.length === 0) {
     deltaTableStats.get(label)!.fields = fields;
   }
+}
 
+function applyChangeWindow<T extends Record<string, any>>(
+  args: T,
+  fields: string[],
+  label: string
+): T {
+  registerDeltaFields(label, fields);
   if (!CHANGE_WINDOW_START) {
     return args;
   }
@@ -143,7 +145,7 @@ function resolvePrismaDelegate(label: string) {
   }
   const [clientKey, ...modelParts] = label.split('.');
   const modelName = modelParts.join('.');
-  const client = clientKey === 'target' ? target : clientKey === 'sourceAuth' ? sourceAuth : clientKey === 'sourceIdentity' ? sourceIdentity : null;
+  const client = clientKey === 'target' ? target : clientKey === 'sourceIdentity' ? sourceIdentity : null;
   if (!client || !modelName) {
     return null;
   }
@@ -323,19 +325,19 @@ async function runParallel(
 
 // ===== AUTH (MySQL) → TARGET =====
 
+async function readAuthBatch<T extends AuthTable>(table: T, offset: number) {
+  const label = `sourceAuth.${table}`;
+  registerDeltaFields(label, ['createdAt', 'modifiedAt']);
+  const rows = await sourceAuth.read(table, CHANGE_WINDOW_START, offset, BATCH_SIZE);
+  recordDeltaFetch(label, rows.length);
+  return rows;
+}
+
 async function migrateRoles() {
   console.log('→ MySQL roles → target.role');
   let skip = 0, total = 0;
   while (true) {
-    const batch: Rows<typeof sourceAuth.role.findMany> =
-      await sourceAuth.role.findMany(
-        applyChangeWindow(
-          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
-          ['createdAt', 'modifiedAt'],
-          'sourceAuth.role'
-        )
-      );
-    recordDeltaFetch('sourceAuth.role', batch.length);
+    const batch = await readAuthBatch('role', skip);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -369,15 +371,7 @@ async function migrateClients() {
   console.log('→ MySQL clients → target.client');
   let skip = 0, total = 0;
   while (true) {
-    const batch: Rows<typeof sourceAuth.client.findMany> =
-      await sourceAuth.client.findMany(
-        applyChangeWindow(
-          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
-          ['createdAt', 'modifiedAt'],
-          'sourceAuth.client'
-        )
-      );
-    recordDeltaFetch('sourceAuth.client', batch.length);
+    const batch = await readAuthBatch('client', skip);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -416,15 +410,7 @@ async function migrateRoleAssignments() {
   console.log('→ MySQL role_assignment → target.roleAssignment');
   let skip = 0, total = 0;
   while (true) {
-    const batch: Rows<typeof sourceAuth.roleAssignment.findMany> =
-      await sourceAuth.roleAssignment.findMany(
-        applyChangeWindow(
-          { skip, take: BATCH_SIZE, orderBy: { id: 'asc' } },
-          ['createdAt', 'modifiedAt'],
-          'sourceAuth.roleAssignment'
-        )
-      );
-    recordDeltaFetch('sourceAuth.roleAssignment', batch.length);
+    const batch = await readAuthBatch('roleAssignment', skip);
     if (batch.length === 0) break;
 
     await target.$transaction(
@@ -1563,14 +1549,14 @@ async function validateDeltaMigration() {
   }
 
   const connectionChecks = [
-    { label: 'target', client: target },
-    { label: 'sourceAuth', client: sourceAuth },
-    { label: 'sourceIdentity', client: sourceIdentity }
+    { label: 'target', ping: () => target.$queryRawUnsafe('SELECT 1') },
+    { label: 'sourceAuth', ping: sourceAuth.ping },
+    { label: 'sourceIdentity', ping: () => sourceIdentity.$queryRawUnsafe('SELECT 1') }
   ];
 
-  for (const { label, client } of connectionChecks) {
+  for (const { label, ping } of connectionChecks) {
     try {
-      await client.$queryRawUnsafe('SELECT 1');
+      await ping();
       console.log(`[delta] Connectivity check OK: ${label}`);
     } catch (err: any) {
       throw new Error(`[delta] Connectivity check failed for ${label}: ${err.message}`);
@@ -1631,25 +1617,27 @@ async function verifyDeltaMigration() {
       continue;
     }
 
+    const [source, model] = label.split('.');
+    const whereClause = buildDeltaWhereClause(stats.fields);
     const sourceDelegate = resolvePrismaDelegate(label);
-    const targetLabel = label.startsWith('sourceAuth.') || label.startsWith('sourceIdentity.')
-      ? `target.${label.split('.').slice(1).join('.')}`
-      : null;
-    if (!sourceDelegate || !targetLabel) {
+    const countSource = source === 'sourceAuth' && isAuthTable(model)
+      ? () => sourceAuth.count(model, CHANGE_WINDOW_START!)
+      : sourceDelegate && (() => sourceDelegate.count({ where: whereClause }));
+    if (!countSource) {
       console.warn(`[delta] ${label}: unable to resolve source delegate; skipping verification.`);
       continue;
     }
 
+    const targetLabel = `target.${model}`;
     const targetDelegate = resolvePrismaDelegate(targetLabel);
     if (!targetDelegate) {
       console.warn(`[delta] ${label}: unable to resolve target delegate (${targetLabel}); skipping.`);
       continue;
     }
 
-    const whereClause = buildDeltaWhereClause(stats.fields);
     try {
       const [sourceCount, targetCount] = await Promise.all([
-        sourceDelegate.count({ where: whereClause }),
+        countSource(),
         targetDelegate.count({ where: whereClause })
       ]);
       if (sourceCount !== targetCount) {
@@ -1723,12 +1711,12 @@ async function main() {
 main()
   .catch((e) => {
     console.error('Migration failed:', e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await Promise.allSettled([
       target.$disconnect(),
-      sourceAuth.$disconnect(),
+      sourceAuth.close(),
       sourceIdentity.$disconnect(),
     ]);
   });

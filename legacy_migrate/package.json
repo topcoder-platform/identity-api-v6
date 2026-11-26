@@ -7,19 +7,15 @@
     "migrate": "node -r ts-node/register src/migrate.ts"
   },
   "dependencies": {
-    "@prisma/adapter-mariadb": "7.10.1",
     "@prisma/adapter-pg": "7.10.1",
-    "@prisma/client": "7.10.1",
+    "@prisma/client-runtime-utils": "7.10.1",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
+    "mysql2": "3.23.1",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@7.0.2",
-    "prisma": "7.10.1",
     "typescript": "npm:@typescript/typescript6@6.0.2"
-  },
-  "overrides": {
-    "effect@^3": "3.22.1"
   }
 }

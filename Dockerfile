@@ -49,4 +49,6 @@ COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/appStartUp.sh ./appStartUp.sh
 RUN chmod +x appStartUp.sh
 USER app
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+    CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/v6/users/validateHandle?handle=Ghostar12345', {redirect:'manual', signal:AbortSignal.timeout(4000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 CMD ["./appStartUp.sh"]
