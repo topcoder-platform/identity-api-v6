@@ -1437,7 +1437,7 @@ export class UserService {
     try {
       // Prisma doesn't have a built-in nextval function, use raw query
       const result: { nextval: bigint }[] = await this.prismaClient
-        .$queryRaw`SELECT nextval('sequence_user_seq'::regclass)`;
+        .$queryRaw`SELECT nextval('identity.sequence_user_seq'::regclass)`;
       if (!result || result.length === 0 || !result[0].nextval) {
         throw new Error('Failed to retrieve next user ID from sequence.');
       }
@@ -1504,7 +1504,7 @@ export class UserService {
       let nextEmailId: number;
       try {
         const result: { nextval: bigint }[] =
-          await prisma.$queryRaw`SELECT nextval('sequence_email_seq'::regclass)`;
+          await prisma.$queryRaw`SELECT nextval('identity.sequence_email_seq'::regclass)`;
         if (!result || result.length === 0 || !result[0].nextval) {
           throw new Error('Failed to retrieve next email ID from sequence.');
         }
